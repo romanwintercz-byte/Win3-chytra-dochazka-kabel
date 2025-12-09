@@ -1,3 +1,4 @@
+
 export enum WorkType {
   REGULAR = 'Běžná práce',
   OVERTIME = 'Přesčas',
@@ -26,6 +27,8 @@ export interface Employee {
   role: 'Manager' | 'Zaměstnanec';
   email: string;
   avatar: string;
+  isActive: boolean;
+  pinCode?: string; // Optional security PIN
 }
 
 export interface Job {
@@ -61,9 +64,20 @@ export interface CalendarEvent {
 }
 
 export interface MonthStatus {
+  employeeId?: string; // Link to owner
   month: string; // YYYY-MM
   status: TimesheetStatus;
   managerComment?: string;
   submittedAt?: string;
   approvedAt?: string;
+}
+
+export interface Notification {
+  id: string;
+  userId: string;
+  senderId?: string; // ID of the sender
+  type: 'info' | 'success' | 'warning' | 'error';
+  message: string;
+  isRead: boolean;
+  createdAt: string;
 }

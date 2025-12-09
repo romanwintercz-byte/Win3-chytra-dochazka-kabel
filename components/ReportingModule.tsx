@@ -1,5 +1,6 @@
+
 import React, { useState, useMemo } from 'react';
-import { TimeEntry, WorkType, Employee } from '../types';
+import { TimeEntry, WorkType, Employee, Job } from '../types';
 import { validateMonth } from '../services/validationService';
 import { jsPDF } from "jspdf";
 import autoTable from "jspdf-autotable";
@@ -7,13 +8,16 @@ import autoTable from "jspdf-autotable";
 interface ReportingModuleProps {
   entries: TimeEntry[];
   employees: Employee[];
+  currentUserRole: string;
+  jobs: Job[];
 }
 
-const ReportingModule: React.FC<ReportingModuleProps> = ({ entries, employees }) => {
+const ReportingModule: React.FC<ReportingModuleProps> = ({ entries, employees, currentUserRole, jobs }) => {
   const [projectFilter, setProjectFilter] = useState<string>('all');
   const [employeeFilter, setEmployeeFilter] = useState<string>('all');
   const [monthFilter, setMonthFilter] = useState<string>('all');
   const [isEmailModalOpen, setIsEmailModalOpen] = useState(false);
+  const [isGeneratingPdf, setIsGeneratingPdf] = useState(false);
 
   // Helper to get employee name
   const getEmployeeName = (id: string) => {
@@ -40,12 +44,15 @@ const ReportingModule: React.FC<ReportingModuleProps> = ({ entries, employees })
   }, [entries]);
 
   const filteredEntries = useMemo(() => {
-    return entries.filter(entry => {
-      const matchesProject = projectFilter === 'all' || entry.project === projectFilter;
-      const matchesEmployee = employeeFilter === 'all' || entry.employeeId === employeeFilter;
-      const matchesMonth = monthFilter === 'all' || entry.date.startsWith(monthFilter);
-      return matchesProject && matchesEmployee && matchesMonth;
-    });
+    return entries
+      .filter(entry => {
+        const matchesProject = projectFilter === 'all' || entry.project === projectFilter;
+        const matchesEmployee = employeeFilter === 'all' || entry.employeeId === employeeFilter;
+        const matchesMonth = monthFilter === 'all' || entry.date.startsWith(monthFilter);
+        return matchesProject && matchesEmployee && matchesMonth;
+      })
+      // STRICT SORT FOR UI: Descending (Newest first)
+      .sort((a, b) => b.date.localeCompare(a.date));
   }, [entries, projectFilter, employeeFilter, monthFilter]);
 
   // Calculate Validation Issues for the current filter (only if a month is selected)
@@ -119,89 +126,236 @@ const ReportingModule: React.FC<ReportingModuleProps> = ({ entries, employees })
   }, [filteredEntries, employees]);
 
   // --- PDF Generation ---
-  const generatePDF = () => {
-    const doc = new jsPDF();
-    const period = monthFilter === 'all' ? 'Celá historie' : monthFilter;
-    const empName = employeeFilter !== 'all' ? getEmployeeName(employeeFilter) : 'Všichni zaměstnanci';
+  const generatePDF = async () => {
+    setIsGeneratingPdf(true);
+    try {
+        const doc = new jsPDF();
 
-    // Title
-    doc.setFontSize(18);
-    doc.text(`Výkaz práce: ${period}`, 14, 20);
-    
-    // Subheader
-    doc.setFontSize(11);
-    doc.setTextColor(100);
-    doc.text(`Zaměstnanec: ${empName}`, 14, 30);
-    doc.text(`Vygenerováno: ${new Date().toLocaleDateString('cs-CZ')}`, 14, 36);
-    doc.setTextColor(0);
+        // 1. Load Font supporting Czech characters (Roboto Regular)
+        const fontUrl = 'https://cdnjs.cloudflare.com/ajax/libs/pdfmake/0.1.66/fonts/Roboto/Roboto-Regular.ttf';
+        const fontBytes = await fetch(fontUrl).then(res => res.arrayBuffer());
+        
+        // Add font to VFS
+        const filename = 'Roboto-Regular.ttf';
+        const base64Font = btoa(
+            new Uint8Array(fontBytes).reduce((data, byte) => data + String.fromCharCode(byte), '')
+        );
+        
+        doc.addFileToVFS(filename, base64Font);
+        doc.addFont(filename, 'Roboto', 'normal');
+        doc.setFont('Roboto'); // Set as default
 
-    // 1. Summary Table
-    doc.setFontSize(14);
-    doc.text("Souhrn", 14, 48);
-    
-    const summaryData = [
-        ['Kategorie', 'Hodiny'],
-        ['Běžná práce (Výkon)', aggregatedData.totalRegularProductive.toFixed(1)],
-        ['Přesčasy', aggregatedData.totalOvertime.toFixed(1)],
-        ['Absence / Svátky', aggregatedData.totalAbsence.toFixed(1)],
-        ['CELKEM', aggregatedData.total.toFixed(1)]
-    ];
+        const period = monthFilter === 'all' ? 'Celá historie' : monthFilter;
+        const empName = employeeFilter !== 'all' ? getEmployeeName(employeeFilter) : 'Všichni zaměstnanci';
 
-    autoTable(doc, {
-        startY: 52,
-        head: [['Kategorie', 'Hodiny']],
-        body: summaryData.slice(1),
-        theme: 'striped',
-        headStyles: { fillColor: [79, 70, 229] } // Indigo-600
-    });
+        // Title
+        doc.setFontSize(14);
+        doc.text(`Výkaz práce: ${period}`, 14, 15);
+        
+        // Subheader
+        doc.setFontSize(9);
+        doc.setTextColor(100);
+        doc.text(`Zaměstnanec: ${empName}`, 14, 20);
+        doc.text(`Vygenerováno: ${new Date().toLocaleDateString('cs-CZ')}`, 14, 24);
+        doc.setTextColor(0);
 
-    // 2. Detailed Table
-    // @ts-ignore
-    const finalY = doc.lastAutoTable.finalY || 60;
-    doc.text("Detailní záznamy", 14, finalY + 15);
+        // ---------------------------------------------------------
+        // 1. Main Summary (Left)
+        // ---------------------------------------------------------
+        const summaryData = [
+            ['Běžná práce', aggregatedData.totalRegularProductive.toFixed(1)],
+            ['Přesčasy', aggregatedData.totalOvertime.toFixed(1)],
+            ['Absence', aggregatedData.totalAbsence.toFixed(1)],
+            ['CELKEM', aggregatedData.total.toFixed(1)]
+        ];
 
-    const tableBody = filteredEntries
-        .sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime())
-        .map(e => [
-            new Date(e.date).toLocaleDateString('cs-CZ'),
-            e.project,
-            e.description,
-            e.type,
-            e.hours.toString()
+        autoTable(doc, {
+            startY: 28,
+            head: [['Souhrn', 'Hod']],
+            body: summaryData,
+            theme: 'plain',
+            headStyles: { fontSize: 8, fontStyle: 'bold' },
+            styles: { font: 'Roboto', fontSize: 8, cellPadding: 1 },
+            columnStyles: { 0: { cellWidth: 30 }, 1: { cellWidth: 20, fontStyle: 'bold', halign: 'right' } },
+            margin: { left: 14 }
+        });
+
+        // ---------------------------------------------------------
+        // 2. Project Breakdown (Left - Below Summary)
+        // ---------------------------------------------------------
+        const projectRows = Object.entries(aggregatedData.byProject).map(([name, s]) => {
+            const stats = s as { regular: number; overtime: number; total: number };
+            const jobCode = jobs.find(j => j.name === name)?.code || '-';
+            return [
+                jobCode,
+                name,
+                stats.regular.toFixed(1),
+                stats.overtime.toFixed(1),
+                stats.total.toFixed(1)
+            ];
+        });
+        
+        // Add totals row for projects
+        projectRows.push([
+            '', // Empty cell for Code column
+            'CELKEM', 
+            aggregatedData.totalRegularProductive.toFixed(1), 
+            aggregatedData.totalOvertime.toFixed(1), 
+            (aggregatedData.totalRegularProductive + aggregatedData.totalOvertime).toFixed(1)
         ]);
 
-    autoTable(doc, {
-        startY: finalY + 20,
-        head: [['Datum', 'Projekt', 'Popis', 'Typ', 'Hodiny']],
-        body: tableBody,
-        theme: 'grid',
-        headStyles: { fillColor: [100, 100, 100] },
-        columnStyles: {
-            2: { cellWidth: 60 } // Description column wider
-        }
-    });
+        // @ts-ignore
+        let currentY = doc.lastAutoTable.finalY + 5;
 
-    // 3. Signature Section
-    // @ts-ignore
-    const signatureY = doc.lastAutoTable.finalY + 40;
-    
-    // Check if page break is needed
-    if (signatureY > 270) {
-        doc.addPage();
-        doc.text("Podpisy", 14, 20);
-        doc.line(14, 50, 80, 50);
-        doc.text("Podpis zaměstnance", 14, 58);
-        doc.line(110, 50, 180, 50);
-        doc.text("Schválil (Nadřízený)", 110, 58);
-    } else {
-        doc.line(14, signatureY, 80, signatureY);
-        doc.text("Podpis zaměstnance", 14, signatureY + 8);
+        doc.setFontSize(9);
+        doc.text("Soupis zakázek", 14, currentY);
+
+        autoTable(doc, {
+            startY: currentY + 2,
+            head: [['Kód', 'Zakázka', 'Běžná', 'Přes.', 'Celk.']],
+            body: projectRows,
+            theme: 'grid',
+            headStyles: { fillColor: [240, 240, 240], textColor: 50, fontSize: 7, fontStyle: 'bold' },
+            styles: { font: 'Roboto', fontSize: 7, cellPadding: 1 },
+            columnStyles: { 
+                0: { cellWidth: 15 }, // Code
+                1: { cellWidth: 35, overflow: 'ellipsize' }, // Name (reduced width)
+                2: { cellWidth: 15, halign: 'right' },
+                3: { cellWidth: 15, halign: 'right' },
+                4: { cellWidth: 15, halign: 'right', fontStyle: 'bold' }
+            },
+            margin: { left: 14 },
+            tableWidth: 95 // Limit width to half page
+        });
+
+        // @ts-ignore
+        const projectsFinalY = doc.lastAutoTable.finalY;
+
+        // ---------------------------------------------------------
+        // 3. Absence Breakdown (Right Side - Top aligned with Projects)
+        // ---------------------------------------------------------
+        const absenceRows = Object.entries(aggregatedData.byType)
+            .filter(([type]) => !isProductiveWork(type as WorkType))
+            .map(([type, hours]) => [type, (hours as number).toFixed(1)]);
+        
+        if (absenceRows.length > 0) {
+            absenceRows.push(['CELKEM', aggregatedData.totalAbsence.toFixed(1)]);
+        }
+
+        doc.text("Soupis absencí", 115, currentY);
+
+        autoTable(doc, {
+            startY: currentY + 2,
+            head: [['Druh absence', 'Hodiny']],
+            body: absenceRows.length > 0 ? absenceRows : [['Žádné absence', '-']],
+            theme: 'grid',
+            headStyles: { fillColor: [240, 240, 240], textColor: 50, fontSize: 7, fontStyle: 'bold' },
+            styles: { font: 'Roboto', fontSize: 7, cellPadding: 1 },
+            columnStyles: { 
+                0: { cellWidth: 50 },
+                1: { cellWidth: 20, halign: 'right', fontStyle: 'bold' }
+            },
+            margin: { left: 115 },
+            tableWidth: 80
+        });
+
+        // @ts-ignore
+        const absencesFinalY = doc.lastAutoTable.finalY;
+        const detailStartY = Math.max(projectsFinalY, absencesFinalY) + 8;
+
+        // ---------------------------------------------------------
+        // 4. Daily Details (Full Width)
+        // ---------------------------------------------------------
+        doc.setFontSize(9);
+        doc.text("Detailní denní záznamy", 14, detailStartY);
+
+        // Grouping Logic
+        const dailyGroups = new Map<string, {
+            date: string;
+            projects: Set<string>;
+            descriptions: Set<string>;
+            types: Set<string>;
+            totalHours: number;
+        }>();
+
+        filteredEntries.forEach(e => {
+            if (!dailyGroups.has(e.date)) {
+                dailyGroups.set(e.date, {
+                    date: e.date,
+                    projects: new Set(),
+                    descriptions: new Set(),
+                    types: new Set(),
+                    totalHours: 0
+                });
+            }
+            const group = dailyGroups.get(e.date)!;
+            if (e.project) group.projects.add(e.project);
+            if (e.description) group.descriptions.add(e.description);
+            group.types.add(e.type);
+            group.totalHours += Number(e.hours);
+        });
+
+        // EXPLICIT SORT: Strict String comparison of ISO dates (YYYY-MM-DD)
+        const sortedGroups = Array.from(dailyGroups.values())
+            .sort((a, b) => a.date.localeCompare(b.date));
+
+        const tableBody = sortedGroups.map(g => [
+            new Date(g.date).toLocaleDateString('cs-CZ'),
+            Array.from(g.projects).join(', ') || '-',
+            Array.from(g.descriptions).join(', '),
+            Array.from(g.types).join(', '),
+            g.totalHours.toFixed(1)
+        ]);
+
+        autoTable(doc, {
+            startY: detailStartY + 2,
+            head: [['Datum', 'Zakázka', 'Popis', 'Typ', 'Hod']],
+            body: tableBody,
+            theme: 'grid',
+            headStyles: { fillColor: [70, 70, 70], fontSize: 7, cellPadding: 1 },
+            styles: { 
+                font: 'Roboto', 
+                fontStyle: 'normal', 
+                fontSize: 7, 
+                cellPadding: 0.8,
+                overflow: 'linebreak'
+            }, 
+            columnStyles: {
+                0: { cellWidth: 18 }, // Date
+                1: { cellWidth: 60, overflow: 'ellipsize' }, // Project
+                2: { cellWidth: 'auto' }, // Description
+                3: { cellWidth: 35 }, // Type
+                4: { cellWidth: 12, halign: 'right', fontStyle: 'bold' }  // Hours
+            }
+        });
+
+        // 5. Signature Section
+        // @ts-ignore
+        let signatureY = doc.lastAutoTable.finalY + 15;
+        
+        // Compact signature check - if it pushes off page, add new page
+        if (signatureY > 270) {
+            doc.addPage();
+            signatureY = 20;
+        }
+
+        doc.setDrawColor(0);
+        doc.setLineWidth(0.5);
+        
+        doc.line(14, signatureY, 70, signatureY);
+        doc.setFontSize(7);
+        doc.text("Podpis zaměstnance", 14, signatureY + 4);
         
         doc.line(110, signatureY, 180, signatureY);
-        doc.text("Schválil (Nadřízený)", 110, signatureY + 8);
-    }
+        doc.text("Schválil (Nadřízený)", 110, signatureY + 4);
 
-    doc.save(`vykaz_prace_${empName}_${period}.pdf`);
+        doc.save(`vykaz_prace_${empName}_${period}.pdf`);
+    } catch (e) {
+        console.error("PDF Generation failed:", e);
+        alert("Chyba při generování PDF. Zkontrolujte připojení k internetu (stahuje se font).");
+    } finally {
+        setIsGeneratingPdf(false);
+    }
   };
 
   // Generate CSV Content
@@ -231,20 +385,6 @@ const ReportingModule: React.FC<ReportingModuleProps> = ({ entries, employees })
     ].join('\n');
     
     return csvContent;
-  };
-
-  // Export raw data (Detail)
-  const handleExportCSV = () => {
-      const headers = ['Datum', 'Zaměstnanec', 'Projekt', 'Popis', 'Typ', 'Hodiny', 'Kategorie'];
-      const csvContent = [
-          headers.join(','),
-          ...filteredEntries.map(e => {
-            const category = isProductiveWork(e.type) ? 'Výkon' : 'Absence/Náhrada';
-            return `${e.date},"${getEmployeeName(e.employeeId)}","${e.project}","${e.description}",${e.type},${e.hours},${category}`;
-          })
-      ].join('\n');
-
-      downloadFile(csvContent, 'vykaz_prace_detail.csv', 'text/csv;charset=utf-8;');
   };
 
   // Export Aggregated Summary (Payroll basis)
@@ -288,9 +428,9 @@ const ReportingModule: React.FC<ReportingModuleProps> = ({ entries, employees })
   };
 
   // Handle Trigger
-  const handlePreSend = () => {
+  const handlePreSend = async () => {
       // 1. Trigger PDF Download (It's more professional for the accountant)
-      generatePDF();
+      await generatePDF();
       // 2. Trigger CSV Download as backup
       const content = generateSummaryCSV();
       downloadFile(content, 'vykaz_prace_data.csv', 'text/csv;charset=utf-8;');
@@ -314,16 +454,18 @@ const ReportingModule: React.FC<ReportingModuleProps> = ({ entries, employees })
         <div className="bg-white p-6 rounded-xl shadow-sm border border-gray-100">
             <div className="flex justify-between items-start mb-4">
                <h3 className="text-lg font-semibold text-gray-800">Filtry Reportu</h3>
-               <button 
-                  onClick={handleBackupData}
-                  className="text-xs bg-gray-800 text-white px-3 py-1 rounded hover:bg-gray-900 flex items-center gap-1 transition-colors"
-                  title="Stáhnout kompletní zálohu všech dat v JSON formátu"
-               >
-                  <svg xmlns="http://www.w3.org/2000/svg" className="h-3 w-3" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
-                  </svg>
-                  Zálohovat všechna data
-               </button>
+               {currentUserRole === 'Manager' && (
+                   <button 
+                      onClick={handleBackupData}
+                      className="text-xs bg-gray-800 text-white px-3 py-1 rounded hover:bg-gray-900 flex items-center gap-1 transition-colors"
+                      title="Stáhnout kompletní zálohu všech dat v JSON formátu"
+                   >
+                      <svg xmlns="http://www.w3.org/2000/svg" className="h-3 w-3" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
+                      </svg>
+                      Zálohovat všechna data
+                   </button>
+               )}
             </div>
             <div className="grid grid-cols-1 md:grid-cols-4 gap-4 items-end">
                 <div>
@@ -404,12 +546,25 @@ const ReportingModule: React.FC<ReportingModuleProps> = ({ entries, employees })
            </div>
            <button 
               onClick={handlePreSend}
-              className="bg-indigo-600 text-white px-6 py-3 rounded-lg shadow-md hover:bg-indigo-700 transition-all font-medium flex items-center gap-2 whitespace-nowrap"
+              disabled={isGeneratingPdf}
+              className={`bg-indigo-600 text-white px-6 py-3 rounded-lg shadow-md hover:bg-indigo-700 transition-all font-medium flex items-center gap-2 whitespace-nowrap ${isGeneratingPdf ? 'opacity-70 cursor-wait' : ''}`}
            >
-              <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" />
-              </svg>
-              Vygenerovat & Odeslat
+              {isGeneratingPdf ? (
+                <>
+                  <svg className="animate-spin h-5 w-5 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                    <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                    <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                  </svg>
+                  Generuji...
+                </>
+              ) : (
+                <>
+                  <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" />
+                  </svg>
+                  Vygenerovat & Odeslat
+                </>
+              )}
            </button>
         </div>
 
@@ -418,11 +573,15 @@ const ReportingModule: React.FC<ReportingModuleProps> = ({ entries, employees })
                 <div className="flex justify-between items-center mb-4 flex-wrap gap-2">
                     <h3 className="text-lg font-semibold text-gray-800">Detailní výkaz ({filteredEntries.length} záznamů)</h3>
                     <div className="flex gap-2">
-                         <button onClick={generatePDF} className="text-sm bg-red-50 text-red-700 border border-red-200 px-3 py-1.5 rounded-md hover:bg-red-100 transition-colors font-medium flex items-center gap-1">
-                            <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 21h10a2 2 0 002-2V9.414a1 1 0 00-.293-.707l-5.414-5.414A1 1 0 0012.586 3H7a2 2 0 00-2 2v14a2 2 0 002 2z" />
-                            </svg>
-                            PDF Výkaz
+                         <button onClick={generatePDF} disabled={isGeneratingPdf} className="text-sm bg-red-50 text-red-700 border border-red-200 px-3 py-1.5 rounded-md hover:bg-red-100 transition-colors font-medium flex items-center gap-1">
+                            {isGeneratingPdf ? '...' : (
+                            <>
+                                <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 21h10a2 2 0 002-2V9.414a1 1 0 00-.293-.707l-5.414-5.414A1 1 0 0012.586 3H7a2 2 0 00-2 2v14a2 2 0 002 2z" />
+                                </svg>
+                                PDF Výkaz
+                            </>
+                            )}
                         </button>
                         <button onClick={handleExportSummaryCSV} className="text-sm bg-green-50 text-green-700 border border-green-200 px-3 py-1.5 rounded-md hover:bg-green-100 transition-colors font-medium flex items-center gap-1">
                             <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -444,9 +603,17 @@ const ReportingModule: React.FC<ReportingModuleProps> = ({ entries, employees })
                             </tr>
                         </thead>
                         <tbody className="divide-y divide-gray-200">
-                            {filteredEntries.map(e => (
+                            {filteredEntries.map(e => {
+                                const date = new Date(e.date);
+                                const dayName = date.toLocaleDateString('cs-CZ', { weekday: 'short' });
+                                const capDayName = dayName.charAt(0).toUpperCase() + dayName.slice(1);
+                                
+                                return (
                                 <tr key={e.id} className={!isProductiveWork(e.type) ? 'bg-orange-50/30' : ''}>
-                                    <td className="px-4 py-2 whitespace-nowrap text-gray-900">{e.date}</td>
+                                    <td className="px-4 py-2 whitespace-nowrap text-gray-900">
+                                        <span className="text-gray-400 font-medium mr-2 inline-block w-6">{capDayName}</span>
+                                        {e.date}
+                                    </td>
                                     <td className="px-4 py-2 font-medium text-gray-800">{e.project}</td>
                                     <td className="px-4 py-2 whitespace-nowrap">
                                         <span className={`px-2 py-0.5 rounded-full text-xs font-medium ${
@@ -463,7 +630,7 @@ const ReportingModule: React.FC<ReportingModuleProps> = ({ entries, employees })
                                         {Number(e.hours).toFixed(1)}
                                     </td>
                                 </tr>
-                            ))}
+                            )})}
                         </tbody>
                     </table>
                 </div>
@@ -557,7 +724,7 @@ const ReportingModule: React.FC<ReportingModuleProps> = ({ entries, employees })
                  <div className="flex items-center gap-3">
                     <div className="bg-blue-100 p-2 rounded-md text-blue-600">
                         <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" />
+                           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 00-2-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" />
                         </svg>
                     </div>
                     <div className="text-left">

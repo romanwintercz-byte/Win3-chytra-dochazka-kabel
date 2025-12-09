@@ -1,211 +1,112 @@
-import React, { useState, useRef } from 'react';
-import { parseNaturalLanguageEntry, transcribeAudio } from '../services/geminiService';
-import { TimeEntry, Job } from '../types';
+import React from 'react';
+import { TimeEntry, Job, WorkType } from '../types';
 import { v4 as uuidv4 } from 'uuid';
 
 interface SmartInputProps {
   onEntriesAdded: (entries: TimeEntry[]) => void;
   currentUserId: string;
-  availableJobs: Job[];
   onManualEntry: () => void;
+  onCopyLastDay: () => void;
+  lastActiveDay?: string; // Date string of last entry
 }
 
-const SmartInput: React.FC<SmartInputProps> = ({ onEntriesAdded, currentUserId, availableJobs, onManualEntry }) => {
-  const [inputText, setInputText] = useState('');
-  const [isProcessing, setIsProcessing] = useState(false);
-  const [isRecording, setIsRecording] = useState(false);
-  const [error, setError] = useState<string | null>(null);
-  
-  const mediaRecorderRef = useRef<MediaRecorder | null>(null);
-  const audioChunksRef = useRef<Blob[]>([]);
+const SmartInput: React.FC<SmartInputProps> = ({ 
+  onEntriesAdded, 
+  currentUserId, 
+  onManualEntry, 
+  onCopyLastDay,
+  lastActiveDay 
+}) => {
 
-  const handleSmartSubmit = async () => {
-    if (!inputText.trim()) return;
-
-    setIsProcessing(true);
-    setError(null);
-
-    try {
-      const today = new Date().toISOString().split('T')[0];
-      const parsedItems = await parseNaturalLanguageEntry(inputText, today, availableJobs);
-
-      const newEntries: TimeEntry[] = parsedItems.map(item => ({
+  const addTemplate = (type: WorkType, hours: number, project: string = '', description: string = '') => {
+    const today = new Date().toISOString().split('T')[0];
+    const entry: TimeEntry = {
         id: uuidv4(),
         employeeId: currentUserId,
-        date: item.date || today,
-        project: item.project || 'General',
-        description: item.description || 'Práce',
-        hours: item.hours || 0,
-        type: item.type || Object.values(item.type || {})[0] // Fallback safety
-      } as TimeEntry));
-
-      onEntriesAdded(newEntries);
-      setInputText('');
-    } catch (err) {
-      setError("Nepodařilo se zpracovat text. Zkuste to prosím znovu nebo zadejte data ručně.");
-    } finally {
-      setIsProcessing(false);
-    }
-  };
-
-  const startRecording = async () => {
-    try {
-      const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
-      const mediaRecorder = new MediaRecorder(stream);
-      mediaRecorderRef.current = mediaRecorder;
-      audioChunksRef.current = [];
-
-      mediaRecorder.ondataavailable = (event) => {
-        if (event.data.size > 0) {
-          audioChunksRef.current.push(event.data);
-        }
-      };
-
-      mediaRecorder.onstop = async () => {
-        const audioBlob = new Blob(audioChunksRef.current, { type: 'audio/webm' });
-        await processAudio(audioBlob);
-        
-        // Stop all tracks
-        stream.getTracks().forEach(track => track.stop());
-      };
-
-      mediaRecorder.start();
-      setIsRecording(true);
-      setError(null);
-    } catch (err) {
-      console.error("Error accessing microphone:", err);
-      setError("Nelze přistupovat k mikrofonu. Zkontrolujte oprávnění.");
-    }
-  };
-
-  const stopRecording = () => {
-    if (mediaRecorderRef.current && isRecording) {
-      mediaRecorderRef.current.stop();
-      setIsRecording(false);
-      setIsProcessing(true); // Show processing while transcribing
-    }
-  };
-
-  const processAudio = async (audioBlob: Blob) => {
-    try {
-      const base64Audio = await new Promise<string>((resolve) => {
-        const reader = new FileReader();
-        reader.onloadend = () => {
-          const result = reader.result as string;
-          // Remove the data URL prefix (e.g., "data:audio/webm;base64,")
-          const base64 = result.split(',')[1];
-          resolve(base64);
-        };
-        reader.readAsDataURL(audioBlob);
-      });
-
-      const transcription = await transcribeAudio(base64Audio, audioBlob.type);
-      if (transcription) {
-        setInputText(prev => (prev ? `${prev} ${transcription}` : transcription));
-      }
-    } catch (err) {
-      setError("Nepodařilo se přepsat audio. Zkuste to prosím znovu.");
-    } finally {
-      setIsProcessing(false);
-    }
+        date: today,
+        project: project,
+        description: description || (type === WorkType.REGULAR ? 'Administrativa / Režie' : type),
+        hours: hours,
+        type: type
+    };
+    onEntriesAdded([entry]);
   };
 
   return (
-    <div className="bg-white p-6 rounded-xl shadow-sm border border-gray-100 mb-6 relative overflow-hidden">
-      <div className="flex justify-between items-center mb-3">
+    <div className="bg-white p-6 rounded-xl shadow-sm border border-gray-100 mb-6">
+      <div className="flex justify-between items-center mb-4">
         <h3 className="text-lg font-semibold text-gray-800 flex items-center gap-2">
           <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5 text-indigo-600" viewBox="0 0 20 20" fill="currentColor">
-            <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM8.707 7.293a1 1 0 00-1.414 1.414L8.586 10l-1.293 1.293a1 1 0 101.414 1.414L10 11.414l1.293 1.293a1 1 0 001.414-1.414L11.414 10l1.293-1.293a1 1 0 00-1.414-1.414L10 8.586 8.707 7.293z" clipRule="evenodd" />
+            <path fillRule="evenodd" d="M11.3 1.046A1 1 0 0112 2v5h4a1 1 0 01.82 1.573l-7 10A1 1 0 018 18v-5H4a1 1 0 01-.82-1.573l7-10a1 1 0 011.12-.38z" clipRule="evenodd" />
           </svg>
-          AI Rychlé zadání
+          Rychlé akce
         </h3>
-        <button 
-          onClick={onManualEntry}
-          className="text-sm text-indigo-600 hover:text-indigo-800 font-medium flex items-center gap-1 px-3 py-1 rounded-md hover:bg-indigo-50 transition-colors"
-        >
-          <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
-          </svg>
-          Zadat ručně
-        </button>
       </div>
       
-      <p className="text-sm text-gray-500 mb-4">
-        Napište nebo nadiktujte, co jste dělali. AI to automaticky roztřídí.
-        <br />
-        <i>Např.: "Včera jsem 4 hodiny programoval API pro Web Redesign."</i>
-      </p>
-      
-      <div className="flex gap-2 flex-col sm:flex-row items-stretch">
-        <div className="relative flex-1">
-          <textarea
-            value={inputText}
-            onChange={(e) => setInputText(e.target.value)}
-            placeholder="Zde popište svou práci nebo použijte mikrofon..."
-            className="w-full h-full p-3 pr-12 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 min-h-[80px] resize-y"
-            onKeyDown={(e) => {
-              if (e.key === 'Enter' && e.ctrlKey) {
-                handleSmartSubmit();
-              }
-            }}
-          />
-          {/* Microphone Button inside the textarea area for easy access */}
-          <button
-            onClick={isRecording ? stopRecording : startRecording}
-            disabled={isProcessing && !isRecording}
-            className={`absolute bottom-3 right-3 p-2 rounded-full transition-all duration-200 ${
-              isRecording 
-                ? 'bg-red-100 text-red-600 animate-pulse ring-2 ring-red-400' 
-                : 'bg-gray-100 text-gray-500 hover:bg-indigo-100 hover:text-indigo-600'
-            }`}
-            title={isRecording ? "Zastavit nahrávání" : "Nahrávat hlasem"}
-          >
-            {isRecording ? (
-               <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6" viewBox="0 0 24 24" fill="currentColor">
-                 <path d="M6 19h4V5H6v14zm8-14v14h4V5h-4z"/>
-               </svg>
-            ) : (
-               <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6" viewBox="0 0 24 24" fill="currentColor">
-                <path d="M12 14c1.66 0 3-1.34 3-3V5c0-1.66-1.34-3-3-3S9 2.34 9 5v6c0 1.66 1.34 3 3 3z"/>
-                <path d="M17 11c0 2.76-2.24 5-5 5s-5-2.24-5-5H5c0 3.53 2.61 6.43 6 6.92V21h2v-3.08c3.39-.49 6-3.39 6-6.92h-2z"/>
-              </svg>
-            )}
-          </button>
-        </div>
-
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+        {/* 1. COPY LAST DAY */}
         <button
-          onClick={handleSmartSubmit}
-          disabled={isProcessing || !inputText.trim()}
-          className={`px-6 py-3 rounded-lg font-medium text-white transition-colors flex items-center justify-center min-w-[120px] ${
-            isProcessing || !inputText.trim()
-              ? 'bg-gray-400 cursor-not-allowed'
-              : 'bg-indigo-600 hover:bg-indigo-700 shadow-md'
+          onClick={onCopyLastDay}
+          disabled={!lastActiveDay}
+          className={`flex flex-col items-center justify-center p-4 rounded-xl border-2 border-dashed transition-all group ${
+            lastActiveDay 
+                ? 'border-indigo-200 bg-indigo-50 hover:bg-indigo-100 hover:border-indigo-300 text-indigo-700' 
+                : 'border-gray-200 bg-gray-50 text-gray-400 cursor-not-allowed'
           }`}
         >
-          {isProcessing ? (
-            <span className="flex items-center gap-2">
-              <svg className="animate-spin h-4 w-4 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
-                <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
-                <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
-              </svg>
-              Zpracování
+            <div className={`p-2 rounded-full mb-2 ${lastActiveDay ? 'bg-white text-indigo-600 shadow-sm' : 'bg-gray-200'}`}>
+                <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 7v8a2 2 0 002 2h6M8 7V5a2 2 0 012-2h4.586a1 1 0 01.707.293l4.414 4.414a1 1 0 01.293.707V15a2 2 0 01-2 2h-2M8 7H6a2 2 0 00-2 2v10a2 2 0 002 2h8a2 2 0 002-2v-2" />
+                </svg>
+            </div>
+            <span className="font-bold text-sm">Zkopírovat minulý den</span>
+            <span className="text-xs mt-1 opacity-70">
+                {lastActiveDay ? new Date(lastActiveDay).toLocaleDateString('cs-CZ') : 'Žádná historie'}
             </span>
-          ) : (
-            'Přidat'
-          )}
+        </button>
+
+        {/* 2. MANUAL ENTRY */}
+        <button
+          onClick={onManualEntry}
+          className="flex flex-col items-center justify-center p-4 rounded-xl border border-gray-200 bg-white hover:border-indigo-300 hover:shadow-md transition-all text-gray-700 hover:text-indigo-600 group"
+        >
+            <div className="p-2 rounded-full bg-gray-100 text-gray-600 mb-2 group-hover:bg-indigo-50 group-hover:text-indigo-600 transition-colors">
+                <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
+                </svg>
+            </div>
+            <span className="font-bold text-sm">Otevřít Editor</span>
+            <span className="text-xs mt-1 text-gray-400">Ruční zadání dne</span>
+        </button>
+
+        {/* 3. TEMPLATES - VACATION */}
+        <button
+          onClick={() => addTemplate(WorkType.VACATION, 8)}
+          className="flex flex-col items-center justify-center p-4 rounded-xl border border-green-200 bg-green-50 hover:bg-green-100 hover:border-green-300 transition-all text-green-700"
+        >
+             <div className="p-2 rounded-full bg-white text-green-600 shadow-sm mb-2">
+                <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 19l9 2-9-18-9 18 9-2zm0 0v-8" />
+                </svg>
+            </div>
+            <span className="font-bold text-sm">Dovolená (8h)</span>
+            <span className="text-xs mt-1 opacity-70">Jeden klik</span>
+        </button>
+
+        {/* 4. TEMPLATES - SICK */}
+        <button
+          onClick={() => addTemplate(WorkType.SICK_DAY, 8)}
+          className="flex flex-col items-center justify-center p-4 rounded-xl border border-red-200 bg-red-50 hover:bg-red-100 hover:border-red-300 transition-all text-red-700"
+        >
+             <div className="p-2 rounded-full bg-white text-red-600 shadow-sm mb-2">
+                <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4.318 6.318a4.5 4.5 0 000 6.364L12 20.364l7.682-7.682a4.5 4.5 0 00-6.364-6.364L12 7.636l-1.318-1.318a4.5 4.5 0 00-6.364 0z" />
+                </svg>
+            </div>
+            <span className="font-bold text-sm">Nemoc (8h)</span>
+            <span className="text-xs mt-1 opacity-70">Jeden klik</span>
         </button>
       </div>
-      {error && (
-        <div className="mt-3 text-red-600 text-sm bg-red-50 p-2 rounded border border-red-100">
-          {error}
-        </div>
-      )}
-      {isRecording && (
-        <div className="mt-2 flex items-center gap-2 text-red-600 text-sm font-medium animate-pulse">
-           <div className="w-2 h-2 bg-red-600 rounded-full"></div>
-           Nahrávání probíhá... (Klikněte na mikrofon pro ukončení)
-        </div>
-      )}
     </div>
   );
 };

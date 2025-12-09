@@ -7,10 +7,11 @@ interface TimesheetTableProps {
   entries: TimeEntry[];
   onDelete: (id: string) => void;
   onEdit: (date: string) => void;
-  isLocked?: boolean;
+  isLocked?: boolean; // Visual state (is status Submitted/Approved?)
+  canEdit?: boolean;  // Functional state (does user have permission?)
 }
 
-const TimesheetTable: React.FC<TimesheetTableProps> = ({ entries, onDelete, onEdit, isLocked = false }) => {
+const TimesheetTable: React.FC<TimesheetTableProps> = ({ entries, onDelete, onEdit, isLocked = false, canEdit = true }) => {
   // 1. Group entries by Date
   const groupedEntries = entries.reduce((acc, entry) => {
     if (!acc[entry.date]) {
@@ -55,7 +56,7 @@ const TimesheetTable: React.FC<TimesheetTableProps> = ({ entries, onDelete, onEd
     <div className="space-y-4">
       {sortedDates.length === 0 ? (
         <div className="text-center py-12 bg-white rounded-xl border border-dashed border-gray-300">
-           <p className="text-gray-500">Zatím žádné záznamy. {isLocked ? 'V uzamčeném měsíci nelze přidávat data.' : 'Použijte AI formulář nebo přidejte den ručně.'}</p>
+           <p className="text-gray-500">Zatím žádné záznamy. {(!canEdit && isLocked) ? 'V uzamčeném měsíci nelze přidávat data.' : 'Použijte formulář nebo přidejte den ručně.'}</p>
         </div>
       ) : (
         sortedDates.map((date) => {
@@ -117,14 +118,16 @@ const TimesheetTable: React.FC<TimesheetTableProps> = ({ entries, onDelete, onEd
                     
                     <button
                         onClick={() => onEdit(date)}
-                        disabled={isLocked}
+                        disabled={!canEdit}
                         className={`flex items-center gap-2 px-4 py-2 rounded-lg font-bold text-sm transition-colors shadow-sm ${
-                            isLocked 
+                            !canEdit
                              ? 'bg-gray-100 text-gray-400 border border-gray-200 cursor-not-allowed' 
-                             : 'bg-white border border-gray-300 text-gray-700 hover:bg-indigo-50 hover:text-indigo-700 hover:border-indigo-200'
+                             : (isLocked 
+                                ? 'bg-purple-50 border border-purple-200 text-purple-700 hover:bg-purple-100' // Manager override style
+                                : 'bg-white border border-gray-300 text-gray-700 hover:bg-indigo-50 hover:text-indigo-700 hover:border-indigo-200')
                         }`}
                     >
-                        {isLocked ? (
+                        {!canEdit ? (
                             <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z" />
                             </svg>
@@ -133,7 +136,9 @@ const TimesheetTable: React.FC<TimesheetTableProps> = ({ entries, onDelete, onEd
                                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
                             </svg>
                         )}
-                        <span>{isLocked ? 'Zamčeno' : 'Upravit'}</span>
+                        <span>
+                            {!canEdit ? 'Zamčeno' : (isLocked ? 'Upravit (Manažer)' : 'Upravit')}
+                        </span>
                     </button>
                  </div>
               </div>

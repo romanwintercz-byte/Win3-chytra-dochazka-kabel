@@ -1,4 +1,5 @@
-const CACHE_NAME = 'smartwork-v1';
+
+const CACHE_NAME = 'smartwork-v9';
 const ASSETS_TO_CACHE = [
   './',
   './index.html',
@@ -7,16 +8,25 @@ const ASSETS_TO_CACHE = [
   'https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap'
 ];
 
-// Install event: Cache core assets
 self.addEventListener('install', (event) => {
   event.waitUntil(
     caches.open(CACHE_NAME).then((cache) => {
-      return cache.addAll(ASSETS_TO_CACHE);
+      return Promise.all(
+        ASSETS_TO_CACHE.map(url => {
+            return cache.add(url).catch(err => console.error('Failed to cache:', url, err));
+        })
+      );
     })
   );
+  // REMOVED self.skipWaiting() to allow "Update available" prompt
 });
 
-// Activate event: Clean up old caches
+self.addEventListener('message', (event) => {
+  if (event.data && event.data.type === 'SKIP_WAITING') {
+    self.skipWaiting();
+  }
+});
+
 self.addEventListener('activate', (event) => {
   event.waitUntil(
     caches.keys().then((cacheNames) => {
@@ -29,38 +39,35 @@ self.addEventListener('activate', (event) => {
       );
     })
   );
+  self.clients.claim();
 });
 
-// Fetch event: Network first, fall back to cache
 self.addEventListener('fetch', (event) => {
-  // Skip cross-origin requests for simplicity in this demo environment, 
-  // except for specific CDNs we know we want.
-  if (!event.request.url.startsWith(self.location.origin) && 
-      !event.request.url.includes('cdn.tailwindcss') &&
-      !event.request.url.includes('fonts.googleapis')) {
+  // Navigation: Network First, then Cache (index.html)
+  if (event.request.mode === 'navigate') {
+    event.respondWith(
+      fetch(event.request)
+        .catch(() => {
+          return caches.match('./index.html');
+        })
+    );
     return;
   }
 
+  // Assets: Stale-While-Revalidate or Network First
   event.respondWith(
-    fetch(event.request)
-      .then((response) => {
-        // Check if we received a valid response
-        if (!response || response.status !== 200 || response.type !== 'basic' && response.type !== 'cors') {
-          return response;
+    caches.match(event.request).then((cachedResponse) => {
+      const fetchPromise = fetch(event.request).then((networkResponse) => {
+        // Cache valid responses
+        if (networkResponse && networkResponse.status === 200 && networkResponse.type === 'basic') {
+          const responseToCache = networkResponse.clone();
+          caches.open(CACHE_NAME).then((cache) => {
+            cache.put(event.request, responseToCache);
+          });
         }
-
-        // Clone the response to put it in the cache
-        const responseToCache = response.clone();
-
-        caches.open(CACHE_NAME).then((cache) => {
-          cache.put(event.request, responseToCache);
-        });
-
-        return response;
-      })
-      .catch(() => {
-        // If network fails, try serving from cache
-        return caches.match(event.request);
-      })
+        return networkResponse;
+      });
+      return cachedResponse || fetchPromise;
+    })
   );
 });

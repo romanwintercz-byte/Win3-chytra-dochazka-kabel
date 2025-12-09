@@ -1,3 +1,4 @@
+
 import React, { useState } from 'react';
 import { ValidationIssue, getIssueColor } from '../services/validationService';
 
@@ -70,7 +71,7 @@ const ValidationStatus: React.FC<ValidationStatusProps> = ({ issues }) => {
             {issues.map((issue, idx) => (
               <li key={idx} className={`flex items-start gap-3 p-2 rounded-lg border text-sm ${getIssueColor(issue.severity)}`}>
                 <span className="font-mono font-bold whitespace-nowrap">
-                   {new Date(issue.date).toLocaleDateString('cs-CZ', { day: '2-digit', month: '2-digit' })}
+                   {new Date(issue.date).toLocaleDateString('cs-CZ', { weekday: 'short', day: '2-digit', month: '2-digit' })}
                 </span>
                 <span>{issue.message}</span>
               </li>

@@ -2,6 +2,7 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import { TimeEntry, Job, WorkType } from '../types';
 import { v4 as uuidv4 } from 'uuid';
+import { isHoliday } from '../services/holidayService';
 
 interface EntryFormModalProps {
   isOpen: boolean;
@@ -11,6 +12,7 @@ interface EntryFormModalProps {
   existingEntries: TimeEntry[];
   currentUserId: string;
   jobs: Job[];
+  allMonthEntries?: TimeEntry[]; // To check for conflicts in bulk mode
 }
 
 // Temporary interface for the form state
@@ -23,7 +25,7 @@ interface RowState {
 }
 
 const EntryFormModal: React.FC<EntryFormModalProps> = ({ 
-  isOpen, onClose, onSubmit, initialDate, existingEntries, currentUserId, jobs
+  isOpen, onClose, onSubmit, initialDate, existingEntries, currentUserId, jobs, allMonthEntries = []
 }) => {
   const [date, setDate] = useState(new Date().toISOString().split('T')[0]);
   const [rows, setRows] = useState<RowState[]>([]);
@@ -32,27 +34,30 @@ const EntryFormModal: React.FC<EntryFormModalProps> = ({
 
   useEffect(() => {
     if (isOpen) {
+      // RESET STATE ON OPEN
+      setIsRangeMode(false);
+      setDateTo('');
+
       const targetDate = initialDate || new Date().toISOString().split('T')[0];
       setDate(targetDate);
       
-      if (!isRangeMode) {
-          if (existingEntries && existingEntries.length > 0) {
-            setRows(existingEntries.map(e => ({
-                id: e.id,
-                project: e.project,
-                description: e.description,
-                hours: e.hours.toString(),
-                type: e.type
-            })));
-          } else {
-            setRows([{
-                id: uuidv4(),
-                project: jobs.length > 0 ? jobs[0].name : '',
-                description: '',
-                hours: '8',
-                type: WorkType.REGULAR
-            }]);
-          }
+      // Always load existing entries or default row when opening (ignoring previous range mode state)
+      if (existingEntries && existingEntries.length > 0) {
+        setRows(existingEntries.map(e => ({
+            id: e.id,
+            project: e.project || '',
+            description: e.description,
+            hours: e.hours.toString(),
+            type: e.type
+        })));
+      } else {
+        setRows([{
+            id: uuidv4(),
+            project: jobs.length > 0 ? jobs[0].name : '',
+            description: '',
+            hours: '8', // Default to 8h for easier entry
+            type: WorkType.REGULAR
+        }]);
       }
     }
   }, [isOpen, initialDate, existingEntries, jobs]);
@@ -60,6 +65,10 @@ const EntryFormModal: React.FC<EntryFormModalProps> = ({
   const totalHours = useMemo(() => {
     return rows.reduce((acc, row) => acc + (parseFloat(row.hours) || 0), 0);
   }, [rows]);
+
+  const isProjectRequired = (type: WorkType) => {
+    return type === WorkType.REGULAR || type === WorkType.OVERTIME;
+  };
 
   const addRow = () => {
     setRows(prev => [...prev, {
@@ -78,7 +87,17 @@ const EntryFormModal: React.FC<EntryFormModalProps> = ({
   const updateRow = (id: string, field: keyof RowState, value: string) => {
     setRows(prev => prev.map(r => {
         if (r.id === id) {
-            return { ...r, [field]: value };
+            const updatedRow = { ...r, [field]: value };
+            
+            // Logic: If type changes to something that doesn't need a project, clear project
+            if (field === 'type') {
+                if (!isProjectRequired(value as WorkType)) {
+                    updatedRow.project = ''; // Clear project
+                } else if (updatedRow.project === '' && jobs.length > 0) {
+                    updatedRow.project = jobs[0].name; // Restore default if switching back to work
+                }
+            }
+            return updatedRow;
         }
         return r;
     }));
@@ -102,7 +121,7 @@ const EntryFormModal: React.FC<EntryFormModalProps> = ({
                             id: uuidv4(),
                             employeeId: currentUserId,
                             date: isoDate,
-                            project: row.project,
+                            project: isProjectRequired(row.type) ? row.project : '', // Ensure project is empty for non-work
                             description: row.description,
                             hours: parseFloat(row.hours),
                             type: row.type
@@ -118,7 +137,7 @@ const EntryFormModal: React.FC<EntryFormModalProps> = ({
             id: uuidv4(),
             employeeId: currentUserId,
             date: date,
-            project: r.project,
+            project: isProjectRequired(r.type) ? r.project : '', // Ensure project is empty for non-work
             description: r.description,
             hours: parseFloat(r.hours) || 0,
             type: r.type
@@ -127,6 +146,51 @@ const EntryFormModal: React.FC<EntryFormModalProps> = ({
         onSubmit(date, finalEntries);
     }
     onClose();
+  };
+  
+  // Feature: Fill Remainder of Month
+  const handleFillRemainder = () => {
+      const startDate = new Date(date);
+      const year = startDate.getFullYear();
+      const month = startDate.getMonth();
+      const lastDay = new Date(year, month + 1, 0);
+      
+      const generatedEntries: TimeEntry[] = [];
+      const datesToSkip = new Set(allMonthEntries.map(e => e.date));
+
+      // Loop from Start Date to End of Month
+      for (let d = new Date(startDate); d <= lastDay; d.setDate(d.getDate() + 1)) {
+          const isoDate = d.toISOString().split('T')[0];
+          const dayOfWeek = d.getDay();
+          const isWeekend = dayOfWeek === 0 || dayOfWeek === 6;
+          
+          // Skip conditions: Weekend, Already has Entry, Is Holiday
+          if (!isWeekend && !datesToSkip.has(isoDate) && !isHoliday(isoDate)) {
+               rows.forEach(row => {
+                   if (parseFloat(row.hours) > 0) {
+                       generatedEntries.push({
+                           id: uuidv4(),
+                           employeeId: currentUserId,
+                           date: isoDate,
+                           project: isProjectRequired(row.type) ? row.project : '',
+                           description: row.description,
+                           hours: parseFloat(row.hours),
+                           type: row.type
+                       });
+                   }
+               });
+          }
+      }
+      
+      if (generatedEntries.length === 0) {
+          alert('Žádné volné pracovní dny k vyplnění.');
+          return;
+      }
+
+      if (window.confirm(`Chystám se vygenerovat ${generatedEntries.length} záznamů do konce měsíce. Přeskočím víkendy, svátky a dny, kde už máte práci. Pokračovat?`)) {
+          onSubmit('BULK_RANGE', generatedEntries);
+          onClose();
+      }
   };
 
   if (!isOpen) return null;
@@ -209,21 +273,28 @@ const EntryFormModal: React.FC<EntryFormModalProps> = ({
 
           {/* Rows Area */}
           <div className="flex-1 overflow-y-auto p-5 space-y-4 bg-gray-100">
-             {rows.map((row, index) => (
+             {rows.map((row, index) => {
+                const projectEnabled = isProjectRequired(row.type);
+                return (
                 <div key={row.id} className="bg-white p-4 rounded-xl border border-gray-200 shadow-sm flex flex-col md:flex-row gap-4 items-start md:items-center animate-fade-in hover:shadow-md transition-shadow">
                     <div className="flex-1 w-full md:w-auto">
                         <label className="block md:hidden text-xs font-bold text-gray-700 mb-1">Projekt</label>
                         <select
-                            required
+                            required={projectEnabled}
+                            disabled={!projectEnabled}
                             value={row.project}
                             onChange={(e) => updateRow(row.id, 'project', e.target.value)}
-                            className="w-full p-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 text-sm font-semibold text-gray-900 bg-white"
+                            className={`w-full p-2.5 border rounded-lg focus:ring-2 focus:ring-indigo-500 text-sm font-semibold transition-colors ${
+                                projectEnabled 
+                                ? 'border-gray-300 text-gray-900 bg-white' 
+                                : 'border-gray-200 text-gray-400 bg-gray-50 cursor-not-allowed'
+                            }`}
                         >
-                            <option value="" disabled>Vyberte projekt...</option>
-                            {jobs.map(job => (
+                            <option value="" disabled={projectEnabled}>{projectEnabled ? 'Vyberte projekt...' : '--- Bez zakázky ---'}</option>
+                            {projectEnabled && jobs.map(job => (
                                 <option key={job.id} value={job.name}>{job.name} ({job.code})</option>
                             ))}
-                            <option value="General">Obecné / Režie</option>
+                            {projectEnabled && <option value="General">Obecné / Režie</option>}
                         </select>
                     </div>
 
@@ -276,7 +347,7 @@ const EntryFormModal: React.FC<EntryFormModalProps> = ({
                         </button>
                     </div>
                 </div>
-             ))}
+             )})}
 
              <button 
                 type="button" 
@@ -292,6 +363,20 @@ const EntryFormModal: React.FC<EntryFormModalProps> = ({
 
           {/* Footer */}
           <div className="p-5 border-t border-gray-200 bg-white flex flex-col md:flex-row items-center justify-between gap-4 rounded-b-xl">
+             <div className="flex items-center gap-3">
+                 <button
+                    type="button"
+                    onClick={handleFillRemainder}
+                    className="flex items-center gap-2 px-4 py-2 bg-orange-50 text-orange-700 rounded-lg hover:bg-orange-100 font-medium text-sm transition-colors border border-orange-200"
+                    title="Vyplní zvolenou činností všechny prázdné pracovní dny do konce měsíce"
+                 >
+                     <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 10V3L4 14h7v7l9-11h-7z" />
+                     </svg>
+                     Vyplnit zbytek měsíce
+                 </button>
+             </div>
+             
              <div className="flex items-center gap-3">
                  <span className="text-gray-600 font-medium text-sm uppercase tracking-wide">Celkem:</span>
                  <span className={`text-3xl font-bold font-mono ${

@@ -1,3 +1,4 @@
+
 import React, { useState } from 'react';
 import { MonthStatus, TimesheetStatus } from '../types';
 import { ValidationIssue } from '../services/validationService';
@@ -25,6 +26,17 @@ const ApprovalWorkflow: React.FC<ApprovalWorkflowProps> = ({ status, onUpdateSta
     }
   };
 
+  const getFormattedMonth = () => {
+    try {
+        const [year, month] = status.month.split('-');
+        const date = new Date(parseInt(year), parseInt(month) - 1, 1);
+        const str = date.toLocaleDateString('cs-CZ', { month: 'long', year: 'numeric' });
+        return str.charAt(0).toUpperCase() + str.slice(1);
+    } catch (e) {
+        return status.month;
+    }
+  };
+
   const handleSubmit = () => {
     if (errors.length > 0) {
       const confirmSubmit = window.confirm(`Ve výkazu jsou chyby (${errors.length}x chybějící dny). Opravdu chcete výkaz odeslat neúplný?`);
@@ -43,7 +55,7 @@ const ApprovalWorkflow: React.FC<ApprovalWorkflowProps> = ({ status, onUpdateSta
     <div className="bg-white border-b border-gray-200 p-4 mb-6 sticky top-0 z-20 shadow-sm">
       <div className="max-w-6xl mx-auto flex flex-col sm:flex-row justify-between items-center gap-4">
         <div className="flex items-center gap-4">
-          <div className="text-sm text-gray-500">Stav výkazu (Říjen 2023):</div>
+          <div className="text-sm text-gray-500">Stav výkazu ({getFormattedMonth()}):</div>
           <span className={`px-3 py-1 rounded-full text-xs font-bold border uppercase tracking-wide ${getStatusBadge(status.status)}`}>
             {status.status === TimesheetStatus.DRAFT && 'Rozpracováno'}
             {status.status === TimesheetStatus.SUBMITTED && 'Čeká na schválení'}

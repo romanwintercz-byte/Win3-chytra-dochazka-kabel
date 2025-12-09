@@ -1,48 +1,9 @@
-import React, { useState, useRef, useEffect } from 'react';
-import { getSmartHelpResponse } from '../services/geminiService';
+
+import React, { useState } from 'react';
 
 const HelpSystem: React.FC = () => {
   const [isOpen, setIsOpen] = useState(false);
-  const [activeTab, setActiveTab] = useState<'guide' | 'chat'>('guide');
-  const [chatInput, setChatInput] = useState('');
-  const [messages, setMessages] = useState<{role: 'user' | 'ai', text: string}[]>([
-    { role: 'ai', text: 'Ahoj! Jsem tvůj průvodce aplikací SmartWork. S čím potřebuješ poradit?' }
-  ]);
-  const [isTyping, setIsTyping] = useState(false);
-  const messagesEndRef = useRef<HTMLDivElement>(null);
-
-  const scrollToBottom = () => {
-    messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
-  };
-
-  useEffect(() => {
-    scrollToBottom();
-  }, [messages, activeTab]);
-
-  const handleSendMessage = async () => {
-    if (!chatInput.trim()) return;
-
-    const userMsg = chatInput;
-    setMessages(prev => [...prev, { role: 'user', text: userMsg }]);
-    setChatInput('');
-    setIsTyping(true);
-
-    try {
-      const aiResponse = await getSmartHelpResponse(userMsg);
-      setMessages(prev => [...prev, { role: 'ai', text: aiResponse }]);
-    } catch (error) {
-      setMessages(prev => [...prev, { role: 'ai', text: 'Omlouvám se, došlo k chybě připojení.' }]);
-    } finally {
-      setIsTyping(false);
-    }
-  };
-
-  const quickQuestions = [
-    "Jak zadat více zakázek?",
-    "Jak funguje hlasové zadání?",
-    "Jak exportovat PDF?",
-    "Co když jsem zapomněl heslo?"
-  ];
+  const [activeTab, setActiveTab] = useState<'guide' | 'cheatsheet'>('cheatsheet');
 
   return (
     <>
@@ -65,39 +26,154 @@ const HelpSystem: React.FC = () => {
 
       {/* Main Modal */}
       {isOpen && (
-        <div className="fixed bottom-24 right-6 z-40 w-[90vw] max-w-[380px] bg-white rounded-2xl shadow-2xl border border-gray-200 flex flex-col h-[500px] animate-fade-in overflow-hidden">
+        <div className="fixed bottom-24 right-6 z-40 w-[90vw] max-w-[400px] bg-white rounded-2xl shadow-2xl border border-gray-200 flex flex-col h-[600px] animate-fade-in overflow-hidden">
           
           {/* Header */}
-          <div className="bg-indigo-600 p-4 text-white">
+          <div className="bg-indigo-600 p-4 text-white shrink-0">
             <h3 className="font-bold text-lg flex items-center gap-2">
               <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 10V3L4 14h7v7l9-11h-7z" />
               </svg>
               SmartWork Nápověda
             </h3>
-            <div className="flex mt-3 bg-indigo-800/50 rounded-lg p-1">
-              <button 
-                onClick={() => setActiveTab('guide')}
-                className={`flex-1 py-1.5 text-sm font-medium rounded-md transition-colors ${activeTab === 'guide' ? 'bg-white text-indigo-600 shadow-sm' : 'text-indigo-100 hover:text-white'}`}
-              >
-                Průvodce
-              </button>
-              <button 
-                onClick={() => setActiveTab('chat')}
-                className={`flex-1 py-1.5 text-sm font-medium rounded-md transition-colors ${activeTab === 'chat' ? 'bg-white text-indigo-600 shadow-sm' : 'text-indigo-100 hover:text-white'}`}
-              >
-                AI Asistent
-              </button>
+            <div className="flex mt-4 bg-indigo-800/50 p-1 rounded-lg">
+                <button 
+                    onClick={() => setActiveTab('cheatsheet')}
+                    className={`flex-1 py-1.5 text-xs font-bold rounded-md transition-all ${activeTab === 'cheatsheet' ? 'bg-white text-indigo-700 shadow' : 'text-indigo-200 hover:text-white'}`}
+                >
+                    TAHÁK
+                </button>
+                <button 
+                    onClick={() => setActiveTab('guide')}
+                    className={`flex-1 py-1.5 text-xs font-bold rounded-md transition-all ${activeTab === 'guide' ? 'bg-white text-indigo-700 shadow' : 'text-indigo-200 hover:text-white'}`}
+                >
+                    OTÁZKY & ODPOVĚDI
+                </button>
             </div>
           </div>
 
           {/* Content Area */}
-          <div className="flex-1 overflow-y-auto bg-gray-50">
+          <div className="flex-1 overflow-y-auto bg-gray-50 scrollbar-thin">
             
-            {/* GUIDE TAB */}
+            {activeTab === 'cheatsheet' && (
+                <div className="p-5 space-y-6">
+                    {/* Krok 1 - Instalace */}
+                    <div className="bg-white p-4 rounded-xl border border-gray-200 shadow-sm relative overflow-hidden">
+                        <div className="absolute top-0 right-0 bg-indigo-100 text-indigo-700 text-xs font-bold px-2 py-1 rounded-bl-lg">KROK 1</div>
+                        <h4 className="font-bold text-gray-900 mb-3 flex items-center gap-2">
+                            <span className="w-6 h-6 bg-indigo-600 text-white rounded-full flex items-center justify-center text-xs">1</span>
+                            Instalace na plochu
+                        </h4>
+                        
+                        <div className="space-y-3">
+                            {/* Apple */}
+                            <div className="flex gap-3 items-start bg-gray-50 p-2 rounded-lg border border-gray-100">
+                                <div className="text-xl">🍏</div>
+                                <div>
+                                    <strong className="text-xs font-bold text-gray-800 block">iPhone / iPad (Safari)</strong>
+                                    <p className="text-xs text-gray-600 mt-1">
+                                        1. Klikněte na tlačítko <strong>Sdílet</strong> (čtvereček se šipkou dole).<br/>
+                                        2. Sjeďte dolů a vyberte <strong>"Přidat na plochu"</strong>.
+                                    </p>
+                                </div>
+                            </div>
+
+                            {/* Android */}
+                            <div className="flex gap-3 items-start bg-gray-50 p-2 rounded-lg border border-gray-100">
+                                <div className="text-xl">🤖</div>
+                                <div>
+                                    <strong className="text-xs font-bold text-gray-800 block">Android (Chrome)</strong>
+                                    <p className="text-xs text-gray-600 mt-1">
+                                        1. Klikněte na <strong>Menu</strong> (tři tečky vpravo nahoře).<br/>
+                                        2. Vyberte <strong>"Instalovat aplikaci"</strong> nebo "Přidat na plochu".
+                                    </p>
+                                </div>
+                            </div>
+
+                            {/* PC / Windows */}
+                            <div className="flex gap-3 items-start bg-gray-50 p-2 rounded-lg border border-gray-100">
+                                <div className="text-xl">💻</div>
+                                <div>
+                                    <strong className="text-xs font-bold text-gray-800 block">Počítač (Windows/Mac)</strong>
+                                    <p className="text-xs text-gray-600 mt-1">
+                                        V adresním řádku vpravo nahoře klikněte na ikonu <strong>Instalovat</strong> (monitor se šipkou).
+                                    </p>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    {/* Krok 2 */}
+                    <div className="bg-white p-4 rounded-xl border border-gray-200 shadow-sm relative overflow-hidden">
+                        <div className="absolute top-0 right-0 bg-green-100 text-green-700 text-xs font-bold px-2 py-1 rounded-bl-lg">KROK 2</div>
+                        <h4 className="font-bold text-gray-900 mb-2 flex items-center gap-2">
+                            <span className="w-6 h-6 bg-green-600 text-white rounded-full flex items-center justify-center text-xs">2</span>
+                            Jak zadat práci?
+                        </h4>
+                        
+                        <div className="space-y-3">
+                            <div className="flex gap-3 items-start">
+                                <div className="mt-1 p-1.5 bg-indigo-50 text-indigo-600 rounded-lg">
+                                    <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 7v8a2 2 0 002 2h6M8 7V5a2 2 0 012-2h4.586a1 1 0 01.707.293l4.414 4.414a1 1 0 01.293.707V15a2 2 0 01-2 2h-2M8 7H6a2 2 0 00-2 2v10a2 2 0 002 2h8a2 2 0 002-2v-2" /></svg>
+                                </div>
+                                <div>
+                                    <strong className="text-sm text-gray-800">Děláte to co včera?</strong>
+                                    <p className="text-xs text-gray-500">Klikněte na tlačítko <strong>Zkopírovat minulý den</strong>. Hotovo za 1 vteřinu.</p>
+                                </div>
+                            </div>
+
+                            <div className="flex gap-3 items-start">
+                                <div className="mt-1 p-1.5 bg-orange-50 text-orange-600 rounded-lg">
+                                    <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 10V3L4 14h7v7l9-11h-7z" /></svg>
+                                </div>
+                                <div>
+                                    <strong className="text-sm text-gray-800">Celý měsíc na jedné akci?</strong>
+                                    <p className="text-xs text-gray-500">Otevřete Editor ➝ Vyplňte 1 den ➝ Klikněte na <strong>Vyplnit zbytek měsíce</strong>.</p>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    {/* Krok 3 */}
+                    <div className="bg-white p-4 rounded-xl border border-gray-200 shadow-sm relative overflow-hidden">
+                        <div className="absolute top-0 right-0 bg-red-100 text-red-700 text-xs font-bold px-2 py-1 rounded-bl-lg">KROK 3</div>
+                        <h4 className="font-bold text-gray-900 mb-2 flex items-center gap-2">
+                            <span className="w-6 h-6 bg-red-600 text-white rounded-full flex items-center justify-center text-xs">3</span>
+                            Konec měsíce
+                        </h4>
+                        <ul className="text-sm text-gray-600 space-y-2">
+                            <li className="flex items-center gap-2">
+                                <span className="text-green-500">●</span> 
+                                Zkontrolujte, zda nemáte červené dny (chybějící hodiny).
+                            </li>
+                            <li className="flex items-center gap-2">
+                                <span className="text-indigo-500">●</span> 
+                                Klikněte na <strong>Odeslat ke schválení</strong>.
+                            </li>
+                        </ul>
+                    </div>
+                </div>
+            )}
+
             {activeTab === 'guide' && (
               <div className="p-4 space-y-3">
-                <details open className="group bg-white rounded-lg border border-gray-200 overflow-hidden">
+                <details className="group bg-white rounded-lg border border-gray-200 overflow-hidden">
+                  <summary className="flex justify-between items-center font-medium cursor-pointer list-none p-3 bg-gray-50 group-open:bg-indigo-50 text-gray-800">
+                    <span>⚡ Rychlé akce</span>
+                    <span className="transition group-open:rotate-180">
+                      <svg fill="none" height="24" shapeRendering="geometricPrecision" stroke="currentColor" strokeLinecap="round" strokeLinejoin="round" strokeWidth="1.5" viewBox="0 0 24 24" width="24"><path d="M6 9l6 6 6-6"></path></svg>
+                    </span>
+                  </summary>
+                  <div className="text-gray-600 text-sm p-3 border-t border-gray-100">
+                    <p>Jak si ušetřit práci?</p>
+                    <ul className="list-disc pl-4 mt-2 space-y-1">
+                      <li><strong>Zkopírovat minulý den:</strong> Vezme vše, co jste dělali naposledy, a vloží to do dneška. Ideální, pokud děláte na stejném projektu.</li>
+                      <li><strong>Dovolená/Nemoc:</strong> Tlačítka na jeden klik v hlavním panelu.</li>
+                    </ul>
+                  </div>
+                </details>
+
+                <details className="group bg-white rounded-lg border border-gray-200 overflow-hidden">
                   <summary className="flex justify-between items-center font-medium cursor-pointer list-none p-3 bg-gray-50 group-open:bg-indigo-50 text-gray-800">
                     <span>🧩 Více zakázek v jeden den</span>
                     <span className="transition group-open:rotate-180">
@@ -107,13 +183,10 @@ const HelpSystem: React.FC = () => {
                   <div className="text-gray-600 text-sm p-3 border-t border-gray-100">
                     <p>Potřebujete rozdělit 8 hodin mezi více projektů nebo přidat lékaře?</p>
                     <ul className="list-disc pl-4 mt-2 space-y-1">
-                      <li>Klikněte na den v tabulce. Otevře se <strong>Detail dne</strong>.</li>
+                      <li>Klikněte na <strong>Otevřít Editor</strong> nebo na den v tabulce.</li>
                       <li>Tlačítkem <strong>"Přidat další činnost"</strong> přidejte řádky.</li>
                       <li>Skládejte činnosti jako kostičky, dokud dole nesvítí zelených 8h.</li>
                     </ul>
-                    <div className="mt-2 p-2 bg-indigo-50 rounded border border-indigo-100 text-indigo-800 font-medium">
-                       🎤 Tip: Řekněte AI boxu: "Včera 4h Web a 4h Eshop". Rozdělí to za vás!
-                    </div>
                   </div>
                 </details>
 
@@ -127,7 +200,7 @@ const HelpSystem: React.FC = () => {
                   <div className="text-gray-600 text-sm p-3 border-t border-gray-100">
                     <p>Chcete zadat celý týden najednou?</p>
                     <ol className="list-decimal pl-4 mt-2 space-y-1">
-                      <li>Klikněte na <strong>Zadat ručně</strong>.</li>
+                      <li>Klikněte na <strong>Otevřít Editor</strong>.</li>
                       <li>Zaškrtněte <strong>Více dní</strong>.</li>
                       <li>Vyberte datum Od a Do.</li>
                       <li>Vyplňte činnost (např. 8h Projekt X).</li>
@@ -135,92 +208,6 @@ const HelpSystem: React.FC = () => {
                     </ol>
                   </div>
                 </details>
-
-                <details className="group bg-white rounded-lg border border-gray-200 overflow-hidden">
-                  <summary className="flex justify-between items-center font-medium cursor-pointer list-none p-3 bg-gray-50 group-open:bg-indigo-50 text-gray-800">
-                    <span>✅ Uzavření měsíce</span>
-                    <span className="transition group-open:rotate-180">
-                       <svg fill="none" height="24" shapeRendering="geometricPrecision" stroke="currentColor" strokeLinecap="round" strokeLinejoin="round" strokeWidth="1.5" viewBox="0 0 24 24" width="24"><path d="M6 9l6 6 6-6"></path></svg>
-                    </span>
-                  </summary>
-                  <div className="text-gray-600 text-sm p-3 border-t border-gray-100">
-                    <p>Na konci měsíce:</p>
-                    <ul className="list-disc pl-4 mt-2 space-y-1">
-                      <li>Zkontrolujte varování (červená pole) v tabulce.</li>
-                      <li>Přejděte do záložky <strong>Reporty</strong>.</li>
-                      <li>Klikněte na <strong>Odeslat ke schválení</strong>.</li>
-                    </ul>
-                  </div>
-                </details>
-                
-                <div className="mt-4 p-3 bg-blue-50 rounded-lg border border-blue-100 text-xs text-blue-800">
-                  <strong>Tip:</strong> Využívejte mikrofon u AI zadání na mobilu pro rychlé diktování cestou z práce!
-                </div>
-              </div>
-            )}
-
-            {/* CHAT TAB */}
-            {activeTab === 'chat' && (
-              <div className="flex flex-col h-full">
-                <div className="flex-1 p-4 space-y-4 overflow-y-auto">
-                  {messages.map((msg, idx) => (
-                    <div key={idx} className={`flex ${msg.role === 'user' ? 'justify-end' : 'justify-start'}`}>
-                      <div className={`max-w-[80%] p-3 rounded-lg text-sm ${
-                        msg.role === 'user' 
-                          ? 'bg-indigo-600 text-white rounded-br-none' 
-                          : 'bg-white border border-gray-200 text-gray-800 rounded-bl-none shadow-sm'
-                      }`}>
-                        {msg.text}
-                      </div>
-                    </div>
-                  ))}
-                  {isTyping && (
-                     <div className="flex justify-start">
-                        <div className="bg-gray-100 p-3 rounded-lg rounded-bl-none flex gap-1">
-                          <div className="w-2 h-2 bg-gray-400 rounded-full animate-bounce"></div>
-                          <div className="w-2 h-2 bg-gray-400 rounded-full animate-bounce" style={{animationDelay: '0.1s'}}></div>
-                          <div className="w-2 h-2 bg-gray-400 rounded-full animate-bounce" style={{animationDelay: '0.2s'}}></div>
-                        </div>
-                     </div>
-                  )}
-                  <div ref={messagesEndRef} />
-                </div>
-
-                {/* Quick Actions */}
-                {messages.length < 3 && (
-                  <div className="px-4 pb-2 flex gap-2 overflow-x-auto no-scrollbar">
-                    {quickQuestions.map((q, i) => (
-                      <button 
-                        key={i}
-                        onClick={() => { setChatInput(q); handleSendMessage(); }}
-                        className="whitespace-nowrap text-xs bg-indigo-50 text-indigo-700 px-3 py-1 rounded-full border border-indigo-100 hover:bg-indigo-100"
-                      >
-                        {q}
-                      </button>
-                    ))}
-                  </div>
-                )}
-
-                {/* Input Area */}
-                <div className="p-3 bg-white border-t border-gray-200 flex gap-2">
-                  <input
-                    type="text"
-                    value={chatInput}
-                    onChange={(e) => setChatInput(e.target.value)}
-                    onKeyDown={(e) => e.key === 'Enter' && handleSendMessage()}
-                    placeholder="Zeptej se..."
-                    className="flex-1 border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-indigo-500"
-                  />
-                  <button 
-                    onClick={handleSendMessage}
-                    disabled={!chatInput.trim() || isTyping}
-                    className="bg-indigo-600 text-white p-2 rounded-lg hover:bg-indigo-700 disabled:opacity-50"
-                  >
-                    <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" viewBox="0 0 20 20" fill="currentColor">
-                      <path d="M10.894 2.553a1 1 0 00-1.788 0l-7 14a1 1 0 001.169 1.409l5-1.429A1 1 0 009 15.571V11a1 1 0 112 0v4.571a1 1 0 00.725.962l5 1.428a1 1 0 001.17-1.408l-7-14z" />
-                    </svg>
-                  </button>
-                </div>
               </div>
             )}
           </div>
