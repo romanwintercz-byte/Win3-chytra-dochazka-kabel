@@ -217,20 +217,21 @@ const EntryFormModal: React.FC<EntryFormModalProps> = ({
   };
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-60 p-4 overflow-y-auto backdrop-blur-sm">
-      <div className="bg-white rounded-xl shadow-2xl w-full max-w-2xl mx-auto animate-fade-in flex flex-col max-h-[90vh]">
+    // Outer Wrapper: Full screen white on mobile, Centered Modal on Desktop
+    <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center bg-white sm:bg-black sm:bg-opacity-60 sm:p-4 sm:backdrop-blur-sm">
+      <div className="bg-white w-full h-full sm:h-auto sm:rounded-xl shadow-2xl sm:max-w-3xl mx-auto animate-fade-in flex flex-col sm:max-h-[90vh]">
         
         {/* Header */}
-        <div className="flex justify-between items-center p-6 border-b border-gray-200 bg-gray-50 rounded-t-xl">
+        <div className="flex justify-between items-center px-5 py-4 border-b border-gray-200 bg-gray-50 sm:rounded-t-xl shrink-0">
           <div>
               <h3 className="text-xl font-bold text-gray-900">
-                {isRangeMode ? 'Hromadné zadání' : 'Editor dne'}
+                {isRangeMode ? 'Hromadný zápis' : 'Editor dne'}
               </h3>
-              <p className="text-sm text-gray-600 mt-1">
+              <p className="text-xs text-gray-500 hidden sm:block mt-1">
                   {isRangeMode ? 'Vygeneruje záznamy pro více dní.' : `Zadejte veškerou činnost pro ${date}.`}
               </p>
           </div>
-          <button onClick={onClose} className="text-gray-500 hover:text-gray-700 bg-white p-2 rounded-full border border-gray-300 hover:bg-gray-100 transition-colors">
+          <button onClick={onClose} className="text-gray-500 hover:text-gray-700 bg-white p-2 rounded-full border border-gray-300 hover:bg-gray-100 transition-colors shadow-sm">
             <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
             </svg>
@@ -239,69 +240,81 @@ const EntryFormModal: React.FC<EntryFormModalProps> = ({
 
         <form onSubmit={handleSubmit} className="flex flex-col flex-1 overflow-hidden">
           
-          {/* Controls Bar */}
-          <div className="p-5 border-b border-gray-200 flex flex-col sm:flex-row gap-5 items-end bg-white">
-             <div className="flex-1 w-full">
-                <label className="block text-xs font-bold text-gray-700 mb-1.5 uppercase tracking-wide">
-                    {isRangeMode ? 'Datum Od' : 'Datum'}
-                </label>
-                <div className="flex items-center gap-2">
-                    <input
-                        type="date"
-                        required
-                        value={date}
-                        onChange={(e) => setDate(e.target.value)}
-                        className="p-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 font-semibold text-gray-900 bg-white"
-                    />
-                    <span className="text-sm font-medium text-gray-700 capitalize min-w-[80px]">
-                        {getDayName(date)}
-                    </span>
-                </div>
-             </div>
-
-             {isRangeMode && (
-                 <div className="flex-1 w-full">
-                    <label className="block text-xs font-bold text-gray-700 mb-1.5 uppercase tracking-wide">Datum Do</label>
-                    <input
-                        type="date"
-                        required
-                        value={dateTo}
-                        onChange={(e) => setDateTo(e.target.value)}
-                        className="w-full p-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 text-gray-900 bg-white"
-                    />
+          {/* Controls Bar - Compact Mobile */}
+          <div className="p-4 border-b border-gray-200 bg-white shrink-0">
+             <div className="flex flex-col gap-3">
+                 {/* Date Row */}
+                 <div className="flex items-center gap-3">
+                    <div className="flex-1">
+                        <label className="block text-[10px] font-bold text-gray-500 uppercase mb-1 tracking-wider">Datum {isRangeMode && 'OD'}</label>
+                        <div className="relative">
+                            <input 
+                                type="date" 
+                                required
+                                value={date} 
+                                onChange={(e) => setDate(e.target.value)} 
+                                className="w-full p-2.5 pl-3 border border-gray-300 rounded-lg font-bold text-gray-900 bg-gray-50 focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500" 
+                            />
+                            <span className="absolute right-10 top-3 text-xs text-gray-400 hidden sm:inline">{getDayName(date)}</span>
+                        </div>
+                    </div>
+                    
+                    {isRangeMode && (
+                         <div className="flex-1 animate-fade-in">
+                            <label className="block text-[10px] font-bold text-gray-500 uppercase mb-1 tracking-wider">Datum DO</label>
+                            <input 
+                                type="date" 
+                                required
+                                value={dateTo} 
+                                onChange={(e) => setDateTo(e.target.value)} 
+                                className="w-full p-2.5 border border-gray-300 rounded-lg font-bold text-gray-900 bg-gray-50 focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500" 
+                            />
+                         </div>
+                    )}
                  </div>
-             )}
 
-             <div className="flex items-center pb-2.5">
-                <label className="flex items-center cursor-pointer text-sm text-indigo-700 font-bold hover:text-indigo-900 transition-colors select-none">
-                    <input 
-                      type="checkbox" 
-                      checked={isRangeMode} 
-                      onChange={(e) => setIsRangeMode(e.target.checked)}
-                      className="mr-2 rounded text-indigo-600 focus:ring-indigo-500 w-5 h-5 border-gray-300"
-                    />
-                    Více dní
-                </label>
+                 {/* Mode Switcher */}
+                 <div className="flex items-center justify-between pt-1">
+                     <span className="text-xs sm:text-sm font-semibold text-gray-600">
+                         {isRangeMode ? 'Vytvářím záznamy pro období' : 'Edituji jeden den'}
+                     </span>
+                     <label className="flex items-center gap-2 px-3 py-1.5 bg-indigo-50 rounded-lg cursor-pointer border border-indigo-100 hover:bg-indigo-100 transition-colors">
+                        <input 
+                            type="checkbox" 
+                            checked={isRangeMode} 
+                            onChange={(e) => setIsRangeMode(e.target.checked)}
+                            className="rounded text-indigo-600 focus:ring-indigo-500 w-4 h-4 border-gray-300"
+                        />
+                        <span className="text-xs font-bold text-indigo-700 uppercase tracking-wide">Více dní</span>
+                     </label>
+                 </div>
              </div>
           </div>
 
-          {/* Rows Area */}
-          <div className="flex-1 overflow-y-auto p-5 space-y-4 bg-gray-100">
+          {/* Rows Area - Mobile Cards */}
+          <div className="flex-1 overflow-y-auto p-3 sm:p-5 space-y-4 bg-gray-100 scrollbar-thin">
              {rows.map((row, index) => {
                 const projectEnabled = isProjectRequired(row.type);
                 return (
-                <div key={row.id} className="bg-white p-4 rounded-xl border border-gray-200 shadow-sm flex flex-col md:flex-row gap-4 items-start md:items-center animate-fade-in hover:shadow-md transition-shadow">
-                    <div className="flex-1 w-full md:w-auto">
-                        <label className="block md:hidden text-xs font-bold text-gray-700 mb-1">Projekt</label>
+                <div key={row.id} className="bg-white p-4 rounded-xl border border-gray-200 shadow-sm flex flex-col sm:flex-row gap-4 relative animate-fade-in hover:shadow-md transition-shadow">
+                    
+                    {/* Delete Button Mobile - Absolute Top Right */}
+                    <button type="button" onClick={() => removeRow(row.id)} className="absolute top-2 right-2 p-2 text-gray-300 hover:text-red-500 sm:hidden">
+                        <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                        </svg>
+                    </button>
+
+                    {/* Project - Full width mobile */}
+                    <div className="w-full sm:flex-1 pr-8 sm:pr-0">
+                        <label className="text-[10px] font-bold text-gray-500 uppercase mb-1 block sm:hidden">Projekt</label>
                         <select
                             required={projectEnabled}
                             disabled={!projectEnabled}
                             value={row.project}
                             onChange={(e) => updateRow(row.id, 'project', e.target.value)}
-                            className={`w-full p-2.5 border rounded-lg focus:ring-2 focus:ring-indigo-500 text-sm font-semibold transition-colors ${
-                                projectEnabled 
-                                ? 'border-gray-300 text-gray-900 bg-white' 
-                                : 'border-gray-200 text-gray-400 bg-gray-50 cursor-not-allowed'
+                            className={`w-full h-11 p-2 border rounded-lg text-base font-medium text-gray-900 shadow-sm focus:ring-2 focus:ring-indigo-500 ${
+                                projectEnabled ? 'bg-white border-gray-300' : 'bg-gray-50 text-gray-400 border-gray-200'
                             }`}
                         >
                             <option value="" disabled={projectEnabled}>{projectEnabled ? 'Vyberte projekt...' : '--- Bez zakázky ---'}</option>
@@ -312,33 +325,24 @@ const EntryFormModal: React.FC<EntryFormModalProps> = ({
                         </select>
                     </div>
 
-                    <div className="flex-[2] w-full md:w-auto">
-                        <label className="block md:hidden text-xs font-bold text-gray-700 mb-1">Popis</label>
-                        <input
-                            type="text"
-                            value={row.description}
-                            onChange={(e) => updateRow(row.id, 'description', e.target.value)}
-                            placeholder="Popis činnosti..."
-                            className="w-full p-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 text-sm text-gray-900 placeholder-gray-400 bg-white"
-                        />
-                    </div>
-
-                    <div className="w-full md:w-36">
-                        <label className="block md:hidden text-xs font-bold text-gray-700 mb-1">Typ</label>
-                        <select
-                            value={row.type}
-                            onChange={(e) => updateRow(row.id, 'type', e.target.value as any)}
-                            className="w-full p-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 text-xs font-medium bg-gray-50 text-gray-900"
-                        >
-                            {Object.values(WorkType).map(t => (
-                            <option key={t} value={t}>{t}</option>
-                            ))}
-                        </select>
-                    </div>
-
-                    <div className="w-full md:w-28 flex items-center gap-2">
-                        <div className="flex-1">
-                            <label className="block md:hidden text-xs font-bold text-gray-700 mb-1">Hodiny</label>
+                    {/* Wrapper for Type + Hours on mobile */}
+                    <div className="flex gap-3 w-full sm:w-auto">
+                        {/* Type */}
+                        <div className="flex-[2] sm:w-36">
+                            <label className="text-[10px] font-bold text-gray-500 uppercase mb-1 block sm:hidden">Činnost</label>
+                            <select
+                                value={row.type}
+                                onChange={(e) => updateRow(row.id, 'type', e.target.value as any)}
+                                className="w-full h-11 p-2 border border-gray-300 rounded-lg text-sm bg-gray-50 text-gray-900 font-medium focus:ring-2 focus:ring-indigo-500"
+                            >
+                                {Object.values(WorkType).map(t => (
+                                <option key={t} value={t}>{t}</option>
+                                ))}
+                            </select>
+                        </div>
+                        {/* Hours */}
+                        <div className="flex-1 sm:w-24">
+                            <label className="text-[10px] font-bold text-gray-500 uppercase mb-1 block sm:hidden">Hodiny</label>
                             <input
                                 type="number"
                                 step="0.5"
@@ -346,13 +350,29 @@ const EntryFormModal: React.FC<EntryFormModalProps> = ({
                                 max="24"
                                 value={row.hours}
                                 onChange={(e) => updateRow(row.id, 'hours', e.target.value)}
-                                className="w-full p-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 text-sm font-bold text-center text-gray-900 bg-white"
+                                className="w-full h-11 p-2 border border-indigo-200 rounded-lg text-lg font-bold text-center bg-white text-indigo-600 focus:ring-2 focus:ring-indigo-500"
                             />
                         </div>
+                    </div>
+
+                    {/* Description */}
+                    <div className="w-full sm:flex-[2]">
+                        <label className="text-[10px] font-bold text-gray-500 uppercase mb-1 block sm:hidden">Popis</label>
+                        <input
+                            type="text"
+                            value={row.description}
+                            onChange={(e) => updateRow(row.id, 'description', e.target.value)}
+                            placeholder="Poznámka (volitelné)..."
+                            className="w-full h-11 p-2 border border-gray-300 rounded-lg text-sm text-gray-900 placeholder-gray-400 bg-white focus:ring-2 focus:ring-indigo-500"
+                        />
+                    </div>
+
+                    {/* Desktop Delete */}
+                    <div className="hidden sm:flex items-center">
                         <button 
                             type="button"
                             onClick={() => removeRow(row.id)}
-                            className="text-gray-400 hover:text-red-600 hover:bg-red-50 p-2 rounded-lg md:mt-0 mt-6 transition-colors"
+                            className="text-gray-400 hover:text-red-600 hover:bg-red-50 p-2 rounded-lg transition-colors"
                             title="Smazat řádek"
                         >
                             <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -366,60 +386,58 @@ const EntryFormModal: React.FC<EntryFormModalProps> = ({
              <button 
                 type="button" 
                 onClick={addRow}
-                className="w-full py-4 border-2 border-dashed border-gray-300 rounded-xl text-gray-600 hover:border-indigo-500 hover:text-indigo-700 hover:bg-indigo-50 transition-all font-semibold flex items-center justify-center gap-2 bg-white shadow-sm"
+                className="w-full py-4 border-2 border-dashed border-gray-300 rounded-xl text-gray-600 hover:border-indigo-500 hover:text-indigo-700 hover:bg-indigo-50 transition-all font-semibold flex items-center justify-center gap-2 bg-white shadow-sm hover:shadow"
              >
                 <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" viewBox="0 0 20 20" fill="currentColor">
                     <path fillRule="evenodd" d="M10 5a1 1 0 011 1v3h3a1 1 0 110 2h-3v3a1 1 0 11-2 0v-3H6a1 1 0 110-2h3V6a1 1 0 011-1z" clipRule="evenodd" />
                 </svg>
                 Přidat další činnost
              </button>
+             
+             {/* Spacer for bottom safe area/footer mobile */}
+             <div className="h-4 sm:hidden"></div>
           </div>
 
-          {/* Footer */}
-          <div className="p-5 border-t border-gray-200 bg-white flex flex-col md:flex-row items-center justify-between gap-4 rounded-b-xl">
-             <div className="flex items-center gap-3">
-                 <button
-                    type="button"
-                    onClick={handleFillRemainder}
-                    className="flex items-center gap-2 px-4 py-2 bg-orange-50 text-orange-700 rounded-lg hover:bg-orange-100 font-medium text-sm transition-colors border border-orange-200"
-                    title="Vyplní zvolenou činností všechny prázdné pracovní dny do konce měsíce"
+          {/* Footer - Sticky Bottom on Mobile */}
+          <div className="p-4 border-t border-gray-200 bg-white flex flex-col sm:flex-row items-center justify-between gap-4 shrink-0 pb-[env(safe-area-inset-bottom,20px)] sm:pb-4 shadow-[0_-4px_6px_-1px_rgba(0,0,0,0.05)] sm:shadow-none z-10">
+             {/* Total & Fill Button */}
+             <div className="flex w-full sm:w-auto justify-between items-center sm:gap-6">
+                 <button 
+                    type="button" 
+                    onClick={handleFillRemainder} 
+                    className="text-xs sm:text-sm text-orange-600 font-bold bg-orange-50 px-3 py-2.5 rounded-lg border border-orange-100 whitespace-nowrap hover:bg-orange-100 transition-colors flex items-center gap-1"
+                    title="Vyplnit prázdné dny"
                  >
-                     <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 10V3L4 14h7v7l9-11h-7z" />
-                     </svg>
-                     Vyplnit zbytek měsíce
+                    </svg>
+                    Vyplnit zbytek
                  </button>
-             </div>
-             
-             <div className="flex items-center gap-3">
-                 <span className="text-gray-600 font-medium text-sm uppercase tracking-wide">Celkem:</span>
-                 <span className={`text-3xl font-bold font-mono ${
-                     totalHours === 8 ? 'text-green-600' : (totalHours > 8 ? 'text-orange-600' : 'text-gray-900')
-                 }`}>
-                     {totalHours.toFixed(1)} h
-                 </span>
-                 {totalHours !== 8 && totalHours > 0 && (
-                     <span className={`text-xs px-2.5 py-1 rounded-full font-bold ${
-                         totalHours > 8 ? 'bg-orange-100 text-orange-800' : 'bg-red-100 text-red-800'
+                 
+                 <div className="text-right sm:text-left flex items-baseline gap-2">
+                     <span className="text-xs text-gray-400 uppercase font-bold">Celkem:</span>
+                     <span className={`text-2xl font-bold font-mono ${
+                        totalHours === 8 ? 'text-green-600' : (totalHours > 8 ? 'text-orange-600' : 'text-gray-900')
                      }`}>
-                         {totalHours > 8 ? `+${(totalHours - 8).toFixed(1)}h` : `-${(8 - totalHours).toFixed(1)}h`}
+                         {totalHours}h
                      </span>
-                 )}
+                 </div>
              </div>
 
-             <div className="flex gap-3 w-full md:w-auto">
-                 <button
-                    type="button"
-                    onClick={onClose}
-                    className="flex-1 md:flex-none px-6 py-3 bg-white border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-100 hover:text-gray-900 font-semibold transition-colors"
+             {/* Action Buttons */}
+             <div className="grid grid-cols-2 gap-3 w-full sm:w-auto">
+                 <button 
+                    type="button" 
+                    onClick={onClose} 
+                    className="py-3.5 sm:py-3 sm:px-6 bg-gray-100 text-gray-700 rounded-xl font-bold hover:bg-gray-200 transition-colors"
                  >
                     Zrušit
                  </button>
-                 <button
-                    type="submit"
-                    className="flex-1 md:flex-none px-8 py-3 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 font-semibold shadow-lg shadow-indigo-200 transition-all transform hover:scale-105"
+                 <button 
+                    type="submit" 
+                    className="py-3.5 sm:py-3 sm:px-8 bg-indigo-600 text-white rounded-xl font-bold shadow-lg shadow-indigo-200 hover:bg-indigo-700 active:scale-95 transition-all"
                  >
-                    Uložit den
+                    Uložit
                  </button>
              </div>
           </div>
