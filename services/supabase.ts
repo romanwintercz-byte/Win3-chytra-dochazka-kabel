@@ -156,6 +156,8 @@ export const uploadAttachment = async (file: File): Promise<string | null> => {
             console.error('Storage Upload Error:', error);
             if (error.message.includes('Bucket not found') || error.message.includes('The resource was not found')) {
                 alert('CHYBA KONFIGURACE: V Supabase neexistuje bucket "attachments". Vytvořte ho v sekci Storage a nastavte jako Public.');
+            } else if (error.message.includes('row-level security policy') || error.message.includes('violate')) {
+                alert('CHYBA OPRÁVNĚNÍ: Supabase blokuje nahrávání (RLS Policy). Jděte do Supabase Dashboard -> Storage -> Policies a přidejte novou politiku pro bucket "attachments", která povolí INSERT pro "anon" roli.');
             } else {
                 alert('Chyba při nahrávání souboru: ' + error.message);
             }
