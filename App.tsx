@@ -325,8 +325,9 @@ const App: React.FC = () => {
     try {
         await addTimeEntriesBulk(newEntries);
         loadData(true);
-    } catch (e) {
-        alert("Chyba při ukládání záznamů.");
+    } catch (e: any) {
+        console.error(e);
+        alert("Chyba při ukládání: " + (e.message || "Neznámá chyba"));
     }
   };
 
@@ -383,8 +384,9 @@ const App: React.FC = () => {
             }
         }
         loadData(true);
-    } catch (e) {
-        alert("Chyba při ukládání.");
+    } catch (e: any) {
+        console.error(e);
+        alert("Chyba při ukládání: " + (e.message || "Neznámá chyba. Pokud se jedná o 'attachment_url', spusťte SQL příkaz v Supabase."));
     }
   };
 
@@ -396,8 +398,8 @@ const App: React.FC = () => {
     try {
         await deleteTimeEntry(id);
         setEntries(prev => prev.filter(e => e.id !== id));
-    } catch (e) {
-        alert("Chyba při mazání.");
+    } catch (e: any) {
+        alert("Chyba při mazání: " + e.message);
     }
   };
 
@@ -455,9 +457,9 @@ const App: React.FC = () => {
             window.location.href = `mailto:${targetUser.email}?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(body)}`;
         }
 
-    } catch (e) {
+    } catch (e: any) {
         console.error("Failed to save report status:", e);
-        alert("Chyba při ukládání stavu výkazu.");
+        alert("Chyba při ukládání stavu výkazu: " + e.message);
     }
   };
 
@@ -515,19 +517,19 @@ const App: React.FC = () => {
 
   // Admin Handlers
   const handleAddEmployee = async (emp: Employee) => {
-      try { await addEmployee(emp); loadData(true); } catch (e) { alert("Chyba"); }
+      try { await addEmployee(emp); loadData(true); } catch (e: any) { alert("Chyba: " + e.message); }
   };
   const handleUpdateEmployee = async (emp: Employee) => {
-      try { await updateEmployee(emp); loadData(true); } catch (e) { alert("Chyba"); }
+      try { await updateEmployee(emp); loadData(true); } catch (e: any) { alert("Chyba: " + e.message); }
   };
   const handleToggleEmployeeStatus = async (id: string, isActive: boolean) => {
-      try { await updateEmployeeStatus(id, isActive); loadData(true); } catch (e) { alert("Chyba"); }
+      try { await updateEmployeeStatus(id, isActive); loadData(true); } catch (e: any) { alert("Chyba: " + e.message); }
   };
   const handleAddJob = async (job: Job) => {
-      try { await addJob(job); loadData(true); } catch (e) { alert("Chyba"); }
+      try { await addJob(job); loadData(true); } catch (e: any) { alert("Chyba: " + e.message); }
   };
   const handleToggleJobStatus = async (id: string, isActive: boolean) => {
-      try { await updateJobStatus(id, isActive); loadData(true); } catch (e) { alert("Chyba"); }
+      try { await updateJobStatus(id, isActive); loadData(true); } catch (e: any) { alert("Chyba: " + e.message); }
   };
   const handleSaveCredentials = () => {
       if (!manualSupabaseUrl || !manualSupabaseKey) { alert("Vyplňte prosím obě pole."); return; }
