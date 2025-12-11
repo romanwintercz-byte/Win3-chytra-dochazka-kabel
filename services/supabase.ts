@@ -154,7 +154,11 @@ export const uploadAttachment = async (file: File): Promise<string | null> => {
 
         if (error) {
             console.error('Storage Upload Error:', error);
-            alert('Chyba při nahrávání souboru: ' + error.message);
+            if (error.message.includes('Bucket not found') || error.message.includes('The resource was not found')) {
+                alert('CHYBA KONFIGURACE: V Supabase neexistuje bucket "attachments". Vytvořte ho v sekci Storage a nastavte jako Public.');
+            } else {
+                alert('Chyba při nahrávání souboru: ' + error.message);
+            }
             return null;
         }
 
