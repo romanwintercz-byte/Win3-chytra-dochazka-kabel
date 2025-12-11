@@ -768,6 +768,8 @@ const App: React.FC = () => {
                     onManualEntry={handleOpenManualEntry}
                     onCopyLastDay={handleCopyLastDay}
                     lastActiveDay={lastActiveDay}
+                    selectedMonth={selectedMonth}
+                    existingEntries={monthlyUserEntries}
                  />
               )}
 

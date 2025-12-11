@@ -1,6 +1,8 @@
+
 import React from 'react';
 import { TimeEntry, Job, WorkType } from '../types';
 import { v4 as uuidv4 } from 'uuid';
+import { isHoliday, getHolidayName } from '../services/holidayService';
 
 interface SmartInputProps {
   onEntriesAdded: (entries: TimeEntry[]) => void;
@@ -8,6 +10,8 @@ interface SmartInputProps {
   onManualEntry: () => void;
   onCopyLastDay: () => void;
   lastActiveDay?: string; // Date string of last entry
+  selectedMonth: string; // YYYY-MM
+  existingEntries: TimeEntry[];
 }
 
 const SmartInput: React.FC<SmartInputProps> = ({ 
@@ -15,7 +19,9 @@ const SmartInput: React.FC<SmartInputProps> = ({
   currentUserId, 
   onManualEntry, 
   onCopyLastDay,
-  lastActiveDay 
+  lastActiveDay,
+  selectedMonth,
+  existingEntries
 }) => {
 
   const addTemplate = (type: WorkType, hours: number, project: string = '', description: string = '') => {
@@ -30,6 +36,41 @@ const SmartInput: React.FC<SmartInputProps> = ({
         type: type
     };
     onEntriesAdded([entry]);
+  };
+
+  const handlePrefillHolidays = () => {
+    const [year, month] = selectedMonth.split('-').map(Number);
+    const daysInMonth = new Date(year, month, 0).getDate();
+    const entriesToAdd: TimeEntry[] = [];
+    const existingDates = new Set(existingEntries.map(e => e.date));
+
+    for (let d = 1; d <= daysInMonth; d++) {
+        const dateObj = new Date(year, month - 1, d);
+        const isoDate = dateObj.toISOString().split('T')[0];
+        const dayOfWeek = dateObj.getDay();
+        const isWeekend = dayOfWeek === 0 || dayOfWeek === 6;
+
+        if (isHoliday(isoDate) && !isWeekend && !existingDates.has(isoDate)) {
+            const holidayName = getHolidayName(isoDate) || 'Státní svátek';
+            entriesToAdd.push({
+                id: uuidv4(),
+                employeeId: currentUserId,
+                date: isoDate,
+                project: '',
+                description: holidayName,
+                hours: 8,
+                type: WorkType.HOLIDAY
+            });
+        }
+    }
+
+    if (entriesToAdd.length > 0) {
+        if (window.confirm(`Nalezeno ${entriesToAdd.length} nevyplněných svátků v pracovních dnech. Chcete je hromadně vložit?`)) {
+            onEntriesAdded(entriesToAdd);
+        }
+    } else {
+        alert('V tomto měsíci nejsou žádné chybějící svátky k vyplnění.');
+    }
   };
 
   return (
@@ -65,18 +106,18 @@ const SmartInput: React.FC<SmartInputProps> = ({
             </span>
         </button>
 
-        {/* 2. MANUAL ENTRY */}
+        {/* 2. PREFILL HOLIDAYS */}
         <button
-          onClick={onManualEntry}
-          className="flex flex-col items-center justify-center p-4 rounded-xl border border-gray-200 bg-white hover:border-indigo-300 hover:shadow-md transition-all text-gray-700 hover:text-indigo-600 group"
+          onClick={handlePrefillHolidays}
+          className="flex flex-col items-center justify-center p-4 rounded-xl border border-indigo-200 bg-indigo-50 hover:bg-indigo-100 hover:border-indigo-300 transition-all text-indigo-700 group"
         >
-            <div className="p-2 rounded-full bg-gray-100 text-gray-600 mb-2 group-hover:bg-indigo-50 group-hover:text-indigo-600 transition-colors">
+            <div className="p-2 rounded-full bg-white text-indigo-600 shadow-sm mb-2">
                 <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 3v4M3 5h4M6 17v4m-2-2h4m5-16l2.286 6.857L21 12l-5.714 2.143L13 21l-2.286-6.857L5 12l5.714-2.143L13 3z" />
                 </svg>
             </div>
-            <span className="font-bold text-sm">Otevřít Editor</span>
-            <span className="text-xs mt-1 text-gray-400">Ruční zadání dne</span>
+            <span className="font-bold text-sm">Vložit svátky</span>
+            <span className="text-xs mt-1 opacity-70">Automaticky (8h)</span>
         </button>
 
         {/* 3. TEMPLATES - VACATION */}
@@ -93,18 +134,18 @@ const SmartInput: React.FC<SmartInputProps> = ({
             <span className="text-xs mt-1 opacity-70">Jeden klik</span>
         </button>
 
-        {/* 4. TEMPLATES - SICK */}
+        {/* 4. MANUAL ENTRY */}
         <button
-          onClick={() => addTemplate(WorkType.SICK_DAY, 8)}
-          className="flex flex-col items-center justify-center p-4 rounded-xl border border-red-200 bg-red-50 hover:bg-red-100 hover:border-red-300 transition-all text-red-700"
+          onClick={onManualEntry}
+          className="flex flex-col items-center justify-center p-4 rounded-xl border border-gray-200 bg-white hover:border-indigo-300 hover:shadow-md transition-all text-gray-700 hover:text-indigo-600 group"
         >
-             <div className="p-2 rounded-full bg-white text-red-600 shadow-sm mb-2">
+            <div className="p-2 rounded-full bg-gray-100 text-gray-600 mb-2 group-hover:bg-indigo-50 group-hover:text-indigo-600 transition-colors">
                 <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4.318 6.318a4.5 4.5 0 000 6.364L12 20.364l7.682-7.682a4.5 4.5 0 00-6.364-6.364L12 7.636l-1.318-1.318a4.5 4.5 0 00-6.364 0z" />
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
                 </svg>
             </div>
-            <span className="font-bold text-sm">Nemoc (8h)</span>
-            <span className="text-xs mt-1 opacity-70">Jeden klik</span>
+            <span className="font-bold text-sm">Otevřít Editor</span>
+            <span className="text-xs mt-1 text-gray-400">Ruční zadání dne</span>
         </button>
       </div>
     </div>

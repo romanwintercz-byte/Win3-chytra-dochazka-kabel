@@ -2,7 +2,7 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import { TimeEntry, Job, WorkType } from '../types';
 import { v4 as uuidv4 } from 'uuid';
-import { isHoliday } from '../services/holidayService';
+import { isHoliday, getHolidayName } from '../services/holidayService';
 
 interface EntryFormModalProps {
   isOpen: boolean;
@@ -164,21 +164,35 @@ const EntryFormModal: React.FC<EntryFormModalProps> = ({
           const dayOfWeek = d.getDay();
           const isWeekend = dayOfWeek === 0 || dayOfWeek === 6;
           
-          // Skip conditions: Weekend, Already has Entry, Is Holiday
-          if (!isWeekend && !datesToSkip.has(isoDate) && !isHoliday(isoDate)) {
-               rows.forEach(row => {
-                   if (parseFloat(row.hours) > 0) {
-                       generatedEntries.push({
-                           id: uuidv4(),
-                           employeeId: currentUserId,
-                           date: isoDate,
-                           project: isProjectRequired(row.type) ? row.project : '',
-                           description: row.description,
-                           hours: parseFloat(row.hours),
-                           type: row.type
-                       });
-                   }
-               });
+          // Skip Weekend and Existing Entries
+          if (!isWeekend && !datesToSkip.has(isoDate)) {
+               // Check if it's a Holiday
+               if (isHoliday(isoDate)) {
+                   generatedEntries.push({
+                       id: uuidv4(),
+                       employeeId: currentUserId,
+                       date: isoDate,
+                       project: '',
+                       description: getHolidayName(isoDate) || 'Svátek',
+                       hours: 8,
+                       type: WorkType.HOLIDAY
+                   });
+               } else {
+                   // Normal day - copy form rows
+                   rows.forEach(row => {
+                       if (parseFloat(row.hours) > 0) {
+                           generatedEntries.push({
+                               id: uuidv4(),
+                               employeeId: currentUserId,
+                               date: isoDate,
+                               project: isProjectRequired(row.type) ? row.project : '',
+                               description: row.description,
+                               hours: parseFloat(row.hours),
+                               type: row.type
+                           });
+                       }
+                   });
+               }
           }
       }
       
@@ -187,7 +201,7 @@ const EntryFormModal: React.FC<EntryFormModalProps> = ({
           return;
       }
 
-      if (window.confirm(`Chystám se vygenerovat ${generatedEntries.length} záznamů do konce měsíce. Přeskočím víkendy, svátky a dny, kde už máte práci. Pokračovat?`)) {
+      if (window.confirm(`Chystám se vygenerovat ${generatedEntries.length} záznamů do konce měsíce. Přeskočím víkendy a dny, kde už máte práci. Svátky se vyplní automaticky (8h). Pokračovat?`)) {
           onSubmit('BULK_RANGE', generatedEntries);
           onClose();
       }
