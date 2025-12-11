@@ -243,31 +243,31 @@ const EntryFormModal: React.FC<EntryFormModalProps> = ({
           {/* Controls Bar - Compact Mobile */}
           <div className="p-4 border-b border-gray-200 bg-white shrink-0">
              <div className="flex flex-col gap-3">
-                 {/* Date Row */}
-                 <div className="flex items-center gap-3">
-                    <div className="flex-1">
-                        <label className="block text-[10px] font-bold text-gray-500 uppercase mb-1 tracking-wider">Datum {isRangeMode && 'OD'}</label>
+                 {/* Date Row - Fixed for iPhone 13 (Flex-nowrap, min-w-0) */}
+                 <div className="flex flex-row items-end gap-2">
+                    <div className="flex-1 min-w-0">
+                        <label className="block text-[10px] font-bold text-gray-500 uppercase mb-1 tracking-wider whitespace-nowrap">Datum {isRangeMode && 'OD'}</label>
                         <div className="relative">
                             <input 
                                 type="date" 
                                 required
                                 value={date} 
                                 onChange={(e) => setDate(e.target.value)} 
-                                className="w-full p-2.5 pl-3 border border-gray-300 rounded-lg font-bold text-gray-900 bg-gray-50 focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500" 
+                                className="w-full h-11 sm:h-auto p-2 border border-gray-300 rounded-lg font-bold text-gray-900 bg-gray-50 focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 text-sm sm:text-base" 
                             />
                             <span className="absolute right-10 top-3 text-xs text-gray-400 hidden sm:inline">{getDayName(date)}</span>
                         </div>
                     </div>
                     
                     {isRangeMode && (
-                         <div className="flex-1 animate-fade-in">
-                            <label className="block text-[10px] font-bold text-gray-500 uppercase mb-1 tracking-wider">Datum DO</label>
+                         <div className="flex-1 min-w-0 animate-fade-in">
+                            <label className="block text-[10px] font-bold text-gray-500 uppercase mb-1 tracking-wider whitespace-nowrap">Datum DO</label>
                             <input 
                                 type="date" 
                                 required
                                 value={dateTo} 
                                 onChange={(e) => setDateTo(e.target.value)} 
-                                className="w-full p-2.5 border border-gray-300 rounded-lg font-bold text-gray-900 bg-gray-50 focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500" 
+                                className="w-full h-11 sm:h-auto p-2 border border-gray-300 rounded-lg font-bold text-gray-900 bg-gray-50 focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 text-sm sm:text-base" 
                             />
                          </div>
                     )}
