@@ -1,7 +1,8 @@
+
 import React, { useState, useEffect } from 'react';
 import { Employee, Job } from '../types';
 import { v4 as uuidv4 } from 'uuid';
-import { fetchGlobalLock, toggleGlobalLock, createGlobalNotification } from '../services/supabase';
+import { fetchGlobalLock, toggleGlobalLock, createGlobalNotification, createNotification } from '../services/supabase';
 import { PresentationType } from './PresentationMode';
 
 interface AdminPanelProps {
@@ -38,6 +39,8 @@ const AdminPanel: React.FC<AdminPanelProps> = ({
   // Announcement State
   const [announcementMsg, setAnnouncementMsg] = useState('');
   const [announcementType, setAnnouncementType] = useState<'info'|'warning'>('info');
+  const [announcementTarget, setAnnouncementTarget] = useState<'all' | 'single'>('all');
+  const [selectedTargetUserId, setSelectedTargetUserId] = useState<string>('');
 
   // Load locks when switching to 'closings'
   useEffect(() => {
@@ -77,12 +80,24 @@ const AdminPanel: React.FC<AdminPanelProps> = ({
 
   const handleSendAnnouncement = async () => {
       if (!announcementMsg.trim()) return;
-      const activeUserIds = employees.filter(e => e.isActive).map(e => e.id);
+      
       try {
-          await createGlobalNotification(activeUserIds, announcementMsg, announcementType);
-          alert('Oznámení odesláno všem aktivním zaměstnancům.');
+          if (announcementTarget === 'all') {
+              const activeUserIds = employees.filter(e => e.isActive).map(e => e.id);
+              await createGlobalNotification(activeUserIds, announcementMsg, announcementType);
+              alert('Oznámení odesláno všem aktivním zaměstnancům.');
+          } else {
+              if (!selectedTargetUserId) {
+                  alert('Vyberte prosím příjemce.');
+                  return;
+              }
+              // Send single notification
+              await createNotification(selectedTargetUserId, announcementMsg, announcementType, currentUser.id);
+              alert('Zpráva odeslána.');
+          }
           setAnnouncementMsg('');
       } catch (e) {
+          console.error(e);
           alert('Chyba při odesílání.');
       }
   };
@@ -342,12 +357,43 @@ const AdminPanel: React.FC<AdminPanelProps> = ({
 
       {activeSection === 'announcements' && (
           <div className="bg-white p-6 rounded-xl shadow-sm border border-gray-100 max-w-2xl">
-              <h3 className="text-lg font-semibold mb-4 text-gray-800">Hromadné oznámení</h3>
+              <h3 className="text-lg font-semibold mb-4 text-gray-800">Centrum zpráv</h3>
               <p className="text-sm text-gray-500 mb-4">
-                  Zpráva se zobrazí všem zaměstnancům pod ikonou zvonku 🔔. Vhodné pro informace o uzávěrkách, odstávkách nebo novinkách.
+                  Odešlete zprávu, která se zobrazí pod ikonou zvonku 🔔.
               </p>
               
               <div className="space-y-4">
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">Příjemce</label>
+                    <div className="flex gap-2 mb-2">
+                        <button 
+                            onClick={() => setAnnouncementTarget('all')}
+                            className={`flex-1 py-2 rounded-lg text-sm font-medium border ${announcementTarget === 'all' ? 'bg-indigo-50 border-indigo-500 text-indigo-700' : 'bg-white border-gray-300 text-gray-700'}`}
+                        >
+                            📢 Všem zaměstnancům
+                        </button>
+                        <button 
+                            onClick={() => setAnnouncementTarget('single')}
+                            className={`flex-1 py-2 rounded-lg text-sm font-medium border ${announcementTarget === 'single' ? 'bg-indigo-50 border-indigo-500 text-indigo-700' : 'bg-white border-gray-300 text-gray-700'}`}
+                        >
+                            👤 Konkrétní osobě
+                        </button>
+                    </div>
+
+                    {announcementTarget === 'single' && (
+                        <select 
+                            value={selectedTargetUserId}
+                            onChange={(e) => setSelectedTargetUserId(e.target.value)}
+                            className="w-full p-2 border border-gray-300 rounded-lg bg-gray-50"
+                        >
+                            <option value="">-- Vyberte zaměstnance --</option>
+                            {activeEmployees.map(emp => (
+                                <option key={emp.id} value={emp.id}>{emp.name}</option>
+                            ))}
+                        </select>
+                    )}
+                  </div>
+
                   <div>
                       <label className="block text-sm font-medium text-gray-700 mb-1">Typ zprávy</label>
                       <select 
@@ -365,15 +411,15 @@ const AdminPanel: React.FC<AdminPanelProps> = ({
                         value={announcementMsg}
                         onChange={(e) => setAnnouncementMsg(e.target.value)}
                         className="w-full p-3 border border-gray-300 rounded-lg h-32"
-                        placeholder="Např. Prosím o uzavření docházky do pátku..."
+                        placeholder={announcementTarget === 'all' ? "Např. Prosím o uzavření docházky do pátku..." : "Např. Prosím o opravu výkazu za minulý měsíc..."}
                       />
                   </div>
                   <button 
                     onClick={handleSendAnnouncement}
                     disabled={!announcementMsg}
-                    className="bg-indigo-600 text-white px-6 py-2 rounded-lg hover:bg-indigo-700 disabled:bg-gray-300 font-medium"
+                    className="bg-indigo-600 text-white px-6 py-2 rounded-lg hover:bg-indigo-700 disabled:bg-gray-300 font-medium w-full sm:w-auto"
                   >
-                      Odeslat všem
+                      Odeslat zprávu
                   </button>
               </div>
           </div>
