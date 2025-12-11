@@ -104,6 +104,13 @@ const TimesheetTable: React.FC<TimesheetTableProps> = ({ entries, onDelete, onEd
                             <span className={`w-2.5 h-2.5 rounded-full flex-shrink-0 ${entry.type === WorkType.REGULAR ? 'bg-blue-500' : 'bg-orange-500'}`}></span>
                             <span className="font-semibold truncate">{entry.project}</span>
                             <span className="text-gray-500 border-l border-gray-200 pl-2 ml-1">{entry.hours}h</span>
+                            {entry.attachmentUrl && (
+                                <span className="text-indigo-500 ml-1" title="Obsahuje přílohu">
+                                    <svg xmlns="http://www.w3.org/2000/svg" className="h-3 w-3" viewBox="0 0 20 20" fill="currentColor">
+                                        <path fillRule="evenodd" d="M8 4a3 3 0 00-3 3v4a5 5 0 0010 0V7a1 1 0 112 0v4a7 7 0 11-14 0V7a5 5 0 0110 0v4a3 3 0 11-6 0V7a1 1 0 012 0v4a1 1 0 102 0V7a3 3 0 00-3-3z" clipRule="evenodd" />
+                                    </svg>
+                                </span>
+                            )}
                         </div>
                     ))}
                  </div>
@@ -148,7 +155,16 @@ const TimesheetTable: React.FC<TimesheetTableProps> = ({ entries, onDelete, onEd
                   {dayEntries.map(entry => (
                       <div key={entry.id} className="p-3 flex justify-between items-start text-sm">
                           <div>
-                              <div className="font-bold text-gray-900">{entry.project}</div>
+                              <div className="font-bold text-gray-900 flex items-center gap-2">
+                                  {entry.project}
+                                  {entry.attachmentUrl && (
+                                      <a href={entry.attachmentUrl} target="_blank" rel="noopener noreferrer" className="text-indigo-500" onClick={(e) => e.stopPropagation()}>
+                                          <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" viewBox="0 0 20 20" fill="currentColor">
+                                            <path fillRule="evenodd" d="M8 4a3 3 0 00-3 3v4a5 5 0 0010 0V7a1 1 0 112 0v4a7 7 0 11-14 0V7a5 5 0 0110 0v4a3 3 0 11-6 0V7a1 1 0 012 0v4a1 1 0 102 0V7a3 3 0 00-3-3z" clipRule="evenodd" />
+                                          </svg>
+                                      </a>
+                                  )}
+                              </div>
                               {entry.description && <div className="text-gray-600 text-xs mt-0.5">{entry.description}</div>}
                               <div className={`mt-2 inline-flex text-[10px] px-2 py-0.5 rounded font-medium ${getWorkTypeBadge(entry.type)}`}>{entry.type}</div>
                           </div>

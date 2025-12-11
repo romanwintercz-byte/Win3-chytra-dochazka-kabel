@@ -46,6 +46,7 @@ export interface TimeEntry {
   description: string;
   hours: number;
   type: WorkType;
+  attachmentUrl?: string; // URL to the uploaded document (Supabase Storage)
 }
 
 export interface MonthlyStats {

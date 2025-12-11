@@ -53,13 +53,20 @@ if (isConfigured) {
           subscribe: () => {},
           track: () => {},
           unsubscribe: () => {}
-      })
+      }),
+      storage: {
+          from: () => ({
+              upload: async () => ({ data: null, error: { message: 'Storage not configured' } }),
+              getPublicUrl: () => ({ data: { publicUrl: '' } })
+          })
+      }
   };
 
   client = {
       from: () => safeDummy,
       auth: { getUser: async () => ({ data: { user: null } }) },
-      channel: () => safeDummy.channel()
+      channel: () => safeDummy.channel(),
+      storage: safeDummy.storage
   } as unknown as SupabaseClient;
 }
 
@@ -124,6 +131,45 @@ export const subscribeToNotifications = (userId: string, onNewNotification: (n: 
 
     return channel;
 };
+
+// --- STORAGE FUNCTIONS ---
+
+export const uploadAttachment = async (file: File): Promise<string | null> => {
+    if (!isConfigured) return null;
+
+    try {
+        // Generate unique path: public/attachments/TIMESTAMP_RANDOM.ext
+        const fileExt = file.name.split('.').pop();
+        const fileName = `${Date.now()}_${Math.random().toString(36).substring(2, 8)}.${fileExt}`;
+        const filePath = `${fileName}`;
+
+        // Upload to 'attachments' bucket
+        // Note: The bucket 'attachments' must exist and be public in Supabase
+        const { data, error } = await supabase.storage
+            .from('attachments')
+            .upload(filePath, file, {
+                cacheControl: '3600',
+                upsert: false
+            });
+
+        if (error) {
+            console.error('Storage Upload Error:', error);
+            alert('Chyba při nahrávání souboru: ' + error.message);
+            return null;
+        }
+
+        // Get Public URL
+        const { data: { publicUrl } } = supabase.storage
+            .from('attachments')
+            .getPublicUrl(filePath);
+
+        return publicUrl;
+    } catch (e) {
+        console.error('Upload exception:', e);
+        return null;
+    }
+};
+
 
 // --- API Functions ---
 
@@ -195,13 +241,27 @@ export const fetchTimeEntries = async (): Promise<TimeEntry[]> => {
       return [];
   }
   return data.map((e: any) => ({
-    id: e.id, employeeId: e.employee_id, date: e.date, project: e.project, description: e.description, hours: e.hours, type: e.type
+    id: e.id, 
+    employeeId: e.employee_id, 
+    date: e.date, 
+    project: e.project, 
+    description: e.description, 
+    hours: e.hours, 
+    type: e.type,
+    attachmentUrl: e.attachment_url // Map attachment URL
   })) as TimeEntry[];
 };
 
 export const addTimeEntriesBulk = async (entries: TimeEntry[]) => {
     const dbEntries = entries.map(entry => ({
-        id: entry.id, employee_id: entry.employeeId, date: entry.date, project: entry.project, description: entry.description, hours: entry.hours, type: entry.type
+        id: entry.id, 
+        employee_id: entry.employeeId, 
+        date: entry.date, 
+        project: entry.project, 
+        description: entry.description, 
+        hours: entry.hours, 
+        type: entry.type,
+        attachment_url: entry.attachmentUrl // Save attachment URL
     }));
     const { error } = await supabase.from('time_entries').insert(dbEntries);
     if (error) throw error;

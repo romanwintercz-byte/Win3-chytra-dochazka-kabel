@@ -349,10 +349,69 @@ const ReportingModule: React.FC<ReportingModuleProps> = ({ entries, employees, c
         doc.line(110, signatureY, 180, signatureY);
         doc.text("Schválil (Nadřízený)", 110, signatureY + 4);
 
+        // ---------------------------------------------------------
+        // 6. ATTACHMENTS SECTION
+        // ---------------------------------------------------------
+        const entriesWithAttachments = filteredEntries.filter(e => e.attachmentUrl);
+        
+        if (entriesWithAttachments.length > 0) {
+            doc.addPage();
+            doc.setFontSize(14);
+            doc.text("Přílohy k výkazu (Propustky, Doklad)", 14, 15);
+            
+            let currentAttachmentY = 25;
+
+            for (const entry of entriesWithAttachments) {
+                 if (currentAttachmentY > 250) {
+                    doc.addPage();
+                    currentAttachmentY = 25;
+                 }
+
+                 doc.setFontSize(10);
+                 doc.setTextColor(0);
+                 const dateStr = new Date(entry.date).toLocaleDateString('cs-CZ');
+                 doc.text(`Datum: ${dateStr} - ${entry.type}`, 14, currentAttachmentY);
+                 
+                 if (entry.description) {
+                     doc.setFontSize(8);
+                     doc.setTextColor(100);
+                     doc.text(`Poznámka: ${entry.description}`, 14, currentAttachmentY + 5);
+                 }
+
+                 try {
+                     // Need to fetch image as blob/base64 to embed in PDF
+                     const response = await fetch(entry.attachmentUrl!);
+                     const blob = await response.blob();
+                     const base64 = await new Promise<string>((resolve) => {
+                         const reader = new FileReader();
+                         reader.onloadend = () => resolve(reader.result as string);
+                         reader.readAsDataURL(blob);
+                     });
+
+                     // Determine format based on attachment URL or blob type
+                     // Simple heuristic: default to JPEG/PNG based on extension or header
+                     const format = entry.attachmentUrl!.toLowerCase().endsWith('.png') ? 'PNG' : 'JPEG';
+
+                     // Add Image (x, y, w, h)
+                     // Keep aspect ratio roughly, max width 180
+                     doc.addImage(base64, format, 14, currentAttachmentY + 10, 100, 0); // 0 height = auto keep aspect ratio
+                     
+                     // Move cursor down (approx 80mm for image + padding)
+                     currentAttachmentY += 90; 
+
+                 } catch (e) {
+                     doc.setFontSize(8);
+                     doc.setTextColor(200, 0, 0);
+                     doc.text("Chyba při načítání obrázku (CORS nebo nedostupný soubor).", 14, currentAttachmentY + 15);
+                     currentAttachmentY += 30;
+                 }
+            }
+        }
+
         doc.save(`vykaz_prace_${empName}_${period}.pdf`);
     } catch (e) {
         console.error("PDF Generation failed:", e);
-        alert("Chyba při generování PDF. Zkontrolujte připojení k internetu (stahuje se font).");
+        alert("Chyba při generování PDF. Zkontrolujte připojení k internetu (stahuje se font a obrázky).");
     } finally {
         setIsGeneratingPdf(false);
     }
@@ -613,6 +672,13 @@ const ReportingModule: React.FC<ReportingModuleProps> = ({ entries, employees, c
                                     <td className="px-4 py-2 whitespace-nowrap text-gray-900">
                                         <span className="text-gray-400 font-medium mr-2 inline-block w-6">{capDayName}</span>
                                         {e.date}
+                                        {e.attachmentUrl && (
+                                            <span className="ml-2 text-indigo-500 inline-block align-middle" title="Obsahuje přílohu">
+                                                <svg xmlns="http://www.w3.org/2000/svg" className="h-3 w-3" viewBox="0 0 20 20" fill="currentColor">
+                                                    <path fillRule="evenodd" d="M8 4a3 3 0 00-3 3v4a5 5 0 0010 0V7a1 1 0 112 0v4a7 7 0 11-14 0V7a5 5 0 0110 0v4a3 3 0 11-6 0V7a1 1 0 012 0v4a1 1 0 102 0V7a3 3 0 00-3-3z" clipRule="evenodd" />
+                                                </svg>
+                                            </span>
+                                        )}
                                     </td>
                                     <td className="px-4 py-2 font-medium text-gray-800">{e.project}</td>
                                     <td className="px-4 py-2 whitespace-nowrap">

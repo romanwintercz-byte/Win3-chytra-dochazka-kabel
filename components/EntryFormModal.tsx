@@ -1,8 +1,9 @@
 
-import React, { useState, useEffect, useMemo } from 'react';
+import React, { useState, useEffect, useMemo, useRef } from 'react';
 import { TimeEntry, Job, WorkType } from '../types';
 import { v4 as uuidv4 } from 'uuid';
 import { isHoliday, getHolidayName } from '../services/holidayService';
+import { uploadAttachment } from '../services/supabase';
 
 interface EntryFormModalProps {
   isOpen: boolean;
@@ -22,6 +23,8 @@ interface RowState {
   description: string;
   hours: string; // String for better input handling
   type: WorkType;
+  attachmentUrl?: string; // Local state for attachment
+  isUploading?: boolean;
 }
 
 const EntryFormModal: React.FC<EntryFormModalProps> = ({ 
@@ -31,6 +34,9 @@ const EntryFormModal: React.FC<EntryFormModalProps> = ({
   const [rows, setRows] = useState<RowState[]>([]);
   const [isRangeMode, setIsRangeMode] = useState(false);
   const [dateTo, setDateTo] = useState('');
+  
+  // Ref to trigger hidden file inputs
+  const fileInputRefs = useRef<Record<string, HTMLInputElement | null>>({});
 
   useEffect(() => {
     if (isOpen) {
@@ -48,7 +54,8 @@ const EntryFormModal: React.FC<EntryFormModalProps> = ({
             project: e.project || '',
             description: e.description,
             hours: e.hours.toString(),
-            type: e.type
+            type: e.type,
+            attachmentUrl: e.attachmentUrl
         })));
       } else {
         setRows([{
@@ -68,6 +75,16 @@ const EntryFormModal: React.FC<EntryFormModalProps> = ({
 
   const isProjectRequired = (type: WorkType) => {
     return type === WorkType.REGULAR || type === WorkType.OVERTIME;
+  };
+
+  const isAttachmentAllowed = (type: WorkType) => {
+      return [
+          WorkType.DOCTOR, 
+          WorkType.SICK_DAY, 
+          WorkType.OCR, 
+          WorkType.OTHER_OBSTACLE,
+          WorkType.COMPENSATORY_LEAVE
+      ].includes(type);
   };
 
   const addRow = () => {
@@ -103,6 +120,20 @@ const EntryFormModal: React.FC<EntryFormModalProps> = ({
     }));
   };
 
+  const handleFileUpload = async (rowId: string, file: File) => {
+      // Set uploading state
+      setRows(prev => prev.map(r => r.id === rowId ? { ...r, isUploading: true } : r));
+
+      const url = await uploadAttachment(file);
+
+      // Set Result
+      setRows(prev => prev.map(r => r.id === rowId ? { 
+          ...r, 
+          isUploading: false,
+          attachmentUrl: url || undefined 
+      } : r));
+  };
+
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
 
@@ -124,7 +155,8 @@ const EntryFormModal: React.FC<EntryFormModalProps> = ({
                             project: isProjectRequired(row.type) ? row.project : '', // Ensure project is empty for non-work
                             description: row.description,
                             hours: parseFloat(row.hours),
-                            type: row.type
+                            type: row.type,
+                            attachmentUrl: row.attachmentUrl // Keep attachment if copied
                         });
                     }
                 });
@@ -140,7 +172,8 @@ const EntryFormModal: React.FC<EntryFormModalProps> = ({
             project: isProjectRequired(r.type) ? r.project : '', // Ensure project is empty for non-work
             description: r.description,
             hours: parseFloat(r.hours) || 0,
-            type: r.type
+            type: r.type,
+            attachmentUrl: r.attachmentUrl
         })).filter(e => e.hours > 0);
 
         onSubmit(date, finalEntries);
@@ -188,7 +221,9 @@ const EntryFormModal: React.FC<EntryFormModalProps> = ({
                                project: isProjectRequired(row.type) ? row.project : '',
                                description: row.description,
                                hours: parseFloat(row.hours),
-                               type: row.type
+                               type: row.type,
+                               // Do NOT copy attachments to future days automatically
+                               // attachmentUrl: row.attachmentUrl 
                            });
                        }
                    });
@@ -295,6 +330,8 @@ const EntryFormModal: React.FC<EntryFormModalProps> = ({
           <div className="flex-1 overflow-y-auto p-3 sm:p-5 space-y-4 bg-gray-100 scrollbar-thin">
              {rows.map((row, index) => {
                 const projectEnabled = isProjectRequired(row.type);
+                const canAttach = isAttachmentAllowed(row.type);
+
                 return (
                 <div key={row.id} className="bg-white p-4 rounded-xl border border-gray-200 shadow-sm flex flex-col sm:flex-row gap-4 relative animate-fade-in hover:shadow-md transition-shadow">
                     
@@ -355,16 +392,63 @@ const EntryFormModal: React.FC<EntryFormModalProps> = ({
                         </div>
                     </div>
 
-                    {/* Description */}
+                    {/* Description + Attachment Row */}
                     <div className="w-full sm:flex-[2]">
-                        <label className="text-[10px] font-bold text-gray-500 uppercase mb-1 block sm:hidden">Popis</label>
-                        <input
-                            type="text"
-                            value={row.description}
-                            onChange={(e) => updateRow(row.id, 'description', e.target.value)}
-                            placeholder="Poznámka (volitelné)..."
-                            className="w-full h-11 p-2 border border-gray-300 rounded-lg text-sm text-gray-900 placeholder-gray-400 bg-white focus:ring-2 focus:ring-indigo-500"
-                        />
+                        <label className="text-[10px] font-bold text-gray-500 uppercase mb-1 block sm:hidden">Popis & Přílohy</label>
+                        <div className="flex gap-2">
+                            <input
+                                type="text"
+                                value={row.description}
+                                onChange={(e) => updateRow(row.id, 'description', e.target.value)}
+                                placeholder="Poznámka..."
+                                className="flex-1 h-11 p-2 border border-gray-300 rounded-lg text-sm text-gray-900 placeholder-gray-400 bg-white focus:ring-2 focus:ring-indigo-500"
+                            />
+                            
+                            {/* Attachment Button */}
+                            {canAttach && (
+                                <>
+                                    <input 
+                                        type="file" 
+                                        accept="image/*" 
+                                        capture="environment"
+                                        className="hidden"
+                                        ref={(el) => { fileInputRefs.current[row.id] = el; }}
+                                        onChange={(e) => {
+                                            if (e.target.files && e.target.files[0]) {
+                                                handleFileUpload(row.id, e.target.files[0]);
+                                            }
+                                        }}
+                                    />
+                                    <button
+                                        type="button"
+                                        onClick={() => fileInputRefs.current[row.id]?.click()}
+                                        disabled={row.isUploading || !!row.attachmentUrl}
+                                        className={`h-11 w-11 flex items-center justify-center rounded-lg border transition-colors ${
+                                            row.attachmentUrl 
+                                                ? 'bg-green-100 border-green-300 text-green-700' 
+                                                : 'bg-white border-gray-300 text-gray-500 hover:bg-gray-50'
+                                        }`}
+                                        title="Vyfotit doklad"
+                                    >
+                                        {row.isUploading ? (
+                                            <svg className="animate-spin h-5 w-5 text-indigo-600" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                                                <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                                                <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                                            </svg>
+                                        ) : row.attachmentUrl ? (
+                                            <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+                                            </svg>
+                                        ) : (
+                                            <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 9a2 2 0 012-2h.93a2 2 0 001.664-.89l.812-1.22A2 2 0 0110.07 4h3.86a2 2 0 011.664.89l.812 1.22A2 2 0 0018.07 7H19a2 2 0 012 2v9a2 2 0 01-2 2H5a2 2 0 01-2-2V9z" />
+                                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 13a3 3 0 11-6 0 3 3 0 016 0z" />
+                                            </svg>
+                                        )}
+                                    </button>
+                                </>
+                            )}
+                        </div>
                     </div>
 
                     {/* Desktop Delete */}
