@@ -134,6 +134,41 @@ const HelpSystem: React.FC = () => {
                         </div>
                     </div>
 
+                    {/* NOVÁ FUNKCE - FOTKY */}
+                    <div className="bg-white p-4 rounded-xl border border-gray-200 shadow-sm relative overflow-hidden">
+                        <div className="absolute top-0 right-0 bg-purple-100 text-purple-700 text-xs font-bold px-2 py-1 rounded-bl-lg">FOTKY</div>
+                        <h4 className="font-bold text-gray-900 mb-2 flex items-center gap-2">
+                            <span className="text-xl">📷</span>
+                            Jak nahrát propustku?
+                        </h4>
+                        <p className="text-sm text-gray-600 mb-2">
+                             U lékaře, nemoci nebo OČR můžete rovnou vyfotit doklad a poslat ho vedení.
+                        </p>
+                        <ol className="text-sm text-gray-600 list-decimal pl-4 space-y-1">
+                             <li>Otevřete <strong>Editor dne</strong>.</li>
+                             <li>Vyberte činnost (např. Lékař).</li>
+                             <li>Vedle poznámky klikněte na <strong>ikonu Fotoaparátu</strong>.</li>
+                             <li>Vyfoťte lístek mobilem.</li>
+                        </ol>
+                    </div>
+
+                    {/* NOVÁ FUNKCE - UPDATE */}
+                    <div className="bg-white p-4 rounded-xl border border-gray-200 shadow-sm relative overflow-hidden">
+                        <div className="absolute top-0 right-0 bg-blue-100 text-blue-700 text-xs font-bold px-2 py-1 rounded-bl-lg">UPDATE</div>
+                        <h4 className="font-bold text-gray-900 mb-2 flex items-center gap-2">
+                            <span className="text-xl">🔄</span>
+                            Jak aktualizovat aplikaci?
+                        </h4>
+                        <p className="text-sm text-gray-600">
+                             Aplikace se vylepšuje sama na pozadí. Aby se změny projevily:
+                        </p>
+                        <ul className="text-sm text-gray-600 list-disc pl-4 mt-2 space-y-1">
+                             <li>Sledujte černou lištu dole: <strong>"Nová verze k dispozici"</strong>.</li>
+                             <li>Vždy klikněte na tlačítko <strong>AKTUALIZOVAT</strong>.</li>
+                             <li>Pokud se aplikace chová divně, úplně ji zavřete a znovu otevřete.</li>
+                        </ul>
+                    </div>
+
                     {/* Krok 3 */}
                     <div className="bg-white p-4 rounded-xl border border-gray-200 shadow-sm relative overflow-hidden">
                         <div className="absolute top-0 right-0 bg-red-100 text-red-700 text-xs font-bold px-2 py-1 rounded-bl-lg">KROK 3</div>
@@ -169,6 +204,23 @@ const HelpSystem: React.FC = () => {
                     <ul className="list-disc pl-4 mt-2 space-y-1">
                       <li><strong>Zkopírovat minulý den:</strong> Vezme vše, co jste dělali naposledy, a vloží to do dneška. Ideální, pokud děláte na stejném projektu.</li>
                       <li><strong>Dovolená/Nemoc:</strong> Tlačítka na jeden klik v hlavním panelu.</li>
+                    </ul>
+                  </div>
+                </details>
+
+                <details className="group bg-white rounded-lg border border-gray-200 overflow-hidden">
+                  <summary className="flex justify-between items-center font-medium cursor-pointer list-none p-3 bg-gray-50 group-open:bg-indigo-50 text-gray-800">
+                    <span>📷 Doklady a propustky</span>
+                    <span className="transition group-open:rotate-180">
+                      <svg fill="none" height="24" shapeRendering="geometricPrecision" stroke="currentColor" strokeLinecap="round" strokeLinejoin="round" strokeWidth="1.5" viewBox="0 0 24 24" width="24"><path d="M6 9l6 6 6-6"></path></svg>
+                    </span>
+                  </summary>
+                  <div className="text-gray-600 text-sm p-3 border-t border-gray-100">
+                    <p>Kam s lístkem od doktora?</p>
+                    <ul className="list-disc pl-4 mt-2 space-y-1">
+                      <li>Nemusíte nikam chodit ani posílat mail.</li>
+                      <li>Při zadávání "Lékaře" nebo "Nemoci" v Editoru klikněte na ikonu fotky.</li>
+                      <li>Vyfoťte lístek. Vedení ho uvidí v systému.</li>
                     </ul>
                   </div>
                 </details>
