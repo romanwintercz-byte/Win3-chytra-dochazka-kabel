@@ -13,11 +13,15 @@ interface ReportingModuleProps {
 }
 
 const ReportingModule: React.FC<ReportingModuleProps> = ({ entries, employees, currentUserRole, jobs }) => {
+  const [activeView, setActiveView] = useState<'stats' | 'documents'>('stats');
   const [projectFilter, setProjectFilter] = useState<string>('all');
   const [employeeFilter, setEmployeeFilter] = useState<string>('all');
   const [monthFilter, setMonthFilter] = useState<string>('all');
   const [isEmailModalOpen, setIsEmailModalOpen] = useState(false);
   const [isGeneratingPdf, setIsGeneratingPdf] = useState(false);
+  
+  // Document Lightbox State
+  const [selectedImage, setSelectedImage] = useState<{url: string, title: string} | null>(null);
 
   // Helper to get employee name
   const getEmployeeName = (id: string) => {
@@ -54,6 +58,11 @@ const ReportingModule: React.FC<ReportingModuleProps> = ({ entries, employees, c
       // STRICT SORT FOR UI: Descending (Newest first)
       .sort((a, b) => b.date.localeCompare(a.date));
   }, [entries, projectFilter, employeeFilter, monthFilter]);
+
+  // Entries that have attachments
+  const entriesWithDocs = useMemo(() => {
+      return filteredEntries.filter(e => e.attachmentUrl);
+  }, [filteredEntries]);
 
   // Calculate Validation Issues for the current filter (only if a month is selected)
   const currentValidationIssues = useMemo(() => {
@@ -575,192 +584,309 @@ const ReportingModule: React.FC<ReportingModuleProps> = ({ entries, employees, c
             </div>
         </div>
 
-        {/* Summary Cards */}
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-            <div className="bg-white p-4 rounded-xl shadow-sm border border-gray-100">
-                <p className="text-sm text-gray-500 mb-1">Běžně odpracováno (Bez přesčasů)</p>
-                <div className="flex items-baseline gap-2">
-                    <p className="text-2xl font-bold text-indigo-600">{aggregatedData.totalRegularProductive.toFixed(1)} h</p>
-                </div>
-            </div>
-            <div className="bg-white p-4 rounded-xl shadow-sm border border-gray-100">
-                <p className="text-sm text-gray-500 mb-1">Přesčasy (Celkem)</p>
-                <p className={`text-2xl font-bold ${aggregatedData.totalOvertime > 0 ? 'text-orange-600' : 'text-gray-900'}`}>
-                    {aggregatedData.totalOvertime.toFixed(1)} h
-                </p>
-            </div>
-            <div className="bg-white p-4 rounded-xl shadow-sm border border-gray-100">
-                <p className="text-sm text-gray-500 mb-1">Celkový fond (vč. absencí)</p>
-                <p className="text-2xl font-bold text-gray-900">{aggregatedData.total.toFixed(1)} h</p>
-            </div>
+        {/* View Switcher (Tabs) */}
+        <div className="flex space-x-1 bg-gray-100 p-1 rounded-lg w-fit">
+            <button
+                onClick={() => setActiveView('stats')}
+                className={`px-4 py-2 rounded-md text-sm font-medium transition-all ${
+                    activeView === 'stats' 
+                    ? 'bg-white text-indigo-600 shadow-sm' 
+                    : 'text-gray-500 hover:text-gray-700'
+                }`}
+            >
+                Statistiky & Tabulky
+            </button>
+            <button
+                onClick={() => setActiveView('documents')}
+                className={`px-4 py-2 rounded-md text-sm font-medium transition-all flex items-center gap-2 ${
+                    activeView === 'documents' 
+                    ? 'bg-white text-indigo-600 shadow-sm' 
+                    : 'text-gray-500 hover:text-gray-700'
+                }`}
+            >
+                Doklady & Přílohy
+                <span className="bg-indigo-100 text-indigo-700 text-xs px-2 py-0.5 rounded-full">
+                    {entriesWithDocs.length}
+                </span>
+            </button>
         </div>
 
-        {/* Communication Section */}
-        <div className="bg-gradient-to-r from-indigo-50 to-blue-50 p-6 rounded-xl border border-indigo-100 flex flex-col md:flex-row justify-between items-center gap-4">
-           <div>
-              <h3 className="text-lg font-bold text-indigo-900">Odeslání podkladů pro mzdy</h3>
-              <p className="text-sm text-indigo-700 mt-1">
-                 Vygeneruje PDF s podpisovým řádkem, CSV data a předpřipraví email pro paní účetní.
-              </p>
-           </div>
-           <button 
-              onClick={handlePreSend}
-              disabled={isGeneratingPdf}
-              className={`bg-indigo-600 text-white px-6 py-3 rounded-lg shadow-md hover:bg-indigo-700 transition-all font-medium flex items-center gap-2 whitespace-nowrap ${isGeneratingPdf ? 'opacity-70 cursor-wait' : ''}`}
-           >
-              {isGeneratingPdf ? (
-                <>
-                  <svg className="animate-spin h-5 w-5 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
-                    <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
-                    <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
-                  </svg>
-                  Generuji...
-                </>
-              ) : (
-                <>
-                  <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" />
-                  </svg>
-                  Vygenerovat & Odeslat
-                </>
-              )}
-           </button>
-        </div>
+        {activeView === 'documents' && (
+            <div className="animate-fade-in">
+                {entriesWithDocs.length === 0 ? (
+                    <div className="bg-white p-12 rounded-xl text-center border border-dashed border-gray-300">
+                        <div className="text-gray-400 text-lg">Žádné nahrané doklady pro vybraný filtr.</div>
+                        <p className="text-sm text-gray-500 mt-2">Přílohy se nahrávají při zadávání Absence, Nemoci nebo Lékaře.</p>
+                    </div>
+                ) : (
+                    <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-4">
+                        {entriesWithDocs.map(entry => (
+                            <div 
+                                key={entry.id} 
+                                className="group bg-white rounded-xl overflow-hidden border border-gray-200 hover:border-indigo-300 hover:shadow-lg transition-all cursor-pointer"
+                                onClick={() => setSelectedImage({
+                                    url: entry.attachmentUrl!,
+                                    title: `${getEmployeeName(entry.employeeId)} - ${new Date(entry.date).toLocaleDateString('cs-CZ')}`
+                                })}
+                            >
+                                <div className="aspect-square bg-gray-100 relative overflow-hidden">
+                                    <img 
+                                        src={entry.attachmentUrl} 
+                                        alt="Attachment" 
+                                        className="w-full h-full object-cover transform group-hover:scale-110 transition-transform duration-500"
+                                        loading="lazy"
+                                    />
+                                    <div className="absolute inset-0 bg-black bg-opacity-0 group-hover:bg-opacity-20 transition-opacity flex items-center justify-center">
+                                         <svg xmlns="http://www.w3.org/2000/svg" className="h-8 w-8 text-white opacity-0 group-hover:opacity-100 transform scale-75 group-hover:scale-100 transition-all" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0zM10 7v3m0 0v3m0-3h3m-3 0H7" />
+                                        </svg>
+                                    </div>
+                                </div>
+                                <div className="p-3">
+                                    <div className="text-xs text-gray-500 font-bold uppercase tracking-wider mb-1">
+                                        {new Date(entry.date).toLocaleDateString('cs-CZ')}
+                                    </div>
+                                    <div className="font-semibold text-gray-900 truncate">
+                                        {getEmployeeName(entry.employeeId)}
+                                    </div>
+                                    <div className="flex items-center justify-between mt-2">
+                                        <span className={`text-[10px] px-2 py-0.5 rounded-full font-bold ${
+                                            entry.type === WorkType.SICK_DAY ? 'bg-red-100 text-red-700' :
+                                            entry.type === WorkType.DOCTOR ? 'bg-yellow-100 text-yellow-700' :
+                                            'bg-gray-100 text-gray-600'
+                                        }`}>
+                                            {entry.type}
+                                        </span>
+                                    </div>
+                                </div>
+                            </div>
+                        ))}
+                    </div>
+                )}
+            </div>
+        )}
 
-        <div className="grid grid-cols-1 xl:grid-cols-3 gap-6">
-            <div className="bg-white p-6 rounded-xl shadow-sm border border-gray-100 xl:col-span-2">
-                <div className="flex justify-between items-center mb-4 flex-wrap gap-2">
-                    <h3 className="text-lg font-semibold text-gray-800">Detailní výkaz ({filteredEntries.length} záznamů)</h3>
-                    <div className="flex gap-2">
-                         <button onClick={generatePDF} disabled={isGeneratingPdf} className="text-sm bg-red-50 text-red-700 border border-red-200 px-3 py-1.5 rounded-md hover:bg-red-100 transition-colors font-medium flex items-center gap-1">
-                            {isGeneratingPdf ? '...' : (
-                            <>
-                                <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 21h10a2 2 0 002-2V9.414a1 1 0 00-.293-.707l-5.414-5.414A1 1 0 0012.586 3H7a2 2 0 00-2 2v14a2 2 0 002 2z" />
-                                </svg>
-                                PDF Výkaz
-                            </>
-                            )}
-                        </button>
-                        <button onClick={handleExportSummaryCSV} className="text-sm bg-green-50 text-green-700 border border-green-200 px-3 py-1.5 rounded-md hover:bg-green-100 transition-colors font-medium flex items-center gap-1">
-                            <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
-                            </svg>
-                            CSV Souhrn
-                        </button>
+        {activeView === 'stats' && (
+        <>
+            {/* Summary Cards */}
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                <div className="bg-white p-4 rounded-xl shadow-sm border border-gray-100">
+                    <p className="text-sm text-gray-500 mb-1">Běžně odpracováno (Bez přesčasů)</p>
+                    <div className="flex items-baseline gap-2">
+                        <p className="text-2xl font-bold text-indigo-600">{aggregatedData.totalRegularProductive.toFixed(1)} h</p>
                     </div>
                 </div>
-                
-                <div className="overflow-x-auto max-h-[500px]">
-                    <table className="min-w-full divide-y divide-gray-200 text-sm">
-                        <thead className="bg-gray-50 sticky top-0 z-10">
-                            <tr>
-                                <th className="px-4 py-2 text-left font-medium text-gray-500">Datum</th>
-                                <th className="px-4 py-2 text-left font-medium text-gray-500">Projekt</th>
-                                <th className="px-4 py-2 text-left font-medium text-gray-500">Typ</th>
-                                <th className="px-4 py-2 text-right font-medium text-gray-500">Hodiny</th>
-                            </tr>
-                        </thead>
-                        <tbody className="divide-y divide-gray-200">
-                            {filteredEntries.map(e => {
-                                const date = new Date(e.date);
-                                const dayName = date.toLocaleDateString('cs-CZ', { weekday: 'short' });
-                                const capDayName = dayName.charAt(0).toUpperCase() + dayName.slice(1);
-                                
-                                return (
-                                <tr key={e.id} className={!isProductiveWork(e.type) ? 'bg-orange-50/30' : ''}>
-                                    <td className="px-4 py-2 whitespace-nowrap text-gray-900">
-                                        <span className="text-gray-400 font-medium mr-2 inline-block w-6">{capDayName}</span>
-                                        {e.date}
-                                        {e.attachmentUrl && (
-                                            <span className="ml-2 text-indigo-500 inline-block align-middle" title="Obsahuje přílohu">
-                                                <svg xmlns="http://www.w3.org/2000/svg" className="h-3 w-3" viewBox="0 0 20 20" fill="currentColor">
-                                                    <path fillRule="evenodd" d="M8 4a3 3 0 00-3 3v4a5 5 0 0010 0V7a1 1 0 112 0v4a7 7 0 11-14 0V7a5 5 0 0110 0v4a3 3 0 11-6 0V7a1 1 0 012 0v4a1 1 0 102 0V7a3 3 0 00-3-3z" clipRule="evenodd" />
-                                                </svg>
-                                            </span>
-                                        )}
-                                    </td>
-                                    <td className="px-4 py-2 font-medium text-gray-800">{e.project}</td>
-                                    <td className="px-4 py-2 whitespace-nowrap">
-                                        <span className={`px-2 py-0.5 rounded-full text-xs font-medium ${
-                                            e.type === WorkType.OVERTIME 
-                                                ? 'text-orange-800 bg-orange-200' 
-                                                : isProductiveWork(e.type) 
-                                                    ? 'text-green-700 bg-green-100' 
-                                                    : 'text-orange-700 bg-orange-100'
-                                        }`}>
-                                          {e.type}
-                                        </span>
-                                    </td>
-                                    <td className={`px-4 py-2 text-right font-mono font-bold text-base ${isProductiveWork(e.type) ? 'text-indigo-600' : 'text-orange-600'}`}>
-                                        {Number(e.hours).toFixed(1)}
-                                    </td>
-                                </tr>
-                            )})}
-                        </tbody>
-                    </table>
+                <div className="bg-white p-4 rounded-xl shadow-sm border border-gray-100">
+                    <p className="text-sm text-gray-500 mb-1">Přesčasy (Celkem)</p>
+                    <p className={`text-2xl font-bold ${aggregatedData.totalOvertime > 0 ? 'text-orange-600' : 'text-gray-900'}`}>
+                        {aggregatedData.totalOvertime.toFixed(1)} h
+                    </p>
+                </div>
+                <div className="bg-white p-4 rounded-xl shadow-sm border border-gray-100">
+                    <p className="text-sm text-gray-500 mb-1">Celkový fond (vč. absencí)</p>
+                    <p className="text-2xl font-bold text-gray-900">{aggregatedData.total.toFixed(1)} h</p>
                 </div>
             </div>
 
-            <div className="space-y-6">
-                {/* Breakdown by Project with Separate Overtime Column */}
-                <div className="bg-white p-6 rounded-xl shadow-sm border border-gray-100">
-                    <h3 className="text-sm font-semibold text-gray-500 uppercase tracking-wider mb-4 border-b pb-2">Soupis hodin na zakázky</h3>
-                    {Object.keys(aggregatedData.byProject).length === 0 ? (
-                        <p className="text-sm text-gray-400 italic">Žádné odpracované hodiny na projektech.</p>
-                    ) : (
-                        <div className="space-y-4">
-                            <div className="grid grid-cols-4 text-xs font-medium text-gray-400 uppercase mb-1">
-                                <div className="col-span-2">Projekt</div>
-                                <div className="text-right" title="Běžná práce bez přesčasů">Běžná</div>
-                                <div className="text-right text-orange-600">Přesčas</div>
-                            </div>
-                            
-                            <ul className="space-y-3">
-                                {Object.entries(aggregatedData.byProject).map(([project, s]) => {
-                                    const stats = s as { total: number; regular: number; overtime: number };
+            {/* Communication Section */}
+            <div className="bg-gradient-to-r from-indigo-50 to-blue-50 p-6 rounded-xl border border-indigo-100 flex flex-col md:flex-row justify-between items-center gap-4">
+            <div>
+                <h3 className="text-lg font-bold text-indigo-900">Odeslání podkladů pro mzdy</h3>
+                <p className="text-sm text-indigo-700 mt-1">
+                    Vygeneruje PDF s podpisovým řádkem, CSV data a předpřipraví email pro paní účetní.
+                </p>
+            </div>
+            <button 
+                onClick={handlePreSend}
+                disabled={isGeneratingPdf}
+                className={`bg-indigo-600 text-white px-6 py-3 rounded-lg shadow-md hover:bg-indigo-700 transition-all font-medium flex items-center gap-2 whitespace-nowrap ${isGeneratingPdf ? 'opacity-70 cursor-wait' : ''}`}
+            >
+                {isGeneratingPdf ? (
+                    <>
+                    <svg className="animate-spin h-5 w-5 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                        <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                        <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                    </svg>
+                    Generuji...
+                    </>
+                ) : (
+                    <>
+                    <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" />
+                    </svg>
+                    Vygenerovat & Odeslat
+                    </>
+                )}
+            </button>
+            </div>
+
+            <div className="grid grid-cols-1 xl:grid-cols-3 gap-6">
+                <div className="bg-white p-6 rounded-xl shadow-sm border border-gray-100 xl:col-span-2">
+                    <div className="flex justify-between items-center mb-4 flex-wrap gap-2">
+                        <h3 className="text-lg font-semibold text-gray-800">Detailní výkaz ({filteredEntries.length} záznamů)</h3>
+                        <div className="flex gap-2">
+                            <button onClick={generatePDF} disabled={isGeneratingPdf} className="text-sm bg-red-50 text-red-700 border border-red-200 px-3 py-1.5 rounded-md hover:bg-red-100 transition-colors font-medium flex items-center gap-1">
+                                {isGeneratingPdf ? '...' : (
+                                <>
+                                    <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 21h10a2 2 0 002-2V9.414a1 1 0 00-.293-.707l-5.414-5.414A1 1 0 0012.586 3H7a2 2 0 00-2 2v14a2 2 0 002 2z" />
+                                    </svg>
+                                    PDF Výkaz
+                                </>
+                                )}
+                            </button>
+                            <button onClick={handleExportSummaryCSV} className="text-sm bg-green-50 text-green-700 border border-green-200 px-3 py-1.5 rounded-md hover:bg-green-100 transition-colors font-medium flex items-center gap-1">
+                                <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+                                </svg>
+                                CSV Souhrn
+                            </button>
+                        </div>
+                    </div>
+                    
+                    <div className="overflow-x-auto max-h-[500px]">
+                        <table className="min-w-full divide-y divide-gray-200 text-sm">
+                            <thead className="bg-gray-50 sticky top-0 z-10">
+                                <tr>
+                                    <th className="px-4 py-2 text-left font-medium text-gray-500">Datum</th>
+                                    <th className="px-4 py-2 text-left font-medium text-gray-500">Projekt</th>
+                                    <th className="px-4 py-2 text-left font-medium text-gray-500">Typ</th>
+                                    <th className="px-4 py-2 text-right font-medium text-gray-500">Hodiny</th>
+                                </tr>
+                            </thead>
+                            <tbody className="divide-y divide-gray-200">
+                                {filteredEntries.map(e => {
+                                    const date = new Date(e.date);
+                                    const dayName = date.toLocaleDateString('cs-CZ', { weekday: 'short' });
+                                    const capDayName = dayName.charAt(0).toUpperCase() + dayName.slice(1);
+                                    
                                     return (
-                                    <li key={project} className="grid grid-cols-4 items-center border-b border-gray-50 pb-2 last:border-0 text-sm">
-                                        <div className="col-span-2 font-medium text-gray-700 truncate pr-2" title={project}>{project}</div>
-                                        <div className="text-right text-gray-600">{stats.regular.toFixed(1)}</div>
-                                        <div className={`text-right font-bold ${stats.overtime > 0 ? 'text-orange-600' : 'text-gray-300'}`}>
-                                            {stats.overtime.toFixed(1)}
-                                        </div>
-                                    </li>
+                                    <tr key={e.id} className={!isProductiveWork(e.type) ? 'bg-orange-50/30' : ''}>
+                                        <td className="px-4 py-2 whitespace-nowrap text-gray-900">
+                                            <span className="text-gray-400 font-medium mr-2 inline-block w-6">{capDayName}</span>
+                                            {e.date}
+                                            {e.attachmentUrl && (
+                                                <button 
+                                                    className="ml-2 text-indigo-500 inline-block align-middle hover:text-indigo-700" 
+                                                    title="Zobrazit přílohu"
+                                                    onClick={() => setSelectedImage({
+                                                        url: e.attachmentUrl!,
+                                                        title: `${getEmployeeName(e.employeeId)} - ${e.date}`
+                                                    })}
+                                                >
+                                                    <svg xmlns="http://www.w3.org/2000/svg" className="h-3 w-3" viewBox="0 0 20 20" fill="currentColor">
+                                                        <path fillRule="evenodd" d="M8 4a3 3 0 00-3 3v4a5 5 0 0010 0V7a1 1 0 112 0v4a7 7 0 11-14 0V7a5 5 0 0110 0v4a3 3 0 11-6 0V7a1 1 0 012 0v4a1 1 0 102 0V7a3 3 0 00-3-3z" clipRule="evenodd" />
+                                                    </svg>
+                                                </button>
+                                            )}
+                                        </td>
+                                        <td className="px-4 py-2 font-medium text-gray-800">{e.project}</td>
+                                        <td className="px-4 py-2 whitespace-nowrap">
+                                            <span className={`px-2 py-0.5 rounded-full text-xs font-medium ${
+                                                e.type === WorkType.OVERTIME 
+                                                    ? 'text-orange-800 bg-orange-200' 
+                                                    : isProductiveWork(e.type) 
+                                                        ? 'text-green-700 bg-green-100' 
+                                                        : 'text-orange-700 bg-orange-100'
+                                            }`}>
+                                            {e.type}
+                                            </span>
+                                        </td>
+                                        <td className={`px-4 py-2 text-right font-mono font-bold text-base ${isProductiveWork(e.type) ? 'text-indigo-600' : 'text-orange-600'}`}>
+                                            {Number(e.hours).toFixed(1)}
+                                        </td>
+                                    </tr>
                                 )})}
-                                <li className="pt-3 border-t border-gray-200 grid grid-cols-4 items-center font-bold">
-                                    <span className="col-span-2">Celkem</span>
-                                    <span className="text-right text-indigo-700">{aggregatedData.totalRegularProductive.toFixed(1)}</span>
-                                    <span className="text-right text-orange-600">{aggregatedData.totalOvertime.toFixed(1)}</span>
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+
+                <div className="space-y-6">
+                    {/* Breakdown by Project with Separate Overtime Column */}
+                    <div className="bg-white p-6 rounded-xl shadow-sm border border-gray-100">
+                        <h3 className="text-sm font-semibold text-gray-500 uppercase tracking-wider mb-4 border-b pb-2">Soupis hodin na zakázky</h3>
+                        {Object.keys(aggregatedData.byProject).length === 0 ? (
+                            <p className="text-sm text-gray-400 italic">Žádné odpracované hodiny na projektech.</p>
+                        ) : (
+                            <div className="space-y-4">
+                                <div className="grid grid-cols-4 text-xs font-medium text-gray-400 uppercase mb-1">
+                                    <div className="col-span-2">Projekt</div>
+                                    <div className="text-right" title="Běžná práce bez přesčasů">Běžná</div>
+                                    <div className="text-right text-orange-600">Přesčas</div>
+                                </div>
+                                
+                                <ul className="space-y-3">
+                                    {Object.entries(aggregatedData.byProject).map(([project, s]) => {
+                                        const stats = s as { total: number; regular: number; overtime: number };
+                                        return (
+                                        <li key={project} className="grid grid-cols-4 items-center border-b border-gray-50 pb-2 last:border-0 text-sm">
+                                            <div className="col-span-2 font-medium text-gray-700 truncate pr-2" title={project}>{project}</div>
+                                            <div className="text-right text-gray-600">{stats.regular.toFixed(1)}</div>
+                                            <div className={`text-right font-bold ${stats.overtime > 0 ? 'text-orange-600' : 'text-gray-300'}`}>
+                                                {stats.overtime.toFixed(1)}
+                                            </div>
+                                        </li>
+                                    )})}
+                                    <li className="pt-3 border-t border-gray-200 grid grid-cols-4 items-center font-bold">
+                                        <span className="col-span-2">Celkem</span>
+                                        <span className="text-right text-indigo-700">{aggregatedData.totalRegularProductive.toFixed(1)}</span>
+                                        <span className="text-right text-orange-600">{aggregatedData.totalOvertime.toFixed(1)}</span>
+                                    </li>
+                                </ul>
+                            </div>
+                        )}
+                    </div>
+
+                    <div className="bg-white p-6 rounded-xl shadow-sm border border-gray-100">
+                        <h3 className="text-sm font-semibold text-gray-500 uppercase tracking-wider mb-4 border-b pb-2">Soupis Absencí a Náhrad</h3>
+                        {aggregatedData.totalAbsence === 0 ? (
+                            <p className="text-sm text-gray-400 italic">Žádné absence v tomto období.</p>
+                        ) : (
+                            <ul className="space-y-3">
+                                {Object.entries(aggregatedData.byType)
+                                    .filter(([type]) => !isProductiveWork(type as WorkType))
+                                    .map(([type, hours]) => (
+                                    <li key={type} className="flex justify-between items-center">
+                                        <span className="text-gray-700 text-sm">{type}</span>
+                                        <span className="font-bold text-orange-600">{(hours as number).toFixed(1)} h</span>
+                                    </li>
+                                ))}
+                                <li className="pt-3 border-t border-gray-100 flex justify-between items-center font-bold text-orange-700">
+                                    <span>Celkem absence</span>
+                                    <span>{aggregatedData.totalAbsence.toFixed(1)} h</span>
                                 </li>
                             </ul>
-                        </div>
-                    )}
-                </div>
-
-                <div className="bg-white p-6 rounded-xl shadow-sm border border-gray-100">
-                    <h3 className="text-sm font-semibold text-gray-500 uppercase tracking-wider mb-4 border-b pb-2">Soupis Absencí a Náhrad</h3>
-                     {aggregatedData.totalAbsence === 0 ? (
-                        <p className="text-sm text-gray-400 italic">Žádné absence v tomto období.</p>
-                    ) : (
-                        <ul className="space-y-3">
-                            {Object.entries(aggregatedData.byType)
-                                .filter(([type]) => !isProductiveWork(type as WorkType))
-                                .map(([type, hours]) => (
-                                <li key={type} className="flex justify-between items-center">
-                                    <span className="text-gray-700 text-sm">{type}</span>
-                                    <span className="font-bold text-orange-600">{(hours as number).toFixed(1)} h</span>
-                                </li>
-                            ))}
-                            <li className="pt-3 border-t border-gray-100 flex justify-between items-center font-bold text-orange-700">
-                                <span>Celkem absence</span>
-                                <span>{aggregatedData.totalAbsence.toFixed(1)} h</span>
-                            </li>
-                        </ul>
-                    )}
+                        )}
+                    </div>
                 </div>
             </div>
-        </div>
+        </>
+        )}
+
+        {/* Lightbox Modal */}
+        {selectedImage && (
+            <div className="fixed inset-0 z-[100] bg-black bg-opacity-90 flex items-center justify-center p-4 backdrop-blur-sm animate-fade-in" onClick={() => setSelectedImage(null)}>
+                <button 
+                    onClick={() => setSelectedImage(null)}
+                    className="absolute top-4 right-4 text-white/70 hover:text-white"
+                >
+                    <svg xmlns="http://www.w3.org/2000/svg" className="h-8 w-8" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                    </svg>
+                </button>
+                <div className="max-w-4xl max-h-full flex flex-col items-center" onClick={(e) => e.stopPropagation()}>
+                    <img 
+                        src={selectedImage.url} 
+                        alt="Full view" 
+                        className="max-h-[85vh] max-w-full object-contain rounded-lg shadow-2xl"
+                    />
+                    <div className="text-white mt-4 font-medium text-lg bg-black/50 px-4 py-2 rounded-full">
+                        {selectedImage.title}
+                    </div>
+                </div>
+            </div>
+        )}
 
         {/* Email Selection Modal */}
         {isEmailModalOpen && (

@@ -134,20 +134,93 @@ export const subscribeToNotifications = (userId: string, onNewNotification: (n: 
 
 // --- STORAGE FUNCTIONS ---
 
+// Helper function to compress images
+const compressImage = async (file: File): Promise<Blob> => {
+    // Only compress images
+    if (!file.type.startsWith('image/')) {
+        return file;
+    }
+
+    return new Promise((resolve, reject) => {
+        const img = new Image();
+        const url = URL.createObjectURL(file);
+
+        img.onload = () => {
+            const canvas = document.createElement('canvas');
+            const ctx = canvas.getContext('2d');
+            
+            // Max dimensions
+            const MAX_WIDTH = 1600;
+            const MAX_HEIGHT = 1600;
+            
+            let width = img.width;
+            let height = img.height;
+
+            // Calculate new dimensions
+            if (width > height) {
+                if (width > MAX_WIDTH) {
+                    height *= MAX_WIDTH / width;
+                    width = MAX_WIDTH;
+                }
+            } else {
+                if (height > MAX_HEIGHT) {
+                    width *= MAX_HEIGHT / height;
+                    height = MAX_HEIGHT;
+                }
+            }
+
+            canvas.width = width;
+            canvas.height = height;
+
+            if (ctx) {
+                ctx.drawImage(img, 0, 0, width, height);
+                // Compress to JPEG with 0.7 quality
+                canvas.toBlob(
+                    (blob) => {
+                        URL.revokeObjectURL(url);
+                        if (blob) {
+                            resolve(blob);
+                        } else {
+                            // Fallback to original if compression fails
+                            resolve(file);
+                        }
+                    }, 
+                    'image/jpeg', 
+                    0.7
+                );
+            } else {
+                resolve(file);
+            }
+        };
+
+        img.onerror = (err) => {
+            URL.revokeObjectURL(url);
+            resolve(file); // Fallback
+        };
+
+        img.src = url;
+    });
+};
+
 export const uploadAttachment = async (file: File): Promise<string | null> => {
     if (!isConfigured) return null;
 
     try {
-        // Generate unique path: public/attachments/TIMESTAMP_RANDOM.ext
-        const fileExt = file.name.split('.').pop();
+        // Compress image before upload
+        const compressedFileBlob = await compressImage(file);
+        
+        // Ensure extension matches content type (always save compressed as .jpg)
+        const originalExt = file.name.split('.').pop();
+        const fileExt = file.type.startsWith('image/') ? 'jpg' : originalExt;
+        
         const fileName = `${Date.now()}_${Math.random().toString(36).substring(2, 8)}.${fileExt}`;
         const filePath = `${fileName}`;
 
         // Upload to 'attachments' bucket
-        // Note: The bucket 'attachments' must exist and be public in Supabase
         const { data, error } = await supabase.storage
             .from('attachments')
-            .upload(filePath, file, {
+            .upload(filePath, compressedFileBlob, {
+                contentType: file.type.startsWith('image/') ? 'image/jpeg' : file.type,
                 cacheControl: '3600',
                 upsert: false
             });
