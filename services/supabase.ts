@@ -4,25 +4,6 @@ import { Employee, Job, TimeEntry, MonthStatus, TimesheetStatus, Notification } 
 import { CREDENTIALS } from '../credentials';
 import { MOCK_EMPLOYEES, MOCK_JOBS, MOCK_ENTRIES } from './mockData';
 
-// --- EMERGENCY RESET ---
-// Pokud je v URL ?reset=true, okamžitě vyčistíme localStorage a obnovíme stránku
-if (typeof window !== 'undefined') {
-    const params = new URLSearchParams(window.location.search);
-    if (params.get('reset') === 'true') {
-        console.warn("Resetting application state...");
-        try {
-            localStorage.removeItem('smartwork_supabase_url');
-            localStorage.removeItem('smartwork_supabase_key');
-            localStorage.removeItem('smartwork_current_user_id');
-        } catch (e) {
-            console.error(e);
-        }
-        // Clean URL without reload loop
-        const newUrl = window.location.pathname;
-        window.history.replaceState({}, '', newUrl);
-    }
-}
-
 // --- DEMO MODE STATE ---
 let demoState = {
     employees: [...MOCK_EMPLOYEES],
@@ -35,50 +16,8 @@ let demoState = {
 
 let forcedDemoMode = false;
 
-// Helper: Prefer localStorage, then real file credentials.
-// STRIPS QUOTES if they were accidentally pasted.
-const getCredential = (fileValue: string | undefined, storageKey: string) => {
-    let val: string | null = null;
-    
-    // 1. Try LocalStorage
-    try {
-        const stored = typeof localStorage !== 'undefined' ? localStorage.getItem(storageKey) : null;
-        if (stored && stored.trim().length > 0) val = stored.trim();
-    } catch (e) {
-        console.warn('LocalStorage access failed', e);
-    }
-
-    // 2. Try File/Env Value if LocalStorage is empty
-    if (!val && fileValue && !fileValue.includes('ZDE_VLOZTE')) {
-        val = fileValue.trim();
-    }
-
-    // 3. Cleanup (Remove quotes if present)
-    if (val) {
-        if ((val.startsWith('"') && val.endsWith('"')) || (val.startsWith("'") && val.endsWith("'"))) {
-            val = val.slice(1, -1);
-        }
-    }
-
-    return val;
-};
-
-// Strict URL Validation
-const isValidUrl = (url: string | null): boolean => {
-    if (!url) return false;
-    if (url.trim() !== url) return false; // Fail on whitespace
-    if (!url.startsWith('http://') && !url.startsWith('https://')) return false;
-    if (url.includes('your-project')) return false; // Common placeholder
-    
-    try {
-        new URL(url);
-        return true;
-    } catch {
-        return false;
-    }
-};
-
-// Dummy client
+// --- DUMMY CLIENT FACTORY ---
+// Vytvoří bezpečného "falešného" klienta, který nic nedělá, ale nehazí chyby.
 const createDummyClient = () => {
     const safeDummy: any = {
         select: () => safeDummy,
@@ -115,66 +54,112 @@ const createDummyClient = () => {
     } as unknown as SupabaseClient;
 };
 
-// --- INITIALIZATION ---
-let client: SupabaseClient = createDummyClient();
+// --- SAFE INITIALIZATION LOGIC ---
 
-// Wrapped in an IIFE-style logic to ensure no top-level throws
+// 1. Helper to clean strings
+const cleanString = (str: string | null | undefined): string | null => {
+    if (!str) return null;
+    let val = str.trim();
+    // Odstranění uvozovek, pokud je tam uživatel omylem vložil
+    if ((val.startsWith('"') && val.endsWith('"')) || (val.startsWith("'") && val.endsWith("'"))) {
+        val = val.slice(1, -1);
+    }
+    return val;
+};
+
+// 2. Helper to get credentials safely
+const getCredentials = () => {
+    let url: string | null = null;
+    let key: string | null = null;
+
+    // Try LocalStorage first
+    try {
+        if (typeof localStorage !== 'undefined') {
+            url = cleanString(localStorage.getItem('smartwork_supabase_url'));
+            key = cleanString(localStorage.getItem('smartwork_supabase_key'));
+        }
+    } catch (e) {
+        console.warn('LocalStorage error', e);
+    }
+
+    // Try Env/File second
+    if (!url || url.includes('ZDE_VLOZTE')) {
+        url = cleanString(CREDENTIALS.SUPABASE_URL);
+    }
+    if (!key || key.includes('ZDE_VLOZTE')) {
+        key = cleanString(CREDENTIALS.SUPABASE_KEY);
+    }
+
+    return { url, key };
+};
+
+// 3. Initialize Client
+let client: SupabaseClient = createDummyClient(); // Default to dummy immediately
+
 try {
-    const rawSupabaseUrl = getCredential(CREDENTIALS.SUPABASE_URL, 'smartwork_supabase_url');
-    const supabaseKey = getCredential(CREDENTIALS.SUPABASE_KEY, 'smartwork_supabase_key');
-    
-    const isUrlValid = isValidUrl(rawSupabaseUrl);
-    const hasKey = !!supabaseKey;
+    // Check reset flag first
+    if (typeof window !== 'undefined') {
+        const params = new URLSearchParams(window.location.search);
+        if (params.get('reset') === 'true') {
+            throw new Error("Reset requested");
+        }
+    }
+
+    const { url, key } = getCredentials();
     const isExplicitDemo = CREDENTIALS.IS_DEMO_MODE;
 
-    if (!isExplicitDemo && isUrlValid && hasKey && rawSupabaseUrl) {
+    // Validate URL format roughly
+    const isValidUrl = (u: string | null) => u && (u.startsWith('http://') || u.startsWith('https://')) && !u.includes('your-project');
+
+    if (!isExplicitDemo && isValidUrl(url) && key) {
         try {
-            // Attempt creation
-            client = createClient(rawSupabaseUrl, supabaseKey!, {
-                realtime: { params: { eventsPerSecond: 10 } },
+            // THE DANGEROUS CALL
+            client = createClient(url!, key!, {
+                auth: { persistSession: false }, // Prevent session issues
+                realtime: { params: { eventsPerSecond: 10 } }
             });
-        } catch (createError) {
-            console.error("Supabase createClient failed:", createError);
-            
-            // AUTO-HEALING: If it failed, the credentials in localStorage might be corrupt.
-            // Clear them so next reload works.
+        } catch (supaError) {
+            console.error("Supabase init crashed:", supaError);
+            // CRITICAL FIX: If init fails, assume credentials are bad and purge them
             if (typeof localStorage !== 'undefined') {
-                 console.warn("Clearing potentially corrupt credentials from LocalStorage.");
-                 localStorage.removeItem('smartwork_supabase_url');
-                 localStorage.removeItem('smartwork_supabase_key');
+                console.warn("Purging corrupt credentials from localStorage");
+                localStorage.removeItem('smartwork_supabase_url');
+                localStorage.removeItem('smartwork_supabase_key');
             }
-            
             forcedDemoMode = true;
             client = createDummyClient();
         }
     } else {
-        // Fallback to demo if keys are missing or invalid
         if (!isExplicitDemo) {
-             console.warn("Invalid credentials structure. Switching to Demo.");
-             forcedDemoMode = true;
+            console.warn("Invalid credentials structure. Using Demo.");
+            forcedDemoMode = true;
         }
         client = createDummyClient();
     }
+
 } catch (e) {
-    console.error("Critical error in supabase.ts:", e);
+    console.error("Global init error:", e);
+    // Nuclear option: Clear everything if we hit a top level error
+    if (typeof localStorage !== 'undefined') {
+        localStorage.removeItem('smartwork_supabase_url');
+        localStorage.removeItem('smartwork_supabase_key');
+    }
     forcedDemoMode = true;
     client = createDummyClient();
 }
 
 export const supabase = client;
 
-// Helper to check effective mode
+// --- EXPORTED HELPERS ---
+
 const isDemo = () => CREDENTIALS.IS_DEMO_MODE || forcedDemoMode;
 
 export const saveCredentialsManually = (url: string, key: string) => {
-    let cleanUrl = url.trim();
-    let cleanKey = key.trim();
-    // Strip quotes if user pasted them
-    if (cleanUrl.startsWith('"') || cleanUrl.startsWith("'")) cleanUrl = cleanUrl.slice(1, -1);
-    if (cleanKey.startsWith('"') || cleanKey.startsWith("'")) cleanKey = cleanKey.slice(1, -1);
-
+    const cleanUrl = cleanString(url) || '';
+    const cleanKey = cleanString(key) || '';
     localStorage.setItem('smartwork_supabase_url', cleanUrl);
     localStorage.setItem('smartwork_supabase_key', cleanKey);
+    // Reload to apply
     window.location.reload();
 };
 
