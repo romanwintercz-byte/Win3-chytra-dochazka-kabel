@@ -7,7 +7,10 @@
 
 // Helper pro detekci URL parametru ?demo=true
 const isUrlDemo = typeof window !== 'undefined' && new URLSearchParams(window.location.search).get('demo') === 'true';
-const isEnvDemo = (import.meta as any).env?.VITE_IS_DEMO_MODE === 'true';
+
+const envDemoVal = (import.meta as any).env?.VITE_IS_DEMO_MODE;
+// Accept 'true', '1', true
+const isEnvDemo = envDemoVal === 'true' || envDemoVal === '1' || envDemoVal === true;
 
 export const CREDENTIALS = {
     // PŘEPÍNAČ DEMO REŽIMU

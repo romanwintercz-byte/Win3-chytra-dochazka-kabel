@@ -5,8 +5,6 @@ import { CREDENTIALS } from '../credentials';
 import { MOCK_EMPLOYEES, MOCK_JOBS, MOCK_ENTRIES } from './mockData';
 
 // --- DEMO MODE STATE ---
-// We use simple in-memory state for Demo mode so changes persist during the session
-// but reset on reload (or you could implement localStorage here).
 let demoState = {
     employees: [...MOCK_EMPLOYEES],
     jobs: [...MOCK_JOBS],
@@ -18,11 +16,13 @@ let demoState = {
 
 // Helper: Prefer localStorage, then real file credentials, ignore placeholders
 const getCredential = (fileValue: string | undefined, storageKey: string) => {
-    // 1. Try LocalStorage (User manual override)
-    const stored = typeof localStorage !== 'undefined' ? localStorage.getItem(storageKey) : null;
-    if (stored) return stored;
+    try {
+        const stored = typeof localStorage !== 'undefined' ? localStorage.getItem(storageKey) : null;
+        if (stored) return stored;
+    } catch (e) {
+        console.warn('LocalStorage access failed', e);
+    }
 
-    // 2. Try File/Env (only if valid)
     if (fileValue && !fileValue.includes('ZDE_VLOZTE')) {
         return fileValue;
     }
@@ -30,58 +30,79 @@ const getCredential = (fileValue: string | undefined, storageKey: string) => {
     return null;
 };
 
-const supabaseUrl = getCredential(CREDENTIALS.SUPABASE_URL, 'smartwork_supabase_url');
+// CRITICAL FIX: Validate URL to prevent app crash if localStorage contains garbage
+const isValidUrl = (url: string | null): boolean => {
+    if (!url) return false;
+    try {
+        new URL(url);
+        return true;
+    } catch {
+        return false;
+    }
+};
+
+const rawSupabaseUrl = getCredential(CREDENTIALS.SUPABASE_URL, 'smartwork_supabase_url');
+const supabaseUrl = isValidUrl(rawSupabaseUrl) ? rawSupabaseUrl : null;
 const supabaseKey = getCredential(CREDENTIALS.SUPABASE_KEY, 'smartwork_supabase_key');
 
 let client: SupabaseClient;
 
-// Kontrola konfigurace (Running standard check unless in Demo Mode)
-const isConfigured = CREDENTIALS.IS_DEMO_MODE || (!!supabaseUrl && !!supabaseKey);
+// Kontrola konfigurace
+// Must be valid URL to attempt connection
+const shouldInitRealClient = !CREDENTIALS.IS_DEMO_MODE && !!supabaseUrl && !!supabaseKey;
 
-if (!CREDENTIALS.IS_DEMO_MODE && isConfigured) {
-  client = createClient(supabaseUrl!, supabaseKey!, {
-      realtime: {
-          params: {
-              eventsPerSecond: 10,
+const createDummyClient = () => {
+    const safeDummy: any = {
+        select: () => safeDummy,
+        insert: () => safeDummy,
+        update: () => safeDummy,
+        delete: () => safeDummy,
+        upsert: () => safeDummy,
+        eq: () => safeDummy,
+        order: () => safeDummy,
+        single: () => safeDummy,
+        then: (resolve: any) => resolve({ 
+            data: [], 
+            error: { message: "Demo mode or Missing Credentials" } 
+        }),
+        channel: () => ({
+            on: () => ({ subscribe: () => {} }),
+            subscribe: () => {},
+            track: () => {},
+            unsubscribe: () => {}
+        }),
+        storage: {
+            from: () => ({
+                upload: async () => ({ data: null, error: { message: 'Storage disabled in Demo' } }),
+                getPublicUrl: () => ({ data: { publicUrl: '' } })
+            })
+        }
+    };
+
+    return {
+        from: () => safeDummy,
+        auth: { getUser: async () => ({ data: { user: null } }) },
+        channel: () => safeDummy.channel(),
+        storage: safeDummy.storage
+    } as unknown as SupabaseClient;
+};
+
+if (shouldInitRealClient) {
+  try {
+      client = createClient(supabaseUrl!, supabaseKey!, {
+          realtime: {
+              params: {
+                  eventsPerSecond: 10,
+              },
           },
-      },
-  });
+      });
+  } catch (e) {
+      console.error("Supabase Client Init Failed (Invalid URL?):", e);
+      // Fallback to dummy to prevent app crash
+      client = createDummyClient();
+  }
 } else {
-  // Dummy client pro případ chyby konfigurace nebo Demo módu
-  // In demo mode, we won't actually use this client, but we need it initialized to avoid crashes
-  const safeDummy: any = {
-      select: () => safeDummy,
-      insert: () => safeDummy,
-      update: () => safeDummy,
-      delete: () => safeDummy,
-      upsert: () => safeDummy,
-      eq: () => safeDummy,
-      order: () => safeDummy,
-      single: () => safeDummy,
-      then: (resolve: any) => resolve({ 
-          data: [], 
-          error: { message: "Demo mode or Missing Credentials" } 
-      }),
-      channel: () => ({
-          on: () => ({ subscribe: () => {} }),
-          subscribe: () => {},
-          track: () => {},
-          unsubscribe: () => {}
-      }),
-      storage: {
-          from: () => ({
-              upload: async () => ({ data: null, error: { message: 'Storage disabled in Demo' } }),
-              getPublicUrl: () => ({ data: { publicUrl: '' } })
-          })
-      }
-  };
-
-  client = {
-      from: () => safeDummy,
-      auth: { getUser: async () => ({ data: { user: null } }) },
-      channel: () => safeDummy.channel(),
-      storage: safeDummy.storage
-  } as unknown as SupabaseClient;
+  client = createDummyClient();
 }
 
 export const supabase = client;
@@ -104,7 +125,7 @@ export const subscribeToPresence = (userId: string, onSync: (onlineUserIds: stri
         return { unsubscribe: () => {} };
     }
 
-    if (!isConfigured) return { unsubscribe: () => {} };
+    if (!shouldInitRealClient) return { unsubscribe: () => {} };
 
     const channel = supabase.channel('online-users');
 
@@ -126,7 +147,7 @@ export const subscribeToPresence = (userId: string, onSync: (onlineUserIds: stri
 export const subscribeToNotifications = (userId: string, onNewNotification: (n: Notification) => void) => {
     if (CREDENTIALS.IS_DEMO_MODE) return { unsubscribe: () => {} };
 
-    if (!isConfigured) return { unsubscribe: () => {} };
+    if (!shouldInitRealClient) return { unsubscribe: () => {} };
 
     const channel = supabase
         .channel(`notifications:${userId}`)
@@ -166,7 +187,7 @@ export const uploadAttachment = async (file: File): Promise<string | null> => {
         return 'https://images.unsplash.com/photo-1562240020-ce31ccb0fa7d?q=80&w=300&auto=format&fit=crop';
     }
 
-    if (!isConfigured) return null;
+    if (!shouldInitRealClient) return null;
 
     try {
         const fileName = `${Date.now()}_${Math.random().toString(36).substring(2, 8)}_${file.name}`;
@@ -176,7 +197,7 @@ export const uploadAttachment = async (file: File): Promise<string | null> => {
 
         if (error) {
             console.error('Storage Upload Error:', error);
-            alert('Chyba při nahrávání souboru. V Demo verzi nebo bez konfigurace toto nefunguje.');
+            // In demo-like broken state, alert user
             return null;
         }
 

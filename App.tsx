@@ -516,6 +516,12 @@ const App: React.FC = () => {
       }
   };
 
+  const handleClearSettings = () => {
+    localStorage.removeItem('smartwork_supabase_url');
+    localStorage.removeItem('smartwork_supabase_key');
+    window.location.reload();
+  };
+
   // Admin Handlers
   const handleAddEmployee = async (emp: Employee) => {
       try { await addEmployee(emp); loadData(true); } catch (e: any) { alert("Chyba: " + e.message); }
@@ -578,7 +584,7 @@ const App: React.FC = () => {
             
             <div className="flex gap-4">
                 <button onClick={() => window.location.reload()} className="px-6 py-2 bg-indigo-600 text-white rounded-lg">Zkusit znovu</button>
-                <button onClick={() => setIsAboutOpen(true)} className="px-6 py-2 bg-gray-200 text-gray-700 rounded-lg">O Aplikaci</button>
+                <button onClick={handleClearSettings} className="px-6 py-2 bg-red-100 text-red-700 hover:bg-red-200 transition-colors rounded-lg">Resetovat nastavení</button>
             </div>
             
             <div className="mt-8 pt-8 border-t border-gray-300 w-full max-w-md">
