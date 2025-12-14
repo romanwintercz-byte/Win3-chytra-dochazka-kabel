@@ -21,13 +21,13 @@ let forcedDemoMode = false;
 const getCredential = (fileValue: string | undefined, storageKey: string) => {
     try {
         const stored = typeof localStorage !== 'undefined' ? localStorage.getItem(storageKey) : null;
-        if (stored) return stored;
+        if (stored && stored.trim().length > 0) return stored.trim();
     } catch (e) {
         console.warn('LocalStorage access failed', e);
     }
 
     if (fileValue && !fileValue.includes('ZDE_VLOZTE')) {
-        return fileValue;
+        return fileValue.trim();
     }
 
     return null;
@@ -36,16 +36,18 @@ const getCredential = (fileValue: string | undefined, storageKey: string) => {
 // Strict URL Validation
 const isValidUrl = (url: string | null): boolean => {
     if (!url) return false;
+    // Check for whitespace
+    if (url.trim() !== url) return false;
+    // Must start with http
+    if (!url.startsWith('http://') && !url.startsWith('https://')) return false;
+    
     try {
-        const parsed = new URL(url);
-        return parsed.protocol === 'http:' || parsed.protocol === 'https:';
+        new URL(url);
+        return true;
     } catch {
         return false;
     }
 };
-
-// --- CLIENT INITIALIZATION ---
-let client: SupabaseClient;
 
 // Dummy client for Demo Mode or Error Fallback
 const createDummyClient = () => {
@@ -84,7 +86,10 @@ const createDummyClient = () => {
     } as unknown as SupabaseClient;
 };
 
-// ROBUST INITIALIZATION LOGIC
+// --- CLIENT INITIALIZATION ---
+// Default to dummy to be safe
+let client: SupabaseClient = createDummyClient();
+
 try {
     const rawSupabaseUrl = getCredential(CREDENTIALS.SUPABASE_URL, 'smartwork_supabase_url');
     const supabaseKey = getCredential(CREDENTIALS.SUPABASE_KEY, 'smartwork_supabase_key');
@@ -94,24 +99,34 @@ try {
     const isExplicitDemo = CREDENTIALS.IS_DEMO_MODE;
 
     // Only attempt to create real client if NOT demo AND credentials look valid
-    if (!isExplicitDemo && isUrlValid && hasKey) {
-        client = createClient(rawSupabaseUrl!, supabaseKey!, {
-            realtime: {
-                params: {
-                    eventsPerSecond: 10,
+    if (!isExplicitDemo && isUrlValid && hasKey && rawSupabaseUrl) {
+        try {
+            // Double check specifically for the error user is seeing
+            if (!rawSupabaseUrl.startsWith('http')) {
+                throw new Error("Invalid protocol");
+            }
+            client = createClient(rawSupabaseUrl, supabaseKey!, {
+                realtime: {
+                    params: {
+                        eventsPerSecond: 10,
+                    },
                 },
-            },
-        });
+            });
+        } catch (innerError) {
+            console.error("Supabase Client Creation Failed:", innerError);
+            forcedDemoMode = true;
+            client = createDummyClient();
+        }
     } else {
         // Fallback or explicit demo
-        if (!isExplicitDemo && (!isUrlValid || !hasKey)) {
-             console.warn("Invalid credentials detected. Forcing Demo Mode to prevent crash.");
+        if (!isExplicitDemo) {
+             console.warn("Invalid credentials detected or missing. Forcing Demo Mode.");
              forcedDemoMode = true;
         }
         client = createDummyClient();
     }
 } catch (e) {
-    console.error("CRITICAL: Supabase init failed. Fallback to dummy client.", e);
+    console.error("CRITICAL: Supabase init failed completely. Fallback to dummy client.", e);
     forcedDemoMode = true;
     client = createDummyClient();
 }
@@ -123,8 +138,8 @@ const isDemo = () => CREDENTIALS.IS_DEMO_MODE || forcedDemoMode;
 
 // Helper to save credentials manually from UI
 export const saveCredentialsManually = (url: string, key: string) => {
-    localStorage.setItem('smartwork_supabase_url', url);
-    localStorage.setItem('smartwork_supabase_key', key);
+    localStorage.setItem('smartwork_supabase_url', url.trim());
+    localStorage.setItem('smartwork_supabase_key', key.trim());
     window.location.reload();
 };
 
@@ -234,7 +249,6 @@ export const fetchEmployees = async (): Promise<Employee[]> => {
   const { data, error } = await supabase.from('employees').select('*').order('name'); 
   if (error) { 
       console.error("Fetch Emps Error:", error.message || error); 
-      // If fetch fails heavily, maybe we should switch to demo? For now just return empty.
       return []; 
   }
   return data.map((e: any) => ({ 
