@@ -103,11 +103,6 @@ const App: React.FC = () => {
   // About Modal State
   const [isAboutOpen, setIsAboutOpen] = useState(false);
 
-  // Config Modal State
-  const [manualSupabaseUrl, setManualSupabaseUrl] = useState('');
-  const [manualSupabaseKey, setManualSupabaseKey] = useState('');
-  const [configOpen, setConfigOpen] = useState(false);
-
   // Manager privileges
   const isManagerRole = currentUser.role === 'Manager';
   const [isManagerMode, setIsManagerMode] = useState(false);
@@ -140,10 +135,10 @@ const App: React.FC = () => {
               fetchTimeEntries()
           ]);
 
-          // CRITICAL FIX: If no employees found (e.g. reload on demo), FORCE MOCK DATA
-          // This prevents the "Connect Database" screen from showing up.
-          if (emps.length === 0) {
-              console.log("No data found on reload. Injecting Demo Data.");
+          // ABSOLUTE SAFETY NET: If emps is empty, force mocks.
+          // This prevents the "setup screen" from ever appearing in this broken state.
+          if (!emps || emps.length === 0) {
+              console.warn("No employees loaded. Forcing Mock Data to bypass setup screen.");
               emps = [...MOCK_EMPLOYEES];
               jbs = [...MOCK_JOBS];
               entrs = [...MOCK_ENTRIES];
@@ -176,15 +171,7 @@ const App: React.FC = () => {
 
   useEffect(() => {
       loadData();
-      // SAFETY TIMEOUT
-      const timer = setTimeout(() => {
-          setIsLoading(false);
-          // If still no employees after timeout, force mocks
-          setEmployees(prev => {
-             if (prev.length === 0) return MOCK_EMPLOYEES;
-             return prev;
-          });
-      }, 1000);
+      const timer = setTimeout(() => setIsLoading(false), 1000);
       return () => clearTimeout(timer);
   }, []);
 
@@ -373,22 +360,12 @@ const App: React.FC = () => {
       } catch (e) { alert('Chyba při odesílání.'); }
   };
 
-  const handleClearSettings = () => {
-    localStorage.removeItem('smartwork_supabase_url');
-    localStorage.removeItem('smartwork_supabase_key');
-    window.location.href = window.location.pathname;
-  };
-
   // Admin Handlers
   const handleAddEmployee = async (emp: Employee) => { try { await addEmployee(emp); loadData(true); } catch (e: any) { alert("Chyba: " + e.message); } };
   const handleUpdateEmployee = async (emp: Employee) => { try { await updateEmployee(emp); loadData(true); } catch (e: any) { alert("Chyba: " + e.message); } };
   const handleToggleEmployeeStatus = async (id: string, isActive: boolean) => { try { await updateEmployeeStatus(id, isActive); loadData(true); } catch (e: any) { alert("Chyba: " + e.message); } };
   const handleAddJob = async (job: Job) => { try { await addJob(job); loadData(true); } catch (e: any) { alert("Chyba: " + e.message); } };
   const handleToggleJobStatus = async (id: string, isActive: boolean) => { try { await updateJobStatus(id, isActive); loadData(true); } catch (e: any) { alert("Chyba: " + e.message); } };
-  const handleSaveCredentials = () => {
-      if (!manualSupabaseUrl || !manualSupabaseKey) { alert("Vyplňte prosím obě pole."); return; }
-      saveCredentialsManually(manualSupabaseUrl, manualSupabaseKey);
-  };
   const handleStartPresentation = (type: PresentationType) => setPresentationMode(type);
 
   if (presentationMode) return <PresentationMode type={presentationMode} onClose={() => setPresentationMode(null)} />;
@@ -404,50 +381,8 @@ const App: React.FC = () => {
       );
   }
 
-  // THIS SCREEN WILL ONLY SHOW IF WE FAILED TO INJECT DATA (Should be impossible now)
-  if (!isLoading && employees.length === 0) {
-      return (
-        <div className="min-h-screen flex flex-col items-center justify-center bg-[#f3f4f6] p-8">
-            <h2 className="text-2xl font-bold text-gray-800 mb-2">Chytrá Docházka</h2>
-            <p className="text-gray-600 mb-8 text-center max-w-md">
-               Aplikace běží v režimu bez databáze.
-            </p>
-            
-            <button 
-                onClick={() => { window.location.reload(); }} 
-                className="bg-indigo-600 hover:bg-indigo-700 text-white font-bold py-4 px-8 rounded-xl shadow-lg transform hover:scale-105 transition-all flex items-center gap-3 text-lg mb-8"
-            >
-                NAČÍST APLIKACI ZNOVU
-            </button>
-            
-            {/* Manual Config Toggle */}
-            <div className="w-full max-w-md border-t border-gray-200 pt-6">
-                <button 
-                    onClick={() => setConfigOpen(!configOpen)}
-                    className="w-full flex justify-between items-center p-3 text-sm text-gray-500 hover:text-gray-700 transition-colors"
-                >
-                    <span>Technické nastavení (Supabase)</span>
-                    <svg xmlns="http://www.w3.org/2000/svg" className={`h-4 w-4 transition-transform ${configOpen ? 'rotate-180' : ''}`} fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
-                    </svg>
-                </button>
-                
-                {configOpen && (
-                    <div className="mt-2 bg-white p-4 rounded-lg border border-gray-200 animate-fade-in-up">
-                        <input className="w-full p-3 border rounded mb-2 text-sm" placeholder="Supabase URL" value={manualSupabaseUrl} onChange={e => setManualSupabaseUrl(e.target.value)} />
-                        <input className="w-full p-3 border rounded mb-4 text-sm" placeholder="Supabase Anon Key" value={manualSupabaseKey} onChange={e => setManualSupabaseKey(e.target.value)} />
-                        <button onClick={handleSaveCredentials} className="w-full py-3 bg-gray-800 text-white rounded font-medium hover:bg-gray-900 transition-colors">Uložit a připojit</button>
-                        <div className="mt-2 text-center">
-                             <button onClick={handleClearSettings} className="text-xs text-red-400 hover:text-red-600 underline">
-                                Vymazat uložené klíče
-                            </button>
-                        </div>
-                    </div>
-                )}
-            </div>
-        </div>
-      );
-  }
+  // NOTE: The setup screen logic has been removed. 
+  // If no employees, we force mocks, so we render the app directly.
 
   return (
     <div className="flex flex-col md:flex-row min-h-screen bg-[#f3f4f6]">

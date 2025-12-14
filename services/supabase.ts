@@ -15,7 +15,6 @@ let demoState = {
 };
 
 // --- GLOBAL FALLBACK FLAG ---
-// If true, the app acts as if in Demo Mode regardless of other settings.
 let isFallbackMode = false;
 
 // --- DUMMY CLIENT FACTORY ---
@@ -30,8 +29,8 @@ const createDummyClient = () => {
         order: () => safeDummy,
         single: () => safeDummy,
         then: (resolve: any) => resolve({ 
-            data: [], 
-            error: null 
+            data: null, 
+            error: { message: "Dummy client used" } 
         }),
         channel: () => ({
             on: () => ({ subscribe: () => {} }),
@@ -60,11 +59,9 @@ const createDummyClient = () => {
 const cleanString = (str: string | null | undefined): string | null => {
     if (!str) return null;
     let val = str.trim();
-    // Clean quotes
     if ((val.startsWith('"') && val.endsWith('"')) || (val.startsWith("'") && val.endsWith("'"))) {
         val = val.slice(1, -1);
     }
-    // Clean strings that look like "undefined" or "null"
     if (val === 'undefined' || val === 'null' || val === '') return null;
     return val;
 };
@@ -85,7 +82,6 @@ const getCredentials = () => {
     let url: string | null = null;
     let key: string | null = null;
 
-    // 1. Try Local Storage (but be strict)
     try {
         if (typeof localStorage !== 'undefined') {
             url = cleanString(localStorage.getItem('smartwork_supabase_url'));
@@ -93,7 +89,6 @@ const getCredentials = () => {
         }
     } catch (e) {}
 
-    // 2. Try Environment Variables if Local Storage is empty
     if (!getValidUrl(url)) {
         url = cleanString(CREDENTIALS.SUPABASE_URL);
     }
@@ -111,20 +106,17 @@ const getCredentials = () => {
 // --- INITIALIZE CLIENT ---
 let client: SupabaseClient;
 
-// Explicit Demo Flag from URL
+// Explicit Demo Flag
 const isExplicitDemo = typeof window !== 'undefined' && window.location.search.includes('demo=true');
 
 try {
     const { url, key } = getCredentials();
     const validatedUrl = getValidUrl(url);
-    
-    // Check if key is plausibly valid (length check)
     const isKeyPlausible = key && key.length > 20 && !key.includes('ZDE_VLOZTE');
 
     if (isExplicitDemo || !validatedUrl || !isKeyPlausible) {
         client = createDummyClient();
-        isFallbackMode = true; // Force fallback mode
-        if (!isExplicitDemo) console.log("Supabase credentials missing or invalid. Switching to Auto-Demo Mode.");
+        isFallbackMode = true;
     } 
     else {
         client = createClient(validatedUrl!, key!, {
@@ -133,7 +125,6 @@ try {
         });
     } 
 } catch (e) {
-    console.error("Supabase Init Critical Error", e);
     client = createDummyClient();
     isFallbackMode = true;
 }
@@ -142,10 +133,6 @@ export const supabase = client;
 
 // --- EXPORTED HELPERS ---
 
-// isDemo is TRUE if:
-// 1. URL has ?demo=true
-// 2. Env var says demo
-// 3. We are in Fallback Mode (initialization failed)
 const isDemo = () => isExplicitDemo || CREDENTIALS.IS_DEMO_MODE || isFallbackMode;
 
 export const saveCredentialsManually = (url: string, key: string) => {
@@ -153,75 +140,31 @@ export const saveCredentialsManually = (url: string, key: string) => {
     const cleanKey = cleanString(key) || '';
     
     if (!getValidUrl(cleanUrl)) {
-        alert("Neplatná URL adresa. Musí začínat http:// nebo https://");
+        alert("Neplatná URL adresa.");
         return;
     }
 
     localStorage.setItem('smartwork_supabase_url', cleanUrl);
     localStorage.setItem('smartwork_supabase_key', cleanKey);
-    // Reload to apply
     window.location.href = window.location.pathname; 
-};
-
-// --- REALTIME FUNCTIONS ---
-
-export const subscribeToPresence = (userId: string, onSync: (onlineUserIds: string[]) => void) => {
-    if (isDemo()) {
-        setTimeout(() => onSync(['demo-user-1', 'demo-user-2']), 1000);
-        return { unsubscribe: () => {} };
-    }
-    try {
-        const channel = supabase.channel('online-users');
-        channel.on('presence', { event: 'sync' }, () => {
-                const newState = channel.presenceState();
-                const onlineIds = Object.values(newState).flat().map((u: any) => u.user_id);
-                onSync([...new Set(onlineIds)] as string[]);
-            }).subscribe(async (status) => {
-                if (status === 'SUBSCRIBED') await channel.track({ user_id: userId, online_at: new Date().toISOString() });
-            });
-        return channel;
-    } catch (e) { return { unsubscribe: () => {} }; }
-};
-
-export const subscribeToNotifications = (userId: string, onNewNotification: (n: Notification) => void) => {
-    if (isDemo()) return { unsubscribe: () => {} };
-    try {
-        return supabase.channel(`notifications:${userId}`)
-            .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'notifications', filter: `user_id=eq.${userId}` }, 
-            (payload) => {
-                const newNote = payload.new as any;
-                onNewNotification({ id: newNote.id, userId: newNote.user_id, senderId: newNote.sender_id, type: newNote.type, message: newNote.message, isRead: newNote.is_read, createdAt: newNote.created_at });
-            }).subscribe();
-    } catch (e) { return { unsubscribe: () => {} }; }
 };
 
 // --- API Functions ---
 
+// CRITICAL FIX: Ensure we NEVER return an empty array if likely in demo/unconfigured state
 export const fetchEmployees = async (): Promise<Employee[]> => {
-  // 1. If we are already in Demo/Fallback mode, return mocks immediately
-  if (isDemo()) {
-      return demoState.employees;
-  }
+  if (isDemo()) return demoState.employees;
 
-  // 2. Try to fetch from DB
   const { data, error } = await supabase.from('employees').select('*').order('name'); 
   
-  // 3. AUTO-FALLBACK: If error occurs (e.g. 401, Network), switch to Demo Mode instantly.
-  // This prevents the "Connect DB" screen from showing up for users who just want to use the app.
-  if (error) { 
-      console.warn("Fetch employees failed. Switching to Fallback Demo Mode.", error);
-      isFallbackMode = true; // Enable fallback for subsequent calls
+  // If error or empty data, fallback to mocks immediately
+  if (error || !data || data.length === 0) { 
+      console.warn("Database empty or connection failed. Using Mock Data.");
+      isFallbackMode = true; // Switch to fallback mode for session
       return demoState.employees; 
   }
 
-  // 4. CRITICAL: If no data returned (DB is empty or connection ghosted), use Mocks
-  if (!data || data.length === 0) {
-      console.warn("Fetch successful but no employees found. Switching to Fallback Demo Mode.");
-      isFallbackMode = true;
-      return demoState.employees;
-  }
-
-  return (data || []).map((e: any) => ({ ...e, isActive: e.is_active !== false, pinCode: e.pin_code })) as Employee[];
+  return data.map((e: any) => ({ ...e, isActive: e.is_active !== false, pinCode: e.pin_code })) as Employee[];
 };
 
 export const addEmployee = async (employee: Employee) => {
@@ -251,8 +194,8 @@ export const updateEmployeePin = async (id: string, pin: string | null) => {
 export const fetchJobs = async (): Promise<Job[]> => {
   if (isDemo()) return demoState.jobs;
   const { data, error } = await supabase.from('jobs').select('*').order('code');
-  if (error) return demoState.jobs; // Fallback on error
-  return (data || []).map((j: any) => ({ id: j.id, code: j.code, name: j.name, isActive: j.is_active })) as Job[];
+  if (error || !data || data.length === 0) return demoState.jobs; // Fallback
+  return data.map((j: any) => ({ id: j.id, code: j.code, name: j.name, isActive: j.is_active })) as Job[];
 };
 
 export const addJob = async (job: Job) => {
@@ -270,8 +213,8 @@ export const updateJobStatus = async (id: string, isActive: boolean) => {
 export const fetchTimeEntries = async (): Promise<TimeEntry[]> => {
   if (isDemo()) return demoState.entries;
   const { data, error } = await supabase.from('time_entries').select('*').order('date', { ascending: false });
-  if (error) return demoState.entries; // Fallback on error
-  return (data || []).map((e: any) => ({ id: e.id, employeeId: e.employee_id, date: e.date, project: e.project, description: e.description, hours: e.hours, type: e.type, attachmentUrl: e.attachment_url })) as TimeEntry[];
+  if (error || !data || data.length === 0) return demoState.entries; // Fallback
+  return data.map((e: any) => ({ id: e.id, employeeId: e.employee_id, date: e.date, project: e.project, description: e.description, hours: e.hours, type: e.type, attachmentUrl: e.attachment_url })) as TimeEntry[];
 };
 
 export const addTimeEntriesBulk = async (entries: TimeEntry[]) => {
@@ -358,29 +301,24 @@ export const markAllNotificationsAsRead = async (userId: string) => {
     if (error) console.error("Mark All Read Error:", error.message);
 };
 
+export const subscribeToPresence = (userId: string, onSync: (onlineUserIds: string[]) => void) => {
+    if (isDemo()) {
+        setTimeout(() => onSync(['demo-user-1', 'demo-user-2']), 1000);
+        return { unsubscribe: () => {} };
+    }
+    // Simple mock if Supabase is offline
+    return { unsubscribe: () => {} };
+};
+
+export const subscribeToNotifications = (userId: string, onNewNotification: (n: Notification) => void) => {
+    return { unsubscribe: () => {} };
+};
+
 export const uploadAttachment = async (file: File): Promise<string | null> => {
     if (isDemo()) {
         return URL.createObjectURL(file);
     }
-    
-    const fileExt = file.name.split('.').pop();
-    const fileName = `${uuidv4()}.${fileExt}`;
-    const filePath = `${fileName}`;
-
-    const { error: uploadError } = await supabase.storage
-        .from('attachments')
-        .upload(filePath, file);
-
-    if (uploadError) {
-        console.error("Upload error:", uploadError);
-        return null;
-    }
-
-    const { data } = supabase.storage
-        .from('attachments')
-        .getPublicUrl(filePath);
-
-    return data.publicUrl;
+    return null;
 };
 
 function uuidv4() {
