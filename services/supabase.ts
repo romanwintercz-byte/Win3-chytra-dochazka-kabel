@@ -15,6 +15,8 @@ let demoState = {
 };
 
 // --- DUMMY CLIENT FACTORY ---
+// This client does absolutely nothing but return empty arrays or success messages.
+// It effectively "disconnects" the app from any backend without crashing it.
 const createDummyClient = () => {
     const safeDummy: any = {
         select: () => safeDummy,
@@ -27,7 +29,7 @@ const createDummyClient = () => {
         single: () => safeDummy,
         then: (resolve: any) => resolve({ 
             data: [], 
-            error: { message: "No Database Connection" } 
+            error: null // Crucial: No error, just empty data
         }),
         channel: () => ({
             on: () => ({ subscribe: () => {} }),
@@ -59,17 +61,18 @@ const cleanString = (str: string | null | undefined): string | null => {
     if ((val.startsWith('"') && val.endsWith('"')) || (val.startsWith("'") && val.endsWith("'"))) {
         val = val.slice(1, -1);
     }
-    if (val === 'undefined' || val === 'null') return null;
+    if (val === 'undefined' || val === 'null' || val === '') return null;
     return val;
 };
 
 const getValidUrl = (urlStr: string | null): string | null => {
     if (!urlStr) return null;
     try {
+        if (!urlStr.startsWith('http')) return null;
         const u = new URL(urlStr);
-        if (u.protocol !== 'http:' && u.protocol !== 'https:') return null;
-        if (u.hostname.includes('your-project')) return null;
-        return u.toString();
+        // Basic validation
+        if (u.hostname === 'localhost' || u.hostname.includes('supabase.co')) return u.toString();
+        return null;
     } catch (e) {
         return null;
     }
@@ -79,65 +82,70 @@ const getCredentials = () => {
     let url: string | null = null;
     let key: string | null = null;
 
+    // 1. Try Local Storage
     try {
         if (typeof localStorage !== 'undefined') {
-            const lsUrl = cleanString(localStorage.getItem('smartwork_supabase_url'));
-            const lsKey = cleanString(localStorage.getItem('smartwork_supabase_key'));
-            if (getValidUrl(lsUrl)) {
-                url = lsUrl;
-                key = lsKey;
-            }
+            url = cleanString(localStorage.getItem('smartwork_supabase_url'));
+            key = cleanString(localStorage.getItem('smartwork_supabase_key'));
         }
     } catch (e) {}
 
-    if (!url) {
-        const envUrlCandidate = cleanString(CREDENTIALS.SUPABASE_URL);
-        if (getValidUrl(envUrlCandidate)) {
-            url = envUrlCandidate;
-        }
+    // 2. Try Environment Variables
+    if (!getValidUrl(url)) {
+        url = cleanString(CREDENTIALS.SUPABASE_URL);
     }
     
     if (!key || key.includes('ZDE_VLOZTE')) {
-        const envKeyCandidate = cleanString(CREDENTIALS.SUPABASE_KEY);
-        if (envKeyCandidate && !envKeyCandidate.includes('ZDE_VLOZTE')) {
-            key = envKeyCandidate;
+        const envKey = cleanString(CREDENTIALS.SUPABASE_KEY);
+        if (envKey && !envKey.includes('ZDE_VLOZTE')) {
+            key = envKey;
         }
     }
 
     return { url, key };
 };
 
-// Initialize Client
-let client: SupabaseClient = createDummyClient();
+// --- INITIALIZE CLIENT ---
+let client: SupabaseClient;
+let initializationError = false;
 
-// Flag to check if we are in EXPLICIT demo mode (user clicked the orange button)
-// We rely solely on the URL param or explicit env var, NOT on missing keys.
-const isExplicitDemo = CREDENTIALS.IS_DEMO_MODE || (typeof window !== 'undefined' && window.location.search.includes('demo=true'));
+// Explicit Demo Flag from URL
+const isExplicitDemo = typeof window !== 'undefined' && window.location.search.includes('demo=true');
 
 try {
     const { url, key } = getCredentials();
     const validatedUrl = getValidUrl(url);
 
-    if (!isExplicitDemo && validatedUrl && key) {
+    // CRITICAL: If no URL or Key, or if placeholders are still there, 
+    // AND we are not in explicit demo mode, use Dummy Client.
+    // This allows the app to load "empty" so the Setup Screen in App.tsx can be shown.
+    if (!isExplicitDemo && (!validatedUrl || !key || key.includes('ZDE_VLOZTE'))) {
+        client = createDummyClient();
+        console.warn("Supabase credentials missing. Using Dummy Client to allow UI rendering.");
+    } 
+    // If we have credentials, try to connect
+    else if (validatedUrl && key && !isExplicitDemo) {
         client = createClient(validatedUrl, key, {
             auth: { persistSession: false }, 
             realtime: { params: { eventsPerSecond: 10 } }
         });
-    } else {
-        // If no keys and NOT explicit demo, we stay with Dummy Client that returns empty arrays.
-        // This forces the App.tsx to see 0 employees and show the Config/Start screen.
+    } 
+    // Fallback/Demo Mode
+    else {
         client = createDummyClient();
     }
 } catch (e) {
-    console.error("Init Error", e);
+    console.error("Supabase Init Error", e);
     client = createDummyClient();
+    initializationError = true;
 }
 
 export const supabase = client;
 
 // --- EXPORTED HELPERS ---
 
-// Only return TRUE if user explicitly requested demo via URL or Env.
+// Only return TRUE if user explicitly requested demo via URL.
+// If keys are missing, we return FALSE so the app attempts to load (gets 0 employees) and shows the Config Screen.
 const isDemo = () => isExplicitDemo;
 
 export const saveCredentialsManually = (url: string, key: string) => {
@@ -151,9 +159,8 @@ export const saveCredentialsManually = (url: string, key: string) => {
 
     localStorage.setItem('smartwork_supabase_url', cleanUrl);
     localStorage.setItem('smartwork_supabase_key', cleanKey);
-    // Remove demo param if present to ensure we try to connect
-    const newUrl = window.location.pathname; 
-    window.location.href = newUrl;
+    // Remove demo param and reload
+    window.location.href = window.location.pathname; 
 };
 
 // --- REALTIME FUNCTIONS ---
@@ -188,34 +195,21 @@ export const subscribeToNotifications = (userId: string, onNewNotification: (n: 
     } catch (e) { return { unsubscribe: () => {} }; }
 };
 
-// --- STORAGE FUNCTIONS ---
-
-export const uploadAttachment = async (file: File): Promise<string | null> => {
-    if (isDemo()) {
-        await new Promise(r => setTimeout(r, 1000));
-        return 'https://images.unsplash.com/photo-1562240020-ce31ccb0fa7d?q=80&w=300&auto=format&fit=crop';
-    }
-    try {
-        const fileName = `${Date.now()}_${Math.random().toString(36).substring(2, 8)}_${file.name}`;
-        const { error } = await supabase.storage.from('attachments').upload(fileName, file);
-        if (error) return null;
-        const { data } = supabase.storage.from('attachments').getPublicUrl(fileName);
-        return data.publicUrl;
-    } catch (e) { return null; }
-};
-
 // --- API Functions ---
 
 export const fetchEmployees = async (): Promise<Employee[]> => {
-  // CRITICAL FIX: Only return mock data if IS_DEMO_MODE is explicitly true.
-  // Otherwise return empty array (if connection fails) to trigger the Setup Screen.
+  // 1. Explicit Demo Mode: Return Mock Data
   if (isDemo()) {
       return demoState.employees;
   }
 
+  // 2. Try to fetch from DB
   const { data, error } = await supabase.from('employees').select('*').order('name'); 
+  
+  // 3. If Error or No Data (which happens with Dummy Client), return EMPTY array.
+  // This triggers the "Setup/Demo" screen in App.tsx
   if (error || !data) { 
-      return []; // Return empty to show "Start Demo" screen
+      return []; 
   }
   return data.map((e: any) => ({ ...e, isActive: e.is_active !== false, pinCode: e.pin_code })) as Employee[];
 };
@@ -352,6 +346,33 @@ export const markAllNotificationsAsRead = async (userId: string) => {
     if (isDemo()) { demoState.notifications.forEach(n => { if (n.userId === userId) n.isRead = true; }); return; }
     const { error } = await supabase.from('notifications').update({ is_read: true }).eq('user_id', userId);
     if (error) console.error("Mark All Read Error:", error.message);
+};
+
+export const uploadAttachment = async (file: File): Promise<string | null> => {
+    if (isDemo()) {
+        // Return a mock URL in demo mode
+        return URL.createObjectURL(file);
+    }
+    
+    // We assume a bucket named 'attachments' exists.
+    const fileExt = file.name.split('.').pop();
+    const fileName = `${uuidv4()}.${fileExt}`;
+    const filePath = `${fileName}`;
+
+    const { error: uploadError } = await supabase.storage
+        .from('attachments')
+        .upload(filePath, file);
+
+    if (uploadError) {
+        console.error("Upload error:", uploadError);
+        return null;
+    }
+
+    const { data } = supabase.storage
+        .from('attachments')
+        .getPublicUrl(filePath);
+
+    return data.publicUrl;
 };
 
 function uuidv4() {

@@ -32,7 +32,8 @@
         background: #cbd5e1;
         border-radius: 3px;
       }
-      #error-overlay {
+      /* CRITICAL ERROR OVERLAY */
+      #fatal-error {
         display: none;
         position: fixed;
         top: 0;
@@ -40,11 +41,19 @@
         width: 100%;
         height: 100%;
         background: white;
-        z-index: 9999;
-        padding: 20px;
-        color: red;
-        font-family: monospace;
-        overflow: auto;
+        z-index: 10000;
+        padding: 40px;
+        text-align: center;
+      }
+      .retry-btn {
+        margin-top: 20px;
+        padding: 10px 20px;
+        background: #4f46e5;
+        color: white;
+        border: none;
+        border-radius: 8px;
+        font-size: 16px;
+        cursor: pointer;
       }
 
       /* Custom Animations */
@@ -101,35 +110,43 @@
   }
 }
 </script>
-<link rel="stylesheet" href="/index.css">
 </head>
   <body>
-    <div id="error-overlay"></div>
+    <div id="fatal-error">
+        <h2 style="color: #ef4444; font-size: 24px; margin-bottom: 10px;">Chyba aplikace</h2>
+        <p style="color: #6b7280; margin-bottom: 20px;">Aplikace nemohla nastartovat. Zkuste Demo režim.</p>
+        <button class="retry-btn" onclick="window.location.search='?demo=true'">Spustit Demo (Záchrana)</button>
+        <br/><br/>
+        <div id="error-details" style="font-family: monospace; font-size: 12px; color: #999; text-align: left; background: #f9f9f9; padding: 10px; border-radius: 5px;"></div>
+    </div>
+    
     <div id="root"></div>
+    
     <script>
       // Global error handler to catch white screen issues
       window.onerror = function(msg, url, line, col, error) {
-        var overlay = document.getElementById('error-overlay');
-        if (overlay) {
+        var overlay = document.getElementById('fatal-error');
+        var details = document.getElementById('error-details');
+        if (overlay && details) {
           overlay.style.display = 'block';
-          overlay.innerHTML += '<h3>App Error</h3><p>' + msg + '</p><p>' + url + ':' + line + ':' + col + '</p>';
-          if (error && error.stack) {
-            overlay.innerHTML += '<pre>' + error.stack + '</pre>';
-          }
+          details.innerHTML = '<strong>' + msg + '</strong><br/>' + url + ':' + line;
         }
         return false;
       };
       
-      // Catch promise rejections
+      // Catch promise rejections (often Supabase init fails here)
       window.addEventListener('unhandledrejection', function(event) {
-        var overlay = document.getElementById('error-overlay');
-        if (overlay) {
+        // Ignore resizeobserver loops
+        if (event.reason && event.reason.message && event.reason.message.includes('ResizeObserver')) return;
+
+        var overlay = document.getElementById('fatal-error');
+        var details = document.getElementById('error-details');
+        if (overlay && details) {
           overlay.style.display = 'block';
-          overlay.innerHTML += '<h3>Unhandled Promise Rejection</h3><p>' + event.reason + '</p>';
+          details.innerHTML += '<br/>Promise Rejection: ' + event.reason;
         }
       });
     </script>
     <script type="module" src="./index.tsx"></script>
-  <script type="module" src="/index.tsx"></script>
-</body>
+  </body>
 </html>
