@@ -26,7 +26,7 @@ import {
     fetchEmployees, addEmployee, updateEmployee, updateEmployeeStatus, 
     fetchJobs, addJob, updateJobStatus,
     fetchTimeEntries, addTimeEntriesBulk, deleteTimeEntriesForDate, deleteTimeEntry,
-    saveCredentialsManually, fetchMonthlyReports, upsertMonthlyReport,
+    fetchMonthlyReports, upsertMonthlyReport,
     fetchGlobalLock,
     fetchNotifications, markNotificationAsRead, markAllNotificationsAsRead, createNotification,
     subscribeToPresence, subscribeToNotifications
@@ -46,9 +46,8 @@ const SUPPORT_ID = 'win3-support-id';
 
 const App: React.FC = () => {
   const [activeTab, setActiveTab] = useState<'overview' | 'report' | 'settings'>('overview');
-  const [isLoading, setIsLoading] = useState(false); // Force false initially
   
-  // Data State - INITIALIZE WITH MOCKS DIRECTLY
+  // Data State - INITIALIZED DIRECTLY WITH MOCKS
   const [employees, setEmployees] = useState<Employee[]>(MOCK_EMPLOYEES);
   const [jobs, setJobs] = useState<Job[]>(MOCK_JOBS);
   const [entries, setEntries] = useState<TimeEntry[]>(MOCK_ENTRIES);
@@ -125,28 +124,23 @@ const App: React.FC = () => {
   const activeJobs = useMemo(() => jobs.filter(j => j.isActive), [jobs]);
 
   // Load Data
-  const loadData = async (isBackground = false) => {
+  const loadData = async () => {
       try {
-          if (!isBackground) setIsLoading(true);
-          
+          // Always try to fetch, but we already have mocks in state so UI won't be empty
           let [emps, jbs, entrs] = await Promise.all([
               fetchEmployees(),
               fetchJobs(),
               fetchTimeEntries()
           ]);
 
-          // CRITICAL: Only update state if we actually got data. 
           if (emps && emps.length > 0) {
               setEmployees(emps);
               setJobs(jbs);
               setEntries(entrs);
-          } else {
-              console.warn("Fetch returned empty data. Keeping previous state (Mocks).");
           }
           
           // Initialize User
           const savedId = localStorage.getItem('smartwork_current_user_id');
-          // Use the 'emps' variable if valid, otherwise fallback to current state 'employees'
           const availableEmps = (emps && emps.length > 0) ? emps : employees;
           
           if (savedId && availableEmps.some(e => e.id === savedId && e.isActive !== false)) {
@@ -158,8 +152,6 @@ const App: React.FC = () => {
 
       } catch (error) {
           console.error("Failed to load data:", error);
-      } finally {
-          if (!isBackground) setIsLoading(false);
       }
   };
 
@@ -173,6 +165,10 @@ const App: React.FC = () => {
       }
 
       loadData();
+      
+      // Force cleanup of any old credentials that might cause issues
+      localStorage.removeItem('smartwork_supabase_url');
+      localStorage.removeItem('smartwork_supabase_key');
   }, []);
 
   // --- REST OF APP LOGIC ---
@@ -268,7 +264,7 @@ const App: React.FC = () => {
 
   const handleAddEntries = async (newEntries: TimeEntry[]) => {
     if (!canEdit) return alert("Měsíc je uzamčen.");
-    try { await addTimeEntriesBulk(newEntries); loadData(true); } catch (e: any) { alert("Chyba: " + e.message); }
+    try { await addTimeEntriesBulk(newEntries); loadData(); } catch (e: any) { alert("Chyba: " + e.message); }
   };
 
   const handleCopyLastDay = async () => {
@@ -294,7 +290,7 @@ const App: React.FC = () => {
             await deleteTimeEntriesForDate(targetUserId, date);
             if (submittedEntries.length > 0) await addTimeEntriesBulk(submittedEntries);
         }
-        loadData(true);
+        loadData();
     } catch (e: any) { alert("Chyba: " + e.message); }
   };
 
@@ -361,11 +357,11 @@ const App: React.FC = () => {
   };
 
   // Admin Handlers
-  const handleAddEmployee = async (emp: Employee) => { try { await addEmployee(emp); loadData(true); } catch (e: any) { alert("Chyba: " + e.message); } };
-  const handleUpdateEmployee = async (emp: Employee) => { try { await updateEmployee(emp); loadData(true); } catch (e: any) { alert("Chyba: " + e.message); } };
-  const handleToggleEmployeeStatus = async (id: string, isActive: boolean) => { try { await updateEmployeeStatus(id, isActive); loadData(true); } catch (e: any) { alert("Chyba: " + e.message); } };
-  const handleAddJob = async (job: Job) => { try { await addJob(job); loadData(true); } catch (e: any) { alert("Chyba: " + e.message); } };
-  const handleToggleJobStatus = async (id: string, isActive: boolean) => { try { await updateJobStatus(id, isActive); loadData(true); } catch (e: any) { alert("Chyba: " + e.message); } };
+  const handleAddEmployee = async (emp: Employee) => { try { await addEmployee(emp); loadData(); } catch (e: any) { alert("Chyba: " + e.message); } };
+  const handleUpdateEmployee = async (emp: Employee) => { try { await updateEmployee(emp); loadData(); } catch (e: any) { alert("Chyba: " + e.message); } };
+  const handleToggleEmployeeStatus = async (id: string, isActive: boolean) => { try { await updateEmployeeStatus(id, isActive); loadData(); } catch (e: any) { alert("Chyba: " + e.message); } };
+  const handleAddJob = async (job: Job) => { try { await addJob(job); loadData(); } catch (e: any) { alert("Chyba: " + e.message); } };
+  const handleToggleJobStatus = async (id: string, isActive: boolean) => { try { await updateJobStatus(id, isActive); loadData(); } catch (e: any) { alert("Chyba: " + e.message); } };
   const handleStartPresentation = (type: PresentationType) => setPresentationMode(type);
 
   if (presentationMode) return <PresentationMode type={presentationMode} onClose={() => setPresentationMode(null)} />;
@@ -389,7 +385,7 @@ const App: React.FC = () => {
            <div className="flex flex-col">
              <div className="flex items-baseline gap-1">
                 <h1 className="font-bold text-lg leading-none">Chytrá</h1>
-                <span className="text-[9px] text-slate-400">v1.5.0</span>
+                <span className="text-[9px] text-slate-400">v1.6.0</span>
              </div>
              <span className="text-[10px] text-indigo-300 font-bold leading-none">DOCHÁZKA</span>
            </div>
@@ -412,15 +408,13 @@ const App: React.FC = () => {
 
       <main className="flex-1 p-0 overflow-y-auto flex flex-col h-screen md:h-auto">
         
-        {/* DEMO MODE BANNER */}
-        {(CREDENTIALS.IS_DEMO_MODE || employees === MOCK_EMPLOYEES) && (
-            <div className="bg-orange-500 text-white px-4 py-2 text-center text-sm font-bold flex items-center justify-center gap-2 shadow-md">
-                <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" viewBox="0 0 20 20" fill="currentColor">
-                    <path fillRule="evenodd" d="M8.257 3.099c.765-1.36 2.722-1.36 3.486 0l5.58 9.92c.75 1.334-.213 2.98-1.742 2.98H4.42c-1.53 0-2.493-1.646-1.743-2.98l5.58-9.92zM11 13a1 1 0 11-2 0 1 1 0 012 0zm-1-8a1 1 0 00-1 1v3a1 1 0 002 0V6a1 1 0 00-1-1z" clipRule="evenodd" />
-                </svg>
-                ZKUŠEBNÍ REŽIM - DATA SE NEUKLÁDAJÍ
-            </div>
-        )}
+        {/* OFFLINE/DEMO MODE BANNER - PERMANENT FIX */}
+        <div className="bg-orange-500 text-white px-4 py-2 text-center text-sm font-bold flex items-center justify-center gap-2 shadow-md">
+            <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" viewBox="0 0 20 20" fill="currentColor">
+                <path fillRule="evenodd" d="M8.257 3.099c.765-1.36 2.722-1.36 3.486 0l5.58 9.92c.75 1.334-.213 2.98-1.742 2.98H4.42c-1.53 0-2.493-1.646-1.743-2.98l5.58-9.92zM11 13a1 1 0 11-2 0 1 1 0 012 0zm-1-8a1 1 0 00-1 1v3a1 1 0 002 0V6a1 1 0 00-1-1z" clipRule="evenodd" />
+            </svg>
+            OFFLINE VERZE - DATA SE NEUKLÁDAJÍ
+        </div>
 
         {/* REVIEW MODE BANNER */}
         {reviewingUserId && (

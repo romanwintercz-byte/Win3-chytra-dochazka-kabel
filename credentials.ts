@@ -16,12 +16,6 @@ const getEnv = (key: string, fallback: string) => {
     return fallback;
 };
 
-// Helper pro detekci URL parametru ?demo=true
-const isUrlDemo = typeof window !== 'undefined' && new URLSearchParams(window.location.search).get('demo') === 'true';
-
-const envDemoVal = (import.meta as any).env?.VITE_IS_DEMO_MODE;
-const isEnvDemo = envDemoVal === 'true' || envDemoVal === '1' || envDemoVal === true;
-
 // Default Placeholder URL used in the project
 const DEFAULT_PLACEHOLDER_URL = 'https://afjsymtiupvcfccsrodi.supabase.co';
 
@@ -29,20 +23,10 @@ const DEFAULT_PLACEHOLDER_URL = 'https://afjsymtiupvcfccsrodi.supabase.co';
 const supabaseUrl = getEnv('VITE_SUPABASE_URL', DEFAULT_PLACEHOLDER_URL);
 const supabaseKey = getEnv('VITE_SUPABASE_KEY', 'ZDE_VLOZTE_SUPABASE_ANON_KEY');
 
-// Ensure placeholders trigger missing keys logic
-// FIX: Explicitly check for the default placeholder URL to auto-enable demo mode
-const isMissingKeys = 
-    !supabaseUrl || 
-    supabaseUrl.includes('ZDE_VLOZTE') || 
-    supabaseUrl === DEFAULT_PLACEHOLDER_URL || // Check for the dummy URL
-    !supabaseKey || 
-    supabaseKey.includes('ZDE_VLOZTE') || 
-    supabaseUrl === 'undefined';
-
 export const CREDENTIALS = {
-    // PŘEPÍNAČ DEMO REŽIMU
-    // Pokud chybí klíče, vynutíme Demo režim automaticky.
-    IS_DEMO_MODE: isEnvDemo || isUrlDemo || isMissingKeys || false,
+    // PŘEPÍNAČ DEMO REŽIMU - NATVRDO ZAPNUTO PRO ODSTRANĚNÍ BLOKACE
+    // Tímto zajistíme, že aplikace nebude nikdy vyžadovat klíče
+    IS_DEMO_MODE: true,
 
     // 1. Supabase URL
     SUPABASE_URL: supabaseUrl,

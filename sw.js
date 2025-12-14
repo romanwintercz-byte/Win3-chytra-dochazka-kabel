@@ -1,5 +1,5 @@
 
-const CACHE_NAME = 'smartwork-v11-force-fix';
+const CACHE_NAME = 'smartwork-v12-nuclear';
 const ASSETS_TO_CACHE = [
   './',
   './index.html',
