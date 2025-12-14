@@ -2,10 +2,18 @@
 // ZDE VLOŽTE SVÉ KLÍČE
 // DŮLEŽITÉ: Hodnoty musí být vždy v jednoduchých uvozovkách ' '
 
-// Helper to safely get string from env
+// Helper to safely get string from env and STRIP ACCIDENTAL QUOTES
 const getEnv = (key: string, fallback: string) => {
-    const val = (import.meta as any).env?.[key];
-    return typeof val === 'string' ? val.trim() : fallback;
+    let val = (import.meta as any).env?.[key];
+    if (typeof val === 'string') {
+        val = val.trim();
+        // Remove quotes if they are part of the string (e.g. from bad env config)
+        if ((val.startsWith('"') && val.endsWith('"')) || (val.startsWith("'") && val.endsWith("'"))) {
+            val = val.slice(1, -1);
+        }
+        return val;
+    }
+    return fallback;
 };
 
 // Helper pro detekci URL parametru ?demo=true
