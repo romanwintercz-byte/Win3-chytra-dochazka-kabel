@@ -48,10 +48,10 @@ const App: React.FC = () => {
   const [activeTab, setActiveTab] = useState<'overview' | 'report' | 'settings'>('overview');
   const [isLoading, setIsLoading] = useState(true);
   
-  // Data State
-  const [employees, setEmployees] = useState<Employee[]>([]);
-  const [jobs, setJobs] = useState<Job[]>([]);
-  const [entries, setEntries] = useState<TimeEntry[]>([]);
+  // Data State - INITIALIZE WITH MOCKS to prevent empty state/setup screen flicker
+  const [employees, setEmployees] = useState<Employee[]>(MOCK_EMPLOYEES);
+  const [jobs, setJobs] = useState<Job[]>(MOCK_JOBS);
+  const [entries, setEntries] = useState<TimeEntry[]>(MOCK_ENTRIES);
   
   // Reports State
   const [monthlyReports, setMonthlyReports] = useState<MonthStatus[]>([]);
@@ -81,8 +81,8 @@ const App: React.FC = () => {
   const [messageRecipientName, setMessageRecipientName] = useState<string>('');
 
   // The actual logged-in user
-  const currentUser = employees.find(e => e.id === currentUserId) || {
-      id: 'temp', name: 'Načítání...', role: 'Zaměstnanec', email: '', avatar: '', isActive: true
+  const currentUser = employees.find(e => e.id === currentUserId) || employees[0] || {
+      id: 'temp', name: 'Uživatel', role: 'Zaměstnanec', email: '', avatar: '', isActive: true
   } as Employee;
 
   // The user whose data we are currently viewing/editing
@@ -135,43 +135,47 @@ const App: React.FC = () => {
               fetchTimeEntries()
           ]);
 
-          // ABSOLUTE SAFETY NET: If emps is empty, force mocks.
-          // This prevents the "setup screen" from ever appearing in this broken state.
-          if (!emps || emps.length === 0) {
-              console.warn("No employees loaded. Forcing Mock Data to bypass setup screen.");
-              emps = [...MOCK_EMPLOYEES];
-              jbs = [...MOCK_JOBS];
-              entrs = [...MOCK_ENTRIES];
+          // Safety check: if fetch returns empty (which it shouldn't due to service logic), stick with mocks
+          if (emps && emps.length > 0) {
+              setEmployees(emps);
+              setJobs(jbs);
+              setEntries(entrs);
+          } else {
+              console.warn("Fetched data was empty, keeping initial mock data.");
           }
-
-          setEmployees(emps);
-          setJobs(jbs);
-          setEntries(entrs);
           
           // Initialize User
           const savedId = localStorage.getItem('smartwork_current_user_id');
-          if (savedId && emps.some(e => e.id === savedId && e.isActive !== false)) {
+          if (savedId && emps && emps.some(e => e.id === savedId && e.isActive !== false)) {
               setCurrentUserId(savedId);
           } else {
-              const firstActive = emps.find(e => e.isActive !== false && e.id !== SUPPORT_ID);
+              // Default to first user if not set or invalid
+              const firstActive = (emps || MOCK_EMPLOYEES).find(e => e.isActive !== false && e.id !== SUPPORT_ID);
               if (firstActive) setCurrentUserId(firstActive.id);
           }
 
       } catch (error) {
-          console.error("Failed to load data:", error);
-          // Fallback on error
-          setEmployees(MOCK_EMPLOYEES);
-          setJobs(MOCK_JOBS);
-          setEntries(MOCK_ENTRIES);
-          setCurrentUserId(MOCK_EMPLOYEES[0].id);
+          console.error("Failed to load data, keeping mocks:", error);
+          // State already initialized with Mocks, so just ensure User ID is set
+          if (!currentUserId) {
+             setCurrentUserId(MOCK_EMPLOYEES[0].id);
+          }
       } finally {
           if (!isBackground) setIsLoading(false);
       }
   };
 
   useEffect(() => {
+      // Set initial user immediately from mocks to prevent "Načítání..."
+      const savedId = localStorage.getItem('smartwork_current_user_id');
+      if (savedId && MOCK_EMPLOYEES.some(e => e.id === savedId)) {
+          setCurrentUserId(savedId);
+      } else {
+          setCurrentUserId(MOCK_EMPLOYEES[0].id);
+      }
+
       loadData();
-      const timer = setTimeout(() => setIsLoading(false), 1000);
+      const timer = setTimeout(() => setIsLoading(false), 500); // Shorter timeout
       return () => clearTimeout(timer);
   }, []);
 
@@ -370,19 +374,16 @@ const App: React.FC = () => {
 
   if (presentationMode) return <PresentationMode type={presentationMode} onClose={() => setPresentationMode(null)} />;
 
-  if (isLoading) {
+  if (isLoading && employees.length === 0) {
       return (
           <div className="min-h-screen flex items-center justify-center bg-[#f3f4f6]">
               <div className="flex flex-col items-center">
                   <div className="w-12 h-12 border-4 border-indigo-600 border-t-transparent rounded-full animate-spin mb-4"></div>
-                  <h2 className="text-gray-700 font-semibold">Načítám data...</h2>
+                  <h2 className="text-gray-700 font-semibold">Startuji aplikaci...</h2>
               </div>
           </div>
       );
   }
-
-  // NOTE: The setup screen logic has been removed. 
-  // If no employees, we force mocks, so we render the app directly.
 
   return (
     <div className="flex flex-col md:flex-row min-h-screen bg-[#f3f4f6]">
