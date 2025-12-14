@@ -562,34 +562,29 @@ const App: React.FC = () => {
       );
   }
 
-  // Modified Error / Config screen for non-Demo mode failure
-  // Check both explicit IS_DEMO_MODE AND if we have data. 
-  // If we have no employees and NOT demo, show error.
-  if (!isLoading && employees.length === 0 && !CREDENTIALS.IS_DEMO_MODE) {
+  // FORCE SHOW START SCREEN IF NO EMPLOYEES LOADED (Regardless of Demo Mode flag)
+  if (!isLoading && employees.length === 0) {
       return (
         <div className="min-h-screen flex flex-col items-center justify-center bg-[#f3f4f6] p-8">
-            <h2 className="text-2xl font-bold text-gray-800 mb-2">Vítejte v Chytre Docházce</h2>
-            <p className="text-gray-600 mb-6 text-center max-w-md">
-                Aplikace je připravena k použití. Pro vyzkoušení bez nutnosti nastavování databáze spusťte Demo režim.
+            <h2 className="text-2xl font-bold text-gray-800 mb-2">Vítejte v Chytré Docházce</h2>
+            <p className="text-gray-600 mb-8 text-center max-w-md">
+                Aplikace nemá připojení k databázi. Jak chcete pokračovat?
             </p>
             
-            <div className="flex flex-col gap-4 mb-8 w-full max-w-sm">
-                 <button 
-                    onClick={() => { window.location.search = '?demo=true'; }} 
-                    className="w-full px-6 py-4 bg-orange-600 text-white rounded-xl font-bold shadow-lg shadow-orange-200 hover:bg-orange-700 hover:scale-105 transition-all flex items-center justify-center gap-3 text-lg"
-                 >
-                    <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6" viewBox="0 0 20 20" fill="currentColor">
-                        <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM9.555 7.168A1 1 0 008 8v4a1 1 0 001.555.832l3-2a1 1 0 000-1.664l-3-2z" clipRule="evenodd" />
-                    </svg>
-                    Spustit Demo Verzi
-                </button>
-                <div className="text-xs text-center text-gray-500">
-                    V demo režimu se data ukládají pouze do paměti prohlížeče.
-                </div>
-            </div>
+            {/* BIG DEMO BUTTON - ALWAYS VISIBLE */}
+            <button 
+                onClick={() => { window.location.search = '?demo=true'; }} 
+                className="w-full max-w-sm px-6 py-5 bg-orange-600 text-white rounded-xl font-bold shadow-xl hover:bg-orange-700 hover:scale-105 transition-all flex items-center justify-center gap-3 text-xl mb-12 animate-fade-in-up"
+            >
+                <svg xmlns="http://www.w3.org/2000/svg" className="h-8 w-8" viewBox="0 0 20 20" fill="currentColor">
+                    <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM9.555 7.168A1 1 0 008 8v4a1 1 0 001.555.832l3-2a1 1 0 000-1.664l-3-2z" clipRule="evenodd" />
+                </svg>
+                Spustit Demo Verzi
+            </button>
             
+            {/* Manual Config */}
             <details className="w-full max-w-md bg-white p-4 rounded-lg border border-gray-200">
-                <summary className="font-semibold text-gray-700 cursor-pointer flex justify-between items-center">
+                <summary className="font-semibold text-gray-700 cursor-pointer flex justify-between items-center select-none">
                     <span>Mám vlastní databázi (Supabase)</span>
                     <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
@@ -597,18 +592,18 @@ const App: React.FC = () => {
                 </summary>
                 <div className="mt-4 pt-4 border-t border-gray-100">
                     <input 
-                        className="w-full p-2 border rounded mb-2 text-sm" 
+                        className="w-full p-3 border rounded mb-2 text-sm" 
                         placeholder="Supabase URL (https://...)" 
                         value={manualSupabaseUrl} 
                         onChange={e => setManualSupabaseUrl(e.target.value)}
                     />
                     <input 
-                        className="w-full p-2 border rounded mb-4 text-sm" 
+                        className="w-full p-3 border rounded mb-4 text-sm" 
                         placeholder="Supabase Anon Key" 
                         value={manualSupabaseKey} 
                         onChange={e => setManualSupabaseKey(e.target.value)}
                     />
-                    <button onClick={handleSaveCredentials} className="w-full py-2 bg-indigo-600 text-white rounded hover:bg-indigo-700 transition-colors">Uložit a připojit</button>
+                    <button onClick={handleSaveCredentials} className="w-full py-3 bg-indigo-600 text-white rounded font-medium hover:bg-indigo-700 transition-colors">Uložit a připojit</button>
                 </div>
             </details>
             
