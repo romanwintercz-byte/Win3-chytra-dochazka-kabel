@@ -56,7 +56,6 @@ const createDummyClient = () => {
 
 // --- SAFE INITIALIZATION LOGIC ---
 
-// 1. Helper to clean strings
 const cleanString = (str: string | null | undefined): string | null => {
     if (!str) return null;
     let val = str.trim();
@@ -64,10 +63,25 @@ const cleanString = (str: string | null | undefined): string | null => {
     if ((val.startsWith('"') && val.endsWith('"')) || (val.startsWith("'") && val.endsWith("'"))) {
         val = val.slice(1, -1);
     }
+    if (val === 'undefined' || val === 'null') return null;
     return val;
 };
 
-// 2. Helper to get credentials safely
+// EXTREMELY STRICT URL VALIDATOR
+const getValidUrl = (urlStr: string | null): string | null => {
+    if (!urlStr) return null;
+    try {
+        const u = new URL(urlStr);
+        // Supabase requires HTTP or HTTPS
+        if (u.protocol !== 'http:' && u.protocol !== 'https:') return null;
+        // Basic check for placeholder
+        if (u.hostname.includes('your-project')) return null;
+        return u.toString();
+    } catch (e) {
+        return null;
+    }
+};
+
 const getCredentials = () => {
     let url: string | null = null;
     let key: string | null = null;
@@ -75,26 +89,43 @@ const getCredentials = () => {
     // Try LocalStorage first
     try {
         if (typeof localStorage !== 'undefined') {
-            url = cleanString(localStorage.getItem('smartwork_supabase_url'));
-            key = cleanString(localStorage.getItem('smartwork_supabase_key'));
+            const lsUrl = cleanString(localStorage.getItem('smartwork_supabase_url'));
+            const lsKey = cleanString(localStorage.getItem('smartwork_supabase_key'));
+            
+            // Validate LS URL immediately
+            if (getValidUrl(lsUrl)) {
+                url = lsUrl;
+                key = lsKey;
+            } else if (lsUrl) {
+                // If LS has a value but it is INVALID, clear it immediately to stop crash loops
+                console.warn("Found invalid URL in LocalStorage, clearing...");
+                localStorage.removeItem('smartwork_supabase_url');
+            }
         }
     } catch (e) {
         console.warn('LocalStorage error', e);
     }
 
-    // Try Env/File second
-    if (!url || url.includes('ZDE_VLOZTE')) {
-        url = cleanString(CREDENTIALS.SUPABASE_URL);
+    // Try Env/File second if LS failed
+    if (!url) {
+        const envUrlCandidate = cleanString(CREDENTIALS.SUPABASE_URL);
+        if (getValidUrl(envUrlCandidate) && !envUrlCandidate?.includes('ZDE_VLOZTE')) {
+            url = envUrlCandidate;
+        }
     }
+    
     if (!key || key.includes('ZDE_VLOZTE')) {
-        key = cleanString(CREDENTIALS.SUPABASE_KEY);
+        const envKeyCandidate = cleanString(CREDENTIALS.SUPABASE_KEY);
+        if (envKeyCandidate && !envKeyCandidate.includes('ZDE_VLOZTE')) {
+            key = envKeyCandidate;
+        }
     }
 
     return { url, key };
 };
 
 // 3. Initialize Client
-let client: SupabaseClient = createDummyClient(); // Default to dummy immediately
+let client: SupabaseClient = createDummyClient(); // Start with dummy
 
 try {
     // Check reset flag first
@@ -107,22 +138,18 @@ try {
 
     const { url, key } = getCredentials();
     const isExplicitDemo = CREDENTIALS.IS_DEMO_MODE;
+    const validatedUrl = getValidUrl(url);
 
-    // Validate URL format roughly
-    const isValidUrl = (u: string | null) => u && (u.startsWith('http://') || u.startsWith('https://')) && !u.includes('your-project');
-
-    if (!isExplicitDemo && isValidUrl(url) && key) {
+    // Only create real client if we have a STRICTLY VALIDATED URL
+    if (!isExplicitDemo && validatedUrl && key) {
         try {
-            // THE DANGEROUS CALL
-            client = createClient(url!, key!, {
-                auth: { persistSession: false }, // Prevent session issues
+            client = createClient(validatedUrl, key, {
+                auth: { persistSession: false }, 
                 realtime: { params: { eventsPerSecond: 10 } }
             });
         } catch (supaError) {
             console.error("Supabase init crashed:", supaError);
-            // CRITICAL FIX: If init fails, assume credentials are bad and purge them
             if (typeof localStorage !== 'undefined') {
-                console.warn("Purging corrupt credentials from localStorage");
                 localStorage.removeItem('smartwork_supabase_url');
                 localStorage.removeItem('smartwork_supabase_key');
             }
@@ -131,7 +158,7 @@ try {
         }
     } else {
         if (!isExplicitDemo) {
-            console.warn("Invalid credentials structure. Using Demo.");
+            console.warn("Invalid credentials structure or Demo Mode active.");
             forcedDemoMode = true;
         }
         client = createDummyClient();
@@ -139,7 +166,6 @@ try {
 
 } catch (e) {
     console.error("Global init error:", e);
-    // Nuclear option: Clear everything if we hit a top level error
     if (typeof localStorage !== 'undefined') {
         localStorage.removeItem('smartwork_supabase_url');
         localStorage.removeItem('smartwork_supabase_key');
@@ -157,9 +183,15 @@ const isDemo = () => CREDENTIALS.IS_DEMO_MODE || forcedDemoMode;
 export const saveCredentialsManually = (url: string, key: string) => {
     const cleanUrl = cleanString(url) || '';
     const cleanKey = cleanString(key) || '';
+    
+    // Validate before saving to prevent loops
+    if (!getValidUrl(cleanUrl)) {
+        alert("Neplatná URL adresa. Musí začínat http:// nebo https://");
+        return;
+    }
+
     localStorage.setItem('smartwork_supabase_url', cleanUrl);
     localStorage.setItem('smartwork_supabase_key', cleanKey);
-    // Reload to apply
     window.location.reload();
 };
 
