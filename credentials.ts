@@ -24,9 +24,10 @@ const supabaseUrl = getEnv('VITE_SUPABASE_URL', DEFAULT_PLACEHOLDER_URL);
 const supabaseKey = getEnv('VITE_SUPABASE_KEY', 'ZDE_VLOZTE_SUPABASE_ANON_KEY');
 
 export const CREDENTIALS = {
-    // PŘEPÍNAČ DEMO REŽIMU - NATVRDO ZAPNUTO PRO ODSTRANĚNÍ BLOKACE
-    // Tímto zajistíme, že aplikace nebude nikdy vyžadovat klíče
-    IS_DEMO_MODE: true,
+    // PŘEPÍNAČ DEMO REŽIMU
+    // false = POKUSÍ SE PŘIPOJIT K SUPABASE (Vaše data)
+    // true = VŽDY POUŽIJE FALEŠNÁ DATA (Bezpečný režim)
+    IS_DEMO_MODE: false,
 
     // 1. Supabase URL
     SUPABASE_URL: supabaseUrl,

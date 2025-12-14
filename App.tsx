@@ -47,10 +47,11 @@ const SUPPORT_ID = 'win3-support-id';
 const App: React.FC = () => {
   const [activeTab, setActiveTab] = useState<'overview' | 'report' | 'settings'>('overview');
   
-  // Data State - INITIALIZED DIRECTLY WITH MOCKS
-  const [employees, setEmployees] = useState<Employee[]>(MOCK_EMPLOYEES);
-  const [jobs, setJobs] = useState<Job[]>(MOCK_JOBS);
-  const [entries, setEntries] = useState<TimeEntry[]>(MOCK_ENTRIES);
+  // Data State - INITIALIZED EMPTY FIRST, THEN LOADED
+  // This prevents flash of mock data if we are in PROD mode
+  const [employees, setEmployees] = useState<Employee[]>(CREDENTIALS.IS_DEMO_MODE ? MOCK_EMPLOYEES : []);
+  const [jobs, setJobs] = useState<Job[]>(CREDENTIALS.IS_DEMO_MODE ? MOCK_JOBS : []);
+  const [entries, setEntries] = useState<TimeEntry[]>(CREDENTIALS.IS_DEMO_MODE ? MOCK_ENTRIES : []);
   
   // Reports State
   const [monthlyReports, setMonthlyReports] = useState<MonthStatus[]>([]);
@@ -81,7 +82,7 @@ const App: React.FC = () => {
 
   // The actual logged-in user
   const currentUser = employees.find(e => e.id === currentUserId) || employees[0] || {
-      id: 'temp', name: 'Uživatel', role: 'Zaměstnanec', email: '', avatar: '', isActive: true
+      id: 'temp', name: 'Načítání...', role: 'Zaměstnanec', email: '', avatar: '', isActive: true
   } as Employee;
 
   // The user whose data we are currently viewing/editing
@@ -126,21 +127,21 @@ const App: React.FC = () => {
   // Load Data
   const loadData = async () => {
       try {
-          // Always try to fetch, but we already have mocks in state so UI won't be empty
+          // Fetch data from Supabase
           let [emps, jbs, entrs] = await Promise.all([
               fetchEmployees(),
               fetchJobs(),
               fetchTimeEntries()
           ]);
 
-          if (emps && emps.length > 0) {
-              setEmployees(emps);
-              setJobs(jbs);
-              setEntries(entrs);
-          }
+          // Update state
+          if (emps) setEmployees(emps);
+          if (jbs) setJobs(jbs);
+          if (entrs) setEntries(entrs);
           
-          // Initialize User
+          // Initialize User logic
           const savedId = localStorage.getItem('smartwork_current_user_id');
+          // Use loaded employees for checking
           const availableEmps = (emps && emps.length > 0) ? emps : employees;
           
           if (savedId && availableEmps.some(e => e.id === savedId && e.isActive !== false)) {
@@ -156,14 +157,6 @@ const App: React.FC = () => {
   };
 
   useEffect(() => {
-      // Set initial user immediately to prevent flicker
-      const savedId = localStorage.getItem('smartwork_current_user_id');
-      if (savedId && MOCK_EMPLOYEES.some(e => e.id === savedId)) {
-          setCurrentUserId(savedId);
-      } else {
-          setCurrentUserId(MOCK_EMPLOYEES[0].id);
-      }
-
       loadData();
       
       // Force cleanup of any old credentials that might cause issues
@@ -385,7 +378,7 @@ const App: React.FC = () => {
            <div className="flex flex-col">
              <div className="flex items-baseline gap-1">
                 <h1 className="font-bold text-lg leading-none">Chytrá</h1>
-                <span className="text-[9px] text-slate-400">v2.2 DONE</span>
+                <span className="text-[9px] text-slate-400">v2.4 PROD</span>
              </div>
              <span className="text-[10px] text-indigo-300 font-bold leading-none">DOCHÁZKA</span>
            </div>
@@ -408,13 +401,15 @@ const App: React.FC = () => {
 
       <main className="flex-1 p-0 overflow-y-auto flex flex-col h-screen md:h-auto">
         
-        {/* OFFLINE/DEMO MODE BANNER - PERMANENT FIX */}
+        {/* OFFLINE/DEMO MODE BANNER - REMOVED FOR PROD */}
+        {CREDENTIALS.IS_DEMO_MODE && (
         <div className="bg-orange-500 text-white px-4 py-2 text-center text-sm font-bold flex items-center justify-center gap-2 shadow-md">
             <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" viewBox="0 0 20 20" fill="currentColor">
                 <path fillRule="evenodd" d="M8.257 3.099c.765-1.36 2.722-1.36 3.486 0l5.58 9.92c.75 1.334-.213 2.98-1.742 2.98H4.42c-1.53 0-2.493-1.646-1.743-2.98l5.58-9.92zM11 13a1 1 0 11-2 0 1 1 0 012 0zm-1-8a1 1 0 00-1 1v3a1 1 0 002 0V6a1 1 0 00-1-1z" clipRule="evenodd" />
             </svg>
             OFFLINE VERZE - DATA SE NEUKLÁDAJÍ
         </div>
+        )}
 
         {/* REVIEW MODE BANNER */}
         {reviewingUserId && (
