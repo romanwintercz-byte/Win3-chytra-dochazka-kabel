@@ -1,71 +1,37 @@
 
-const CACHE_NAME = 'smartwork-v12-nuclear';
-const ASSETS_TO_CACHE = [
-  './',
-  './index.html',
-  './manifest.json',
-  'https://cdn.tailwindcss.com',
-  'https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap'
-];
+// CACHE KILLER SERVICE WORKER
+// Tato verze slouží k vyčištění staré cache a vynucení stažení nové verze aplikace.
+
+const CACHE_NAME = 'smartwork-reset-v999';
 
 self.addEventListener('install', (event) => {
-  // Force immediate activation
+  // Okamžitě převzít kontrolu, nečekat
   self.skipWaiting();
-  
-  event.waitUntil(
-    caches.open(CACHE_NAME).then((cache) => {
-      return Promise.all(
-        ASSETS_TO_CACHE.map(url => {
-            return cache.add(url).catch(err => console.error('Failed to cache:', url, err));
-        })
-      );
-    })
-  );
 });
 
 self.addEventListener('activate', (event) => {
-  // Claim clients immediately
+  // Okamžitě smazat VŠECHNY staré cache
   event.waitUntil(
     caches.keys().then((cacheNames) => {
       return Promise.all(
         cacheNames.map((cacheName) => {
-          if (cacheName !== CACHE_NAME) {
-            console.log('Deleting old cache:', cacheName);
-            return caches.delete(cacheName);
-          }
+          console.log('MAŽU STAROU CACHE:', cacheName);
+          return caches.delete(cacheName);
         })
       );
     })
   );
+  // Okamžitě začít ovládat všechny otevřené stránky
   self.clients.claim();
 });
 
 self.addEventListener('fetch', (event) => {
-  // Network First for HTML to ensure latest version
-  if (event.request.mode === 'navigate') {
-    event.respondWith(
-      fetch(event.request)
-        .catch(() => {
-          return caches.match('./index.html');
-        })
-    );
-    return;
-  }
-
-  // Stale-While-Revalidate for other assets
+  // IGNOROVAT CACHE - VŽDY STAHOVAT ZE SÍTĚ
+  // Tím zajistíme, že se načte nový index.html a App.tsx bez staré obrazovky
   event.respondWith(
-    caches.match(event.request).then((cachedResponse) => {
-      const fetchPromise = fetch(event.request).then((networkResponse) => {
-        if (networkResponse && networkResponse.status === 200 && networkResponse.type === 'basic') {
-          const responseToCache = networkResponse.clone();
-          caches.open(CACHE_NAME).then((cache) => {
-            cache.put(event.request, responseToCache);
-          });
-        }
-        return networkResponse;
-      }).catch(() => cachedResponse); // Return cached if network fails
-      
-      return cachedResponse || fetchPromise;
+    fetch(event.request).catch(() => {
+        // Fallback jen pokud není síť, ale pravděpodobně selže, což je v pořádku pro reset
+        return new Response("Jste offline a probíhá reset aplikace. Připojte se k internetu.", { status: 503 });
     })
   );
 });
