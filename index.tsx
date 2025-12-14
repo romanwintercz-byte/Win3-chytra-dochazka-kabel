@@ -38,7 +38,8 @@ if ('caches' in window) {
 }
 // --- NUCLEAR CLEANUP END ---
 
-// Register the NEW "Killer" SW
+// --- DISABLE SW REGISTRATION FOR RECOVERY ---
+/*
 if ('serviceWorker' in navigator) {
   window.addEventListener('load', () => {
     navigator.serviceWorker.register('./sw.js').then(reg => {
@@ -47,6 +48,7 @@ if ('serviceWorker' in navigator) {
     });
   });
 }
+*/
 
 const root = ReactDOM.createRoot(rootElement);
 root.render(
