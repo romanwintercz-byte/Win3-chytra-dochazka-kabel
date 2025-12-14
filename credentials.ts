@@ -9,7 +9,7 @@ export const CREDENTIALS = {
     // PŘEPÍNAČ DEMO REŽIMU
     // true = Aplikace jede "offline" s fiktivními daty (bezpečné pro web)
     // false = Aplikace se připojuje k ostré databázi Supabase
-    IS_DEMO_MODE: false,
+    IS_DEMO_MODE: true,
 
     // 1. Supabase URL
     SUPABASE_URL: (import.meta as any).env?.VITE_SUPABASE_URL || 'https://afjsymtiupvcfccsrodi.supabase.co',
