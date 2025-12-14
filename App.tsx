@@ -388,30 +388,30 @@ const App: React.FC = () => {
   if (!isLoading && employees.length === 0) {
       return (
         <div className="min-h-screen flex flex-col items-center justify-center bg-[#f3f4f6] p-8">
-            <h2 className="text-2xl font-bold text-gray-800 mb-2">Vítejte v Chytré Docházce</h2>
+            <h2 className="text-2xl font-bold text-gray-800 mb-2">Chytrá Docházka</h2>
             <p className="text-gray-600 mb-8 text-center max-w-md">
-               Aplikace nemá připojení k databázi. Spusťte demo nebo připojte vlastní.
+               Nepodařilo se připojit k databázi nebo je prázdná.
             </p>
             
             {/* BIG DEMO BUTTON - HIGH VISIBILITY */}
             <button 
                 onClick={() => { window.location.href = window.location.pathname + '?demo=true'; }} 
-                className="bg-orange-600 hover:bg-orange-700 text-white font-bold py-4 px-8 rounded-xl shadow-lg transform hover:scale-105 transition-all flex items-center gap-3 text-lg mb-8"
+                className="bg-indigo-600 hover:bg-indigo-700 text-white font-bold py-4 px-8 rounded-xl shadow-lg transform hover:scale-105 transition-all flex items-center gap-3 text-lg mb-8"
             >
                 <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 20 20" fill="currentColor">
                     <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM9.555 7.168A1 1 0 008 8v4a1 1 0 001.555.832l3-2a1 1 0 000-1.664l-3-2z" clipRule="evenodd" />
                 </svg>
-                SPUSTIT DEMO
+                POKRAČOVAT V DEMU
             </button>
             
             {/* Manual Config Toggle */}
-            <div className="w-full max-w-md">
+            <div className="w-full max-w-md border-t border-gray-200 pt-6">
                 <button 
                     onClick={() => setConfigOpen(!configOpen)}
-                    className="w-full flex justify-between items-center p-4 bg-white rounded-lg border border-gray-200 text-gray-700 font-medium hover:bg-gray-50 transition-colors"
+                    className="w-full flex justify-between items-center p-3 text-sm text-gray-500 hover:text-gray-700 transition-colors"
                 >
-                    <span>Mám vlastní databázi (Supabase)</span>
-                    <svg xmlns="http://www.w3.org/2000/svg" className={`h-5 w-5 transition-transform ${configOpen ? 'rotate-180' : ''}`} fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <span>Technické nastavení (Supabase)</span>
+                    <svg xmlns="http://www.w3.org/2000/svg" className={`h-4 w-4 transition-transform ${configOpen ? 'rotate-180' : ''}`} fill="none" viewBox="0 0 24 24" stroke="currentColor">
                         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
                     </svg>
                 </button>
@@ -420,15 +420,14 @@ const App: React.FC = () => {
                     <div className="mt-2 bg-white p-4 rounded-lg border border-gray-200 animate-fade-in-up">
                         <input className="w-full p-3 border rounded mb-2 text-sm" placeholder="Supabase URL" value={manualSupabaseUrl} onChange={e => setManualSupabaseUrl(e.target.value)} />
                         <input className="w-full p-3 border rounded mb-4 text-sm" placeholder="Supabase Anon Key" value={manualSupabaseKey} onChange={e => setManualSupabaseKey(e.target.value)} />
-                        <button onClick={handleSaveCredentials} className="w-full py-3 bg-indigo-600 text-white rounded font-medium hover:bg-indigo-700 transition-colors">Uložit a připojit</button>
+                        <button onClick={handleSaveCredentials} className="w-full py-3 bg-gray-800 text-white rounded font-medium hover:bg-gray-900 transition-colors">Uložit a připojit</button>
+                        <div className="mt-2 text-center">
+                             <button onClick={handleClearSettings} className="text-xs text-red-400 hover:text-red-600 underline">
+                                Vymazat uložené klíče
+                            </button>
+                        </div>
                     </div>
                 )}
-            </div>
-            
-             <div className="mt-8 text-center">
-                <button onClick={handleClearSettings} className="text-sm text-red-400 hover:text-red-600 underline">
-                    Resetovat nastavení
-                </button>
             </div>
         </div>
       );

@@ -14,9 +14,11 @@ let demoState = {
     notifications: [] as any[]
 };
 
+// --- GLOBAL FALLBACK FLAG ---
+// If true, the app acts as if in Demo Mode regardless of other settings.
+let isFallbackMode = false;
+
 // --- DUMMY CLIENT FACTORY ---
-// This client does absolutely nothing but return empty arrays or success messages.
-// It effectively "disconnects" the app from any backend without crashing it.
 const createDummyClient = () => {
     const safeDummy: any = {
         select: () => safeDummy,
@@ -29,7 +31,7 @@ const createDummyClient = () => {
         single: () => safeDummy,
         then: (resolve: any) => resolve({ 
             data: [], 
-            error: null // Crucial: No error, just empty data
+            error: null 
         }),
         channel: () => ({
             on: () => ({ subscribe: () => {} }),
@@ -58,9 +60,11 @@ const createDummyClient = () => {
 const cleanString = (str: string | null | undefined): string | null => {
     if (!str) return null;
     let val = str.trim();
+    // Clean quotes
     if ((val.startsWith('"') && val.endsWith('"')) || (val.startsWith("'") && val.endsWith("'"))) {
         val = val.slice(1, -1);
     }
+    // Clean strings that look like "undefined" or "null"
     if (val === 'undefined' || val === 'null' || val === '') return null;
     return val;
 };
@@ -70,7 +74,6 @@ const getValidUrl = (urlStr: string | null): string | null => {
     try {
         if (!urlStr.startsWith('http')) return null;
         const u = new URL(urlStr);
-        // Basic validation
         if (u.hostname === 'localhost' || u.hostname.includes('supabase.co')) return u.toString();
         return null;
     } catch (e) {
@@ -82,7 +85,7 @@ const getCredentials = () => {
     let url: string | null = null;
     let key: string | null = null;
 
-    // 1. Try Local Storage
+    // 1. Try Local Storage (but be strict)
     try {
         if (typeof localStorage !== 'undefined') {
             url = cleanString(localStorage.getItem('smartwork_supabase_url'));
@@ -90,7 +93,7 @@ const getCredentials = () => {
         }
     } catch (e) {}
 
-    // 2. Try Environment Variables
+    // 2. Try Environment Variables if Local Storage is empty
     if (!getValidUrl(url)) {
         url = cleanString(CREDENTIALS.SUPABASE_URL);
     }
@@ -114,30 +117,36 @@ const isExplicitDemo = typeof window !== 'undefined' && window.location.search.i
 try {
     const { url, key } = getCredentials();
     const validatedUrl = getValidUrl(url);
+    
+    // Check if key is plausibly valid (length check)
+    const isKeyPlausible = key && key.length > 20 && !key.includes('ZDE_VLOZTE');
 
-    // CRITICAL: If no URL or Key, OR if explicitly in demo mode, use Dummy Client.
-    if (isExplicitDemo || !validatedUrl || !key || key.includes('ZDE_VLOZTE')) {
+    if (isExplicitDemo || !validatedUrl || !isKeyPlausible) {
         client = createDummyClient();
-        if (!isExplicitDemo) console.log("Supabase credentials missing. Defaulting to Demo Mode.");
+        isFallbackMode = true; // Force fallback mode
+        if (!isExplicitDemo) console.log("Supabase credentials missing or invalid. Switching to Auto-Demo Mode.");
     } 
-    // If we have credentials, try to connect
     else {
-        client = createClient(validatedUrl, key, {
+        client = createClient(validatedUrl!, key!, {
             auth: { persistSession: false }, 
             realtime: { params: { eventsPerSecond: 10 } }
         });
     } 
 } catch (e) {
-    console.error("Supabase Init Error", e);
+    console.error("Supabase Init Critical Error", e);
     client = createDummyClient();
+    isFallbackMode = true;
 }
 
 export const supabase = client;
 
 // --- EXPORTED HELPERS ---
 
-// FORCE DEMO if explicit via URL OR if credentials are missing (CREDENTIALS.IS_DEMO_MODE)
-const isDemo = () => isExplicitDemo || CREDENTIALS.IS_DEMO_MODE;
+// isDemo is TRUE if:
+// 1. URL has ?demo=true
+// 2. Env var says demo
+// 3. We are in Fallback Mode (initialization failed)
+const isDemo = () => isExplicitDemo || CREDENTIALS.IS_DEMO_MODE || isFallbackMode;
 
 export const saveCredentialsManually = (url: string, key: string) => {
     const cleanUrl = cleanString(url) || '';
@@ -189,7 +198,7 @@ export const subscribeToNotifications = (userId: string, onNewNotification: (n: 
 // --- API Functions ---
 
 export const fetchEmployees = async (): Promise<Employee[]> => {
-  // 1. If Demo (Explicit OR Missing Keys) -> Return Mock Data
+  // 1. If we are already in Demo/Fallback mode, return mocks immediately
   if (isDemo()) {
       return demoState.employees;
   }
@@ -197,11 +206,18 @@ export const fetchEmployees = async (): Promise<Employee[]> => {
   // 2. Try to fetch from DB
   const { data, error } = await supabase.from('employees').select('*').order('name'); 
   
-  // 3. If Error or No Data, return empty array (UI will handle it)
-  if (error || !data) { 
-      return []; 
+  // 3. AUTO-FALLBACK: If error occurs (e.g. 401, Network), switch to Demo Mode instantly.
+  // This prevents the "Connect DB" screen from showing up for users who just want to use the app.
+  if (error) { 
+      console.warn("Fetch employees failed. Switching to Fallback Demo Mode.", error);
+      isFallbackMode = true; // Enable fallback for subsequent calls
+      return demoState.employees; 
   }
-  return data.map((e: any) => ({ ...e, isActive: e.is_active !== false, pinCode: e.pin_code })) as Employee[];
+
+  // 4. If data is strictly null (shouldn't happen with real client usually) or empty,
+  // we might want to return empty array, BUT if user expects demo, we might want to fallback.
+  // For now, if no data, we assume it's a fresh DB (return empty).
+  return (data || []).map((e: any) => ({ ...e, isActive: e.is_active !== false, pinCode: e.pin_code })) as Employee[];
 };
 
 export const addEmployee = async (employee: Employee) => {
@@ -231,8 +247,8 @@ export const updateEmployeePin = async (id: string, pin: string | null) => {
 export const fetchJobs = async (): Promise<Job[]> => {
   if (isDemo()) return demoState.jobs;
   const { data, error } = await supabase.from('jobs').select('*').order('code');
-  if (error || !data) return [];
-  return data.map((j: any) => ({ id: j.id, code: j.code, name: j.name, isActive: j.is_active })) as Job[];
+  if (error) return demoState.jobs; // Fallback on error
+  return (data || []).map((j: any) => ({ id: j.id, code: j.code, name: j.name, isActive: j.is_active })) as Job[];
 };
 
 export const addJob = async (job: Job) => {
@@ -250,8 +266,8 @@ export const updateJobStatus = async (id: string, isActive: boolean) => {
 export const fetchTimeEntries = async (): Promise<TimeEntry[]> => {
   if (isDemo()) return demoState.entries;
   const { data, error } = await supabase.from('time_entries').select('*').order('date', { ascending: false });
-  if (error || !data) return [];
-  return data.map((e: any) => ({ id: e.id, employeeId: e.employee_id, date: e.date, project: e.project, description: e.description, hours: e.hours, type: e.type, attachmentUrl: e.attachment_url })) as TimeEntry[];
+  if (error) return demoState.entries; // Fallback on error
+  return (data || []).map((e: any) => ({ id: e.id, employeeId: e.employee_id, date: e.date, project: e.project, description: e.description, hours: e.hours, type: e.type, attachmentUrl: e.attachment_url })) as TimeEntry[];
 };
 
 export const addTimeEntriesBulk = async (entries: TimeEntry[]) => {
@@ -276,8 +292,8 @@ export const deleteTimeEntry = async (id: string) => {
 export const fetchMonthlyReports = async (month: string): Promise<MonthStatus[]> => {
     if (isDemo()) return demoState.reports.filter(r => r.month === month);
     const { data, error } = await supabase.from('monthly_reports').select('*').eq('month', month);
-    if (error || !data) return [];
-    return data.map((r: any) => ({ employeeId: r.employee_id, month: r.month, status: r.status as TimesheetStatus, managerComment: r.manager_comment, updatedAt: r.updated_at }));
+    if (error) return [];
+    return (data || []).map((r: any) => ({ employeeId: r.employee_id, month: r.month, status: r.status as TimesheetStatus, managerComment: r.manager_comment, updatedAt: r.updated_at }));
 };
 
 export const upsertMonthlyReport = async (report: MonthStatus) => {
@@ -307,8 +323,8 @@ export const toggleGlobalLock = async (month: string, isLocked: boolean, manager
 export const fetchNotifications = async (userId: string): Promise<Notification[]> => {
     if (isDemo()) return demoState.notifications.filter(n => n.userId === userId);
     const { data, error } = await supabase.from('notifications').select('*').eq('user_id', userId).order('created_at', { ascending: false });
-    if (error || !data) return [];
-    return data.map((n: any) => ({ id: n.id, userId: n.user_id, senderId: n.sender_id, type: n.type, message: n.message, isRead: n.is_read, createdAt: n.created_at }));
+    if (error) return [];
+    return (data || []).map((n: any) => ({ id: n.id, userId: n.user_id, senderId: n.sender_id, type: n.type, message: n.message, isRead: n.is_read, createdAt: n.created_at }));
 };
 
 export const createNotification = async (userId: string, message: string, type: 'info' | 'success' | 'warning' | 'error' = 'info', senderId?: string) => {
