@@ -31,7 +31,7 @@ import {
     fetchNotifications, markNotificationAsRead, markAllNotificationsAsRead, createNotification,
     subscribeToPresence, subscribeToNotifications
 } from './services/supabase';
-import { MOCK_EMPLOYEES } from './services/mockData';
+import { MOCK_EMPLOYEES, MOCK_JOBS, MOCK_ENTRIES } from './services/mockData';
 
 const getCurrentMonth = () => {
   return new Date().toISOString().slice(0, 7);
@@ -133,11 +133,22 @@ const App: React.FC = () => {
   const loadData = async (isBackground = false) => {
       try {
           if (!isBackground) setIsLoading(true);
-          const [emps, jbs, entrs] = await Promise.all([
+          
+          let [emps, jbs, entrs] = await Promise.all([
               fetchEmployees(),
               fetchJobs(),
               fetchTimeEntries()
           ]);
+
+          // CRITICAL FIX: If no employees found (e.g. reload on demo), FORCE MOCK DATA
+          // This prevents the "Connect Database" screen from showing up.
+          if (emps.length === 0) {
+              console.log("No data found on reload. Injecting Demo Data.");
+              emps = [...MOCK_EMPLOYEES];
+              jbs = [...MOCK_JOBS];
+              entrs = [...MOCK_ENTRIES];
+          }
+
           setEmployees(emps);
           setJobs(jbs);
           setEntries(entrs);
@@ -152,7 +163,12 @@ const App: React.FC = () => {
           }
 
       } catch (error) {
-          console.error("Failed to load data from Supabase:", error);
+          console.error("Failed to load data:", error);
+          // Fallback on error
+          setEmployees(MOCK_EMPLOYEES);
+          setJobs(MOCK_JOBS);
+          setEntries(MOCK_ENTRIES);
+          setCurrentUserId(MOCK_EMPLOYEES[0].id);
       } finally {
           if (!isBackground) setIsLoading(false);
       }
@@ -160,10 +176,15 @@ const App: React.FC = () => {
 
   useEffect(() => {
       loadData();
-      // SAFETY TIMEOUT: Shortened to 800ms to allow UI to show quickly if data fails
+      // SAFETY TIMEOUT
       const timer = setTimeout(() => {
           setIsLoading(false);
-      }, 800);
+          // If still no employees after timeout, force mocks
+          setEmployees(prev => {
+             if (prev.length === 0) return MOCK_EMPLOYEES;
+             return prev;
+          });
+      }, 1000);
       return () => clearTimeout(timer);
   }, []);
 
@@ -383,25 +404,20 @@ const App: React.FC = () => {
       );
   }
 
-  // CONFIG / START SCREEN
-  // Show if NO employees loaded (which happens if Supabase connection fails)
+  // THIS SCREEN WILL ONLY SHOW IF WE FAILED TO INJECT DATA (Should be impossible now)
   if (!isLoading && employees.length === 0) {
       return (
         <div className="min-h-screen flex flex-col items-center justify-center bg-[#f3f4f6] p-8">
             <h2 className="text-2xl font-bold text-gray-800 mb-2">Chytrá Docházka</h2>
             <p className="text-gray-600 mb-8 text-center max-w-md">
-               Nepodařilo se připojit k databázi nebo je prázdná.
+               Aplikace běží v režimu bez databáze.
             </p>
             
-            {/* BIG DEMO BUTTON - HIGH VISIBILITY */}
             <button 
-                onClick={() => { window.location.href = window.location.pathname + '?demo=true'; }} 
+                onClick={() => { window.location.reload(); }} 
                 className="bg-indigo-600 hover:bg-indigo-700 text-white font-bold py-4 px-8 rounded-xl shadow-lg transform hover:scale-105 transition-all flex items-center gap-3 text-lg mb-8"
             >
-                <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 20 20" fill="currentColor">
-                    <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM9.555 7.168A1 1 0 008 8v4a1 1 0 001.555.832l3-2a1 1 0 000-1.664l-3-2z" clipRule="evenodd" />
-                </svg>
-                POKRAČOVAT V DEMU
+                NAČÍST APLIKACI ZNOVU
             </button>
             
             {/* Manual Config Toggle */}

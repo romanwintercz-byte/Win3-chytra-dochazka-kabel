@@ -214,9 +214,13 @@ export const fetchEmployees = async (): Promise<Employee[]> => {
       return demoState.employees; 
   }
 
-  // 4. If data is strictly null (shouldn't happen with real client usually) or empty,
-  // we might want to return empty array, BUT if user expects demo, we might want to fallback.
-  // For now, if no data, we assume it's a fresh DB (return empty).
+  // 4. CRITICAL: If no data returned (DB is empty or connection ghosted), use Mocks
+  if (!data || data.length === 0) {
+      console.warn("Fetch successful but no employees found. Switching to Fallback Demo Mode.");
+      isFallbackMode = true;
+      return demoState.employees;
+  }
+
   return (data || []).map((e: any) => ({ ...e, isActive: e.is_active !== false, pinCode: e.pin_code })) as Employee[];
 };
 
