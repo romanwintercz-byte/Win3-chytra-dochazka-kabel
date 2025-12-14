@@ -9,12 +9,12 @@
     <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
     <meta name="apple-mobile-web-app-title" content="Chytrá docházka">
     
-    <!-- Anti-caching headers -->
-    <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate" />
+    <!-- Aggressive Anti-caching headers -->
+    <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate, max-age=0" />
     <meta http-equiv="Pragma" content="no-cache" />
-    <meta http-equiv="Expires" content="0" />
+    <meta http-equiv="Expires" content="Thu, 01 Jan 1970 00:00:00 GMT" />
     
-    <title>Chytrá docházka</title>
+    <title>Chytrá docházka - v2.2</title>
     <link rel="manifest" href="./manifest.json" />
     <link rel="apple-touch-icon" href="https://cdn-icons-png.flaticon.com/512/9512/9512839.png">
     
@@ -149,6 +149,6 @@
         }
       });
     </script>
-    <script type="module" src="./index.tsx"></script>
+    <script type="module" src="./index.tsx?v=2.2"></script>
   </body>
 </html>

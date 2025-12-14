@@ -385,7 +385,7 @@ const App: React.FC = () => {
            <div className="flex flex-col">
              <div className="flex items-baseline gap-1">
                 <h1 className="font-bold text-lg leading-none">Chytrá</h1>
-                <span className="text-[9px] text-slate-400">v2.1 FINAL</span>
+                <span className="text-[9px] text-slate-400">v2.2 DONE</span>
              </div>
              <span className="text-[10px] text-indigo-300 font-bold leading-none">DOCHÁZKA</span>
            </div>
