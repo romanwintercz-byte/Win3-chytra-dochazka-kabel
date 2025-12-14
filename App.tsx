@@ -520,7 +520,8 @@ const App: React.FC = () => {
   const handleClearSettings = () => {
     localStorage.removeItem('smartwork_supabase_url');
     localStorage.removeItem('smartwork_supabase_key');
-    window.location.reload();
+    // Also clear query params
+    window.location.href = window.location.pathname;
   };
 
   // Admin Handlers
@@ -562,28 +563,51 @@ const App: React.FC = () => {
       );
   }
 
-  // FORCE SHOW START SCREEN IF NO EMPLOYEES LOADED (Regardless of Demo Mode flag)
+  // FORCE SHOW START SCREEN IF NO EMPLOYEES LOADED
   if (!isLoading && employees.length === 0) {
+      const isDemoInUrl = typeof window !== 'undefined' && window.location.search.includes('demo=true');
+
       return (
         <div className="min-h-screen flex flex-col items-center justify-center bg-[#f3f4f6] p-8">
             <h2 className="text-2xl font-bold text-gray-800 mb-2">Vítejte v Chytré Docházce</h2>
             <p className="text-gray-600 mb-8 text-center max-w-md">
-                Aplikace nemá připojení k databázi. Jak chcete pokračovat?
+                {isDemoInUrl 
+                    ? 'Nepodařilo se načíst demo data. Zkuste tvrdý restart.' 
+                    : 'Aplikace nemá připojení k databázi. Jak chcete pokračovat?'}
             </p>
             
-            {/* BIG DEMO BUTTON - ALWAYS VISIBLE */}
+            {/* BIG DEMO BUTTON - HIGH VISIBILITY, NO ANIMATION */}
             <button 
                 onClick={() => { window.location.search = '?demo=true'; }} 
-                className="w-full max-w-sm px-6 py-5 bg-orange-600 text-white rounded-xl font-bold shadow-xl hover:bg-orange-700 hover:scale-105 transition-all flex items-center justify-center gap-3 text-xl mb-12 animate-fade-in-up"
+                style={{ 
+                    backgroundColor: '#ea580c', 
+                    color: 'white', 
+                    padding: '16px 24px', 
+                    borderRadius: '12px', 
+                    fontWeight: 'bold',
+                    fontSize: '18px',
+                    border: 'none',
+                    cursor: 'pointer',
+                    boxShadow: '0 10px 15px -3px rgba(234, 88, 12, 0.3)',
+                    marginBottom: '30px',
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '12px',
+                    width: '100%',
+                    maxWidth: '300px',
+                    justifyContent: 'center',
+                    visibility: 'visible',
+                    opacity: 1
+                }}
             >
-                <svg xmlns="http://www.w3.org/2000/svg" className="h-8 w-8" viewBox="0 0 20 20" fill="currentColor">
+                <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 20 20" fill="currentColor">
                     <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM9.555 7.168A1 1 0 008 8v4a1 1 0 001.555.832l3-2a1 1 0 000-1.664l-3-2z" clipRule="evenodd" />
                 </svg>
                 Spustit Demo Verzi
             </button>
             
             {/* Manual Config */}
-            <details className="w-full max-w-md bg-white p-4 rounded-lg border border-gray-200">
+            <details className="w-full max-w-md bg-white p-4 rounded-lg border border-gray-200" style={{marginTop: '20px'}}>
                 <summary className="font-semibold text-gray-700 cursor-pointer flex justify-between items-center select-none">
                     <span>Mám vlastní databázi (Supabase)</span>
                     <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -607,8 +631,10 @@ const App: React.FC = () => {
                 </div>
             </details>
             
-             <div className="mt-8">
-                <button onClick={handleClearSettings} className="text-sm text-red-500 hover:text-red-700 underline">Resetovat nastavení aplikace</button>
+             <div className="mt-8 text-center">
+                <button onClick={handleClearSettings} className="text-sm text-red-500 hover:text-red-700 underline font-bold">
+                    Tvrdý restart aplikace (Smazat nastavení)
+                </button>
             </div>
         </div>
       );
