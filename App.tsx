@@ -568,43 +568,52 @@ const App: React.FC = () => {
   if (!isLoading && employees.length === 0 && !CREDENTIALS.IS_DEMO_MODE) {
       return (
         <div className="min-h-screen flex flex-col items-center justify-center bg-[#f3f4f6] p-8">
-            <h2 className="text-xl font-bold text-gray-800 mb-2">Chyba připojení</h2>
+            <h2 className="text-2xl font-bold text-gray-800 mb-2">Vítejte v Chytre Docházce</h2>
             <p className="text-gray-600 mb-6 text-center max-w-md">
-                Nepodařilo se načíst data z databáze. Zkontrolujte API klíče nebo internetové připojení. 
-                Pokud si chcete aplikaci jen vyzkoušet, spusťte Demo režim.
+                Aplikace je připravena k použití. Pro vyzkoušení bez nutnosti nastavování databáze spusťte Demo režim.
             </p>
-            <div className="flex flex-col sm:flex-row gap-4 mb-6 w-full max-w-sm">
+            
+            <div className="flex flex-col gap-4 mb-8 w-full max-w-sm">
                  <button 
                     onClick={() => { window.location.search = '?demo=true'; }} 
-                    className="flex-1 px-6 py-3 bg-orange-600 text-white rounded-lg font-bold shadow-lg shadow-orange-200 hover:bg-orange-700 transition-all flex items-center justify-center gap-2"
+                    className="w-full px-6 py-4 bg-orange-600 text-white rounded-xl font-bold shadow-lg shadow-orange-200 hover:bg-orange-700 hover:scale-105 transition-all flex items-center justify-center gap-3 text-lg"
                  >
-                    <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" viewBox="0 0 20 20" fill="currentColor">
+                    <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6" viewBox="0 0 20 20" fill="currentColor">
                         <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM9.555 7.168A1 1 0 008 8v4a1 1 0 001.555.832l3-2a1 1 0 000-1.664l-3-2z" clipRule="evenodd" />
                     </svg>
                     Spustit Demo Verzi
                 </button>
+                <div className="text-xs text-center text-gray-500">
+                    V demo režimu se data ukládají pouze do paměti prohlížeče.
+                </div>
             </div>
             
-            <div className="flex gap-4">
-                <button onClick={() => window.location.reload()} className="px-6 py-2 bg-indigo-600 text-white rounded-lg">Zkusit znovu</button>
-                <button onClick={handleClearSettings} className="px-6 py-2 bg-red-100 text-red-700 hover:bg-red-200 transition-colors rounded-lg">Resetovat nastavení</button>
-            </div>
+            <details className="w-full max-w-md bg-white p-4 rounded-lg border border-gray-200">
+                <summary className="font-semibold text-gray-700 cursor-pointer flex justify-between items-center">
+                    <span>Mám vlastní databázi (Supabase)</span>
+                    <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+                    </svg>
+                </summary>
+                <div className="mt-4 pt-4 border-t border-gray-100">
+                    <input 
+                        className="w-full p-2 border rounded mb-2 text-sm" 
+                        placeholder="Supabase URL (https://...)" 
+                        value={manualSupabaseUrl} 
+                        onChange={e => setManualSupabaseUrl(e.target.value)}
+                    />
+                    <input 
+                        className="w-full p-2 border rounded mb-4 text-sm" 
+                        placeholder="Supabase Anon Key" 
+                        value={manualSupabaseKey} 
+                        onChange={e => setManualSupabaseKey(e.target.value)}
+                    />
+                    <button onClick={handleSaveCredentials} className="w-full py-2 bg-indigo-600 text-white rounded hover:bg-indigo-700 transition-colors">Uložit a připojit</button>
+                </div>
+            </details>
             
-            <div className="mt-8 pt-8 border-t border-gray-300 w-full max-w-md">
-                <h3 className="font-bold mb-4">Ruční konfigurace připojení</h3>
-                <input 
-                    className="w-full p-2 border rounded mb-2" 
-                    placeholder="Supabase URL" 
-                    value={manualSupabaseUrl} 
-                    onChange={e => setManualSupabaseUrl(e.target.value)}
-                />
-                <input 
-                    className="w-full p-2 border rounded mb-4" 
-                    placeholder="Supabase Anon Key" 
-                    value={manualSupabaseKey} 
-                    onChange={e => setManualSupabaseKey(e.target.value)}
-                />
-                <button onClick={handleSaveCredentials} className="w-full py-2 bg-gray-700 text-white rounded">Uložit konfiguraci</button>
+             <div className="mt-8">
+                <button onClick={handleClearSettings} className="text-sm text-red-500 hover:text-red-700 underline">Resetovat nastavení aplikace</button>
             </div>
         </div>
       );
@@ -717,74 +726,6 @@ const App: React.FC = () => {
         )}
 
         {activeTab === 'overview' && (
-          <ApprovalWorkflow 
-            status={monthStatus} 
-            onUpdateStatus={handleStatusUpdate}
-            isManagerMode={isManagerMode} 
-            validationIssues={validationIssues}
-          />
-        )}
-
-        <div className="max-w-6xl mx-auto w-full px-4 md:px-8 pb-24 md:pb-8">
-          
-          <div className="flex flex-col sm:flex-row justify-between items-start sm:items-end mb-8 gap-4 mt-4 md:mt-0">
-            <div className="w-full sm:w-auto">
-              <h2 className="text-2xl font-bold text-gray-900">
-                {activeTab === 'overview' && `Denní přehled: ${targetUser.name}`}
-                {activeTab === 'report' && 'Reporty & Export'}
-                {activeTab === 'settings' && 'Admin & Nastavení'}
-              </h2>
-              
-              {activeTab === 'overview' && (
-                <div className="flex items-center gap-2 mt-3 bg-white p-1 rounded-lg border border-gray-300 shadow-sm w-fit">
-                   <button 
-                      onClick={() => changeMonth(-1)}
-                      className="p-2 hover:bg-gray-100 rounded-md text-gray-600 transition-colors"
-                   >
-                      <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
-                      </svg>
-                   </button>
-                   
-                   <input 
-                      type="month" 
-                      value={selectedMonth}
-                      onChange={(e) => setSelectedMonth(e.target.value)}
-                      className="border-none focus:ring-0 text-sm font-semibold text-gray-800 bg-transparent outline-none cursor-pointer py-1"
-                   />
-                   
-                   <button 
-                      onClick={() => changeMonth(1)}
-                      className="p-2 hover:bg-gray-100 rounded-md text-gray-600 transition-colors"
-                   >
-                      <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
-                      </svg>
-                   </button>
-                </div>
-              )}
-            </div>
-            
-            {/* Desktop Notification Bell & Manager Badge */}
-            <div className="hidden md:flex items-center gap-4">
-                <NotificationBell 
-                    notifications={notifications} 
-                    onMarkAsRead={handleMarkRead} 
-                    onMarkAllAsRead={handleMarkAllRead} 
-                />
-                
-                {activeTab === 'overview' && isManagerMode && !reviewingUserId && (
-                <div className="bg-purple-100 text-purple-800 px-3 py-1 rounded-md text-xs font-bold border border-purple-200 flex items-center gap-2">
-                    <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z" />
-                    </svg>
-                    MANAŽERSKÝ PŘÍSTUP
-                </div>
-                )}
-            </div>
-          </div>
-
-          {activeTab === 'overview' && (
             <>
               {isManagerMode && !reviewingUserId && (
                 <TeamOverview 
@@ -861,7 +802,6 @@ const App: React.FC = () => {
             </div>
           )}
 
-        </div>
       </main>
       
       <HelpSystem />

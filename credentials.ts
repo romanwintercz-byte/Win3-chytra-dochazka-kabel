@@ -22,12 +22,22 @@ const isUrlDemo = typeof window !== 'undefined' && new URLSearchParams(window.lo
 const envDemoVal = (import.meta as any).env?.VITE_IS_DEMO_MODE;
 const isEnvDemo = envDemoVal === 'true' || envDemoVal === '1' || envDemoVal === true;
 
+// Default Placeholder URL used in the project
+const DEFAULT_PLACEHOLDER_URL = 'https://afjsymtiupvcfccsrodi.supabase.co';
+
 // Detection of placeholders
-const supabaseUrl = getEnv('VITE_SUPABASE_URL', 'https://afjsymtiupvcfccsrodi.supabase.co');
+const supabaseUrl = getEnv('VITE_SUPABASE_URL', DEFAULT_PLACEHOLDER_URL);
 const supabaseKey = getEnv('VITE_SUPABASE_KEY', 'ZDE_VLOZTE_SUPABASE_ANON_KEY');
 
 // Ensure placeholders trigger missing keys logic
-const isMissingKeys = !supabaseUrl || supabaseUrl.includes('ZDE_VLOZTE') || !supabaseKey || supabaseKey.includes('ZDE_VLOZTE') || supabaseUrl === 'undefined';
+// FIX: Explicitly check for the default placeholder URL to auto-enable demo mode
+const isMissingKeys = 
+    !supabaseUrl || 
+    supabaseUrl.includes('ZDE_VLOZTE') || 
+    supabaseUrl === DEFAULT_PLACEHOLDER_URL || // Check for the dummy URL
+    !supabaseKey || 
+    supabaseKey.includes('ZDE_VLOZTE') || 
+    supabaseUrl === 'undefined';
 
 export const CREDENTIALS = {
     // PŘEPÍNAČ DEMO REŽIMU
