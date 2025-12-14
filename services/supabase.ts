@@ -14,6 +14,9 @@ let demoState = {
     notifications: [] as any[]
 };
 
+// Internal flag to force demo mode if initialization fails (safety net)
+let forcedDemoMode = false;
+
 // Helper: Prefer localStorage, then real file credentials, ignore placeholders
 const getCredential = (fileValue: string | undefined, storageKey: string) => {
     try {
@@ -30,27 +33,21 @@ const getCredential = (fileValue: string | undefined, storageKey: string) => {
     return null;
 };
 
-// CRITICAL FIX: Validate URL to prevent app crash if localStorage contains garbage
+// Strict URL Validation
 const isValidUrl = (url: string | null): boolean => {
     if (!url) return false;
     try {
-        new URL(url);
-        return true;
+        const parsed = new URL(url);
+        return parsed.protocol === 'http:' || parsed.protocol === 'https:';
     } catch {
         return false;
     }
 };
 
-const rawSupabaseUrl = getCredential(CREDENTIALS.SUPABASE_URL, 'smartwork_supabase_url');
-const supabaseUrl = isValidUrl(rawSupabaseUrl) ? rawSupabaseUrl : null;
-const supabaseKey = getCredential(CREDENTIALS.SUPABASE_KEY, 'smartwork_supabase_key');
-
+// --- CLIENT INITIALIZATION ---
 let client: SupabaseClient;
 
-// Kontrola konfigurace
-// Must be valid URL to attempt connection
-const shouldInitRealClient = !CREDENTIALS.IS_DEMO_MODE && !!supabaseUrl && !!supabaseKey;
-
+// Dummy client for Demo Mode or Error Fallback
 const createDummyClient = () => {
     const safeDummy: any = {
         select: () => safeDummy,
@@ -63,7 +60,7 @@ const createDummyClient = () => {
         single: () => safeDummy,
         then: (resolve: any) => resolve({ 
             data: [], 
-            error: { message: "Demo mode or Missing Credentials" } 
+            error: { message: "Demo/Offline Mode" } 
         }),
         channel: () => ({
             on: () => ({ subscribe: () => {} }),
@@ -87,25 +84,42 @@ const createDummyClient = () => {
     } as unknown as SupabaseClient;
 };
 
-if (shouldInitRealClient) {
-  try {
-      client = createClient(supabaseUrl!, supabaseKey!, {
-          realtime: {
-              params: {
-                  eventsPerSecond: 10,
-              },
-          },
-      });
-  } catch (e) {
-      console.error("Supabase Client Init Failed (Invalid URL?):", e);
-      // Fallback to dummy to prevent app crash
-      client = createDummyClient();
-  }
-} else {
-  client = createDummyClient();
+// ROBUST INITIALIZATION LOGIC
+try {
+    const rawSupabaseUrl = getCredential(CREDENTIALS.SUPABASE_URL, 'smartwork_supabase_url');
+    const supabaseKey = getCredential(CREDENTIALS.SUPABASE_KEY, 'smartwork_supabase_key');
+    
+    const isUrlValid = isValidUrl(rawSupabaseUrl);
+    const hasKey = !!supabaseKey;
+    const isExplicitDemo = CREDENTIALS.IS_DEMO_MODE;
+
+    // Only attempt to create real client if NOT demo AND credentials look valid
+    if (!isExplicitDemo && isUrlValid && hasKey) {
+        client = createClient(rawSupabaseUrl!, supabaseKey!, {
+            realtime: {
+                params: {
+                    eventsPerSecond: 10,
+                },
+            },
+        });
+    } else {
+        // Fallback or explicit demo
+        if (!isExplicitDemo && (!isUrlValid || !hasKey)) {
+             console.warn("Invalid credentials detected. Forcing Demo Mode to prevent crash.");
+             forcedDemoMode = true;
+        }
+        client = createDummyClient();
+    }
+} catch (e) {
+    console.error("CRITICAL: Supabase init failed. Fallback to dummy client.", e);
+    forcedDemoMode = true;
+    client = createDummyClient();
 }
 
 export const supabase = client;
+
+// Helper to check effective mode
+const isDemo = () => CREDENTIALS.IS_DEMO_MODE || forcedDemoMode;
 
 // Helper to save credentials manually from UI
 export const saveCredentialsManually = (url: string, key: string) => {
@@ -117,77 +131,75 @@ export const saveCredentialsManually = (url: string, key: string) => {
 // --- REALTIME FUNCTIONS ---
 
 export const subscribeToPresence = (userId: string, onSync: (onlineUserIds: string[]) => void) => {
-    if (CREDENTIALS.IS_DEMO_MODE) {
-        // In Demo mode, simulate random users being online
+    if (isDemo()) {
         setTimeout(() => {
             onSync(['demo-user-1', 'demo-user-2']);
         }, 1000);
         return { unsubscribe: () => {} };
     }
 
-    if (!shouldInitRealClient) return { unsubscribe: () => {} };
-
-    const channel = supabase.channel('online-users');
-
-    channel
-        .on('presence', { event: 'sync' }, () => {
-            const newState = channel.presenceState();
-            const onlineIds = Object.values(newState).flat().map((u: any) => u.user_id);
-            onSync([...new Set(onlineIds)] as string[]);
-        })
-        .subscribe(async (status) => {
-            if (status === 'SUBSCRIBED') {
-                await channel.track({ user_id: userId, online_at: new Date().toISOString() });
-            }
-        });
-
-    return channel;
+    try {
+        const channel = supabase.channel('online-users');
+        channel
+            .on('presence', { event: 'sync' }, () => {
+                const newState = channel.presenceState();
+                const onlineIds = Object.values(newState).flat().map((u: any) => u.user_id);
+                onSync([...new Set(onlineIds)] as string[]);
+            })
+            .subscribe(async (status) => {
+                if (status === 'SUBSCRIBED') {
+                    await channel.track({ user_id: userId, online_at: new Date().toISOString() });
+                }
+            });
+        return channel;
+    } catch (e) {
+        console.error("Realtime error", e);
+        return { unsubscribe: () => {} };
+    }
 };
 
 export const subscribeToNotifications = (userId: string, onNewNotification: (n: Notification) => void) => {
-    if (CREDENTIALS.IS_DEMO_MODE) return { unsubscribe: () => {} };
+    if (isDemo()) return { unsubscribe: () => {} };
 
-    if (!shouldInitRealClient) return { unsubscribe: () => {} };
-
-    const channel = supabase
-        .channel(`notifications:${userId}`)
-        .on(
-            'postgres_changes',
-            {
-                event: 'INSERT',
-                schema: 'public',
-                table: 'notifications',
-                filter: `user_id=eq.${userId}`
-            },
-            (payload) => {
-                const newNote = payload.new as any;
-                onNewNotification({
-                    id: newNote.id,
-                    userId: newNote.user_id,
-                    senderId: newNote.sender_id,
-                    type: newNote.type,
-                    message: newNote.message,
-                    isRead: newNote.is_read,
-                    createdAt: newNote.created_at
-                });
-            }
-        )
-        .subscribe();
-
-    return channel;
+    try {
+        const channel = supabase
+            .channel(`notifications:${userId}`)
+            .on(
+                'postgres_changes',
+                {
+                    event: 'INSERT',
+                    schema: 'public',
+                    table: 'notifications',
+                    filter: `user_id=eq.${userId}`
+                },
+                (payload) => {
+                    const newNote = payload.new as any;
+                    onNewNotification({
+                        id: newNote.id,
+                        userId: newNote.user_id,
+                        senderId: newNote.sender_id,
+                        type: newNote.type,
+                        message: newNote.message,
+                        isRead: newNote.is_read,
+                        createdAt: newNote.created_at
+                    });
+                }
+            )
+            .subscribe();
+        return channel;
+    } catch (e) {
+        console.error("Notification subscription error", e);
+        return { unsubscribe: () => {} };
+    }
 };
 
 // --- STORAGE FUNCTIONS ---
 
 export const uploadAttachment = async (file: File): Promise<string | null> => {
-    if (CREDENTIALS.IS_DEMO_MODE) {
-        // Simulate upload delay
+    if (isDemo()) {
         await new Promise(r => setTimeout(r, 1000));
-        // Return a dummy image URL
         return 'https://images.unsplash.com/photo-1562240020-ce31ccb0fa7d?q=80&w=300&auto=format&fit=crop';
     }
-
-    if (!shouldInitRealClient) return null;
 
     try {
         const fileName = `${Date.now()}_${Math.random().toString(36).substring(2, 8)}_${file.name}`;
@@ -197,7 +209,6 @@ export const uploadAttachment = async (file: File): Promise<string | null> => {
 
         if (error) {
             console.error('Storage Upload Error:', error);
-            // In demo-like broken state, alert user
             return null;
         }
 
@@ -216,24 +227,25 @@ export const uploadAttachment = async (file: File): Promise<string | null> => {
 // --- API Functions ---
 
 export const fetchEmployees = async (): Promise<Employee[]> => {
-  if (CREDENTIALS.IS_DEMO_MODE) {
+  if (isDemo()) {
       return demoState.employees;
   }
 
   const { data, error } = await supabase.from('employees').select('*').order('name'); 
   if (error) { 
       console.error("Fetch Emps Error:", error.message || error); 
+      // If fetch fails heavily, maybe we should switch to demo? For now just return empty.
       return []; 
   }
   return data.map((e: any) => ({ 
       ...e, 
       isActive: e.is_active !== false,
-      pinCode: e.pin_code // Map PIN from DB
+      pinCode: e.pin_code
   })) as Employee[];
 };
 
 export const addEmployee = async (employee: Employee) => {
-  if (CREDENTIALS.IS_DEMO_MODE) {
+  if (isDemo()) {
       demoState.employees.push(employee);
       return;
   }
@@ -244,7 +256,7 @@ export const addEmployee = async (employee: Employee) => {
 };
 
 export const updateEmployee = async (employee: Employee) => {
-  if (CREDENTIALS.IS_DEMO_MODE) {
+  if (isDemo()) {
       const idx = demoState.employees.findIndex(e => e.id === employee.id);
       if (idx !== -1) demoState.employees[idx] = employee;
       return;
@@ -258,7 +270,7 @@ export const updateEmployee = async (employee: Employee) => {
 };
 
 export const updateEmployeeStatus = async (id: string, isActive: boolean) => {
-  if (CREDENTIALS.IS_DEMO_MODE) {
+  if (isDemo()) {
       const emp = demoState.employees.find(e => e.id === id);
       if (emp) emp.isActive = isActive;
       return;
@@ -268,13 +280,13 @@ export const updateEmployeeStatus = async (id: string, isActive: boolean) => {
 };
 
 export const updateEmployeePin = async (id: string, pin: string | null) => {
-    if (CREDENTIALS.IS_DEMO_MODE) return;
+    if (isDemo()) return;
     const { error } = await supabase.from('employees').update({ pin_code: pin }).eq('id', id);
     if (error) throw error;
 };
 
 export const fetchJobs = async (): Promise<Job[]> => {
-  if (CREDENTIALS.IS_DEMO_MODE) {
+  if (isDemo()) {
       return demoState.jobs;
   }
   const { data, error } = await supabase.from('jobs').select('*').order('code');
@@ -286,7 +298,7 @@ export const fetchJobs = async (): Promise<Job[]> => {
 };
 
 export const addJob = async (job: Job) => {
-  if (CREDENTIALS.IS_DEMO_MODE) {
+  if (isDemo()) {
       demoState.jobs.push(job);
       return;
   }
@@ -297,7 +309,7 @@ export const addJob = async (job: Job) => {
 };
 
 export const updateJobStatus = async (id: string, isActive: boolean) => {
-    if (CREDENTIALS.IS_DEMO_MODE) {
+    if (isDemo()) {
         const job = demoState.jobs.find(j => j.id === id);
         if (job) job.isActive = isActive;
         return;
@@ -307,10 +319,9 @@ export const updateJobStatus = async (id: string, isActive: boolean) => {
 };
 
 export const fetchTimeEntries = async (): Promise<TimeEntry[]> => {
-  if (CREDENTIALS.IS_DEMO_MODE) {
+  if (isDemo()) {
       return demoState.entries;
   }
-  // ORDER BY DATE DESCENDING from DB to ensure consistent state
   const { data, error } = await supabase.from('time_entries').select('*').order('date', { ascending: false });
   if (error) {
       console.error("Fetch Entries Error:", error.message || error);
@@ -324,12 +335,12 @@ export const fetchTimeEntries = async (): Promise<TimeEntry[]> => {
     description: e.description, 
     hours: e.hours, 
     type: e.type,
-    attachmentUrl: e.attachment_url // Map attachment URL
+    attachmentUrl: e.attachment_url
   })) as TimeEntry[];
 };
 
 export const addTimeEntriesBulk = async (entries: TimeEntry[]) => {
-    if (CREDENTIALS.IS_DEMO_MODE) {
+    if (isDemo()) {
         demoState.entries = [...demoState.entries, ...entries];
         return;
     }
@@ -341,14 +352,14 @@ export const addTimeEntriesBulk = async (entries: TimeEntry[]) => {
         description: entry.description, 
         hours: entry.hours, 
         type: entry.type,
-        attachment_url: entry.attachmentUrl // Save attachment URL
+        attachment_url: entry.attachmentUrl
     }));
     const { error } = await supabase.from('time_entries').insert(dbEntries);
     if (error) throw error;
 };
 
 export const deleteTimeEntriesForDate = async (employeeId: string, date: string) => {
-    if (CREDENTIALS.IS_DEMO_MODE) {
+    if (isDemo()) {
         demoState.entries = demoState.entries.filter(e => !(e.employeeId === employeeId && e.date === date));
         return;
     }
@@ -357,7 +368,7 @@ export const deleteTimeEntriesForDate = async (employeeId: string, date: string)
 };
 
 export const deleteTimeEntry = async (id: string) => {
-    if (CREDENTIALS.IS_DEMO_MODE) {
+    if (isDemo()) {
         demoState.entries = demoState.entries.filter(e => e.id !== id);
         return;
     }
@@ -365,10 +376,8 @@ export const deleteTimeEntry = async (id: string) => {
     if (error) throw error;
 };
 
-// --- Report Status Functions ---
-
 export const fetchMonthlyReports = async (month: string): Promise<MonthStatus[]> => {
-    if (CREDENTIALS.IS_DEMO_MODE) {
+    if (isDemo()) {
         return demoState.reports.filter(r => r.month === month);
     }
     const { data, error } = await supabase
@@ -391,7 +400,7 @@ export const fetchMonthlyReports = async (month: string): Promise<MonthStatus[]>
 };
 
 export const upsertMonthlyReport = async (report: MonthStatus) => {
-    if (CREDENTIALS.IS_DEMO_MODE) {
+    if (isDemo()) {
         const idx = demoState.reports.findIndex(r => r.employeeId === report.employeeId && r.month === report.month);
         if (idx !== -1) {
             demoState.reports[idx] = { ...demoState.reports[idx], ...report };
@@ -411,10 +420,8 @@ export const upsertMonthlyReport = async (report: MonthStatus) => {
     if (error) throw error;
 };
 
-// --- Global Lock Functions ---
-
 export const fetchGlobalLock = async (month: string): Promise<boolean> => {
-    if (CREDENTIALS.IS_DEMO_MODE) {
+    if (isDemo()) {
         const lock = demoState.locks.find(l => l.month === month);
         return lock ? lock.isLocked : false;
     }
@@ -429,7 +436,7 @@ export const fetchGlobalLock = async (month: string): Promise<boolean> => {
 };
 
 export const toggleGlobalLock = async (month: string, isLocked: boolean, managerId: string) => {
-    if (CREDENTIALS.IS_DEMO_MODE) {
+    if (isDemo()) {
         const idx = demoState.locks.findIndex(l => l.month === month);
         if (idx !== -1) {
             demoState.locks[idx].isLocked = isLocked;
@@ -447,10 +454,8 @@ export const toggleGlobalLock = async (month: string, isLocked: boolean, manager
     if (error) throw error;
 };
 
-// --- Notification Functions ---
-
 export const fetchNotifications = async (userId: string): Promise<Notification[]> => {
-    if (CREDENTIALS.IS_DEMO_MODE) {
+    if (isDemo()) {
         return demoState.notifications.filter(n => n.userId === userId);
     }
     const { data, error } = await supabase
@@ -467,7 +472,7 @@ export const fetchNotifications = async (userId: string): Promise<Notification[]
     return data.map((n: any) => ({
         id: n.id,
         userId: n.user_id,
-        senderId: n.sender_id, // Map sender ID
+        senderId: n.sender_id,
         type: n.type,
         message: n.message,
         isRead: n.is_read,
@@ -476,7 +481,7 @@ export const fetchNotifications = async (userId: string): Promise<Notification[]
 };
 
 export const createNotification = async (userId: string, message: string, type: 'info' | 'success' | 'warning' | 'error' = 'info', senderId?: string) => {
-    if (CREDENTIALS.IS_DEMO_MODE) {
+    if (isDemo()) {
         const newNotif = {
             id: uuidv4(),
             userId,
@@ -505,7 +510,7 @@ export const createNotification = async (userId: string, message: string, type: 
 };
 
 export const createGlobalNotification = async (userIds: string[], message: string, type: 'info' | 'success' | 'warning' | 'error' = 'info') => {
-    if (CREDENTIALS.IS_DEMO_MODE) {
+    if (isDemo()) {
         userIds.forEach(uid => {
              demoState.notifications.push({
                 id: uuidv4(),
@@ -529,7 +534,7 @@ export const createGlobalNotification = async (userIds: string[], message: strin
 };
 
 export const markNotificationAsRead = async (id: string) => {
-    if (CREDENTIALS.IS_DEMO_MODE) {
+    if (isDemo()) {
         const n = demoState.notifications.find(n => n.id === id);
         if (n) n.isRead = true;
         return;
@@ -539,7 +544,7 @@ export const markNotificationAsRead = async (id: string) => {
 };
 
 export const markAllNotificationsAsRead = async (userId: string) => {
-    if (CREDENTIALS.IS_DEMO_MODE) {
+    if (isDemo()) {
         demoState.notifications.forEach(n => {
             if (n.userId === userId) n.isRead = true;
         });
