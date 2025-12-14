@@ -107,7 +107,6 @@ const getCredentials = () => {
 
 // --- INITIALIZE CLIENT ---
 let client: SupabaseClient;
-let initializationError = false;
 
 // Explicit Demo Flag from URL
 const isExplicitDemo = typeof window !== 'undefined' && window.location.search.includes('demo=true');
@@ -116,37 +115,29 @@ try {
     const { url, key } = getCredentials();
     const validatedUrl = getValidUrl(url);
 
-    // CRITICAL: If no URL or Key, or if placeholders are still there, 
-    // AND we are not in explicit demo mode, use Dummy Client.
-    // This allows the app to load "empty" so the Setup Screen in App.tsx can be shown.
-    if (!isExplicitDemo && (!validatedUrl || !key || key.includes('ZDE_VLOZTE'))) {
+    // CRITICAL: If no URL or Key, OR if explicitly in demo mode, use Dummy Client.
+    if (isExplicitDemo || !validatedUrl || !key || key.includes('ZDE_VLOZTE')) {
         client = createDummyClient();
-        console.warn("Supabase credentials missing. Using Dummy Client to allow UI rendering.");
+        if (!isExplicitDemo) console.log("Supabase credentials missing. Defaulting to Demo Mode.");
     } 
     // If we have credentials, try to connect
-    else if (validatedUrl && key && !isExplicitDemo) {
+    else {
         client = createClient(validatedUrl, key, {
             auth: { persistSession: false }, 
             realtime: { params: { eventsPerSecond: 10 } }
         });
     } 
-    // Fallback/Demo Mode
-    else {
-        client = createDummyClient();
-    }
 } catch (e) {
     console.error("Supabase Init Error", e);
     client = createDummyClient();
-    initializationError = true;
 }
 
 export const supabase = client;
 
 // --- EXPORTED HELPERS ---
 
-// Only return TRUE if user explicitly requested demo via URL.
-// If keys are missing, we return FALSE so the app attempts to load (gets 0 employees) and shows the Config Screen.
-const isDemo = () => isExplicitDemo;
+// FORCE DEMO if explicit via URL OR if credentials are missing (CREDENTIALS.IS_DEMO_MODE)
+const isDemo = () => isExplicitDemo || CREDENTIALS.IS_DEMO_MODE;
 
 export const saveCredentialsManually = (url: string, key: string) => {
     const cleanUrl = cleanString(url) || '';
@@ -159,7 +150,7 @@ export const saveCredentialsManually = (url: string, key: string) => {
 
     localStorage.setItem('smartwork_supabase_url', cleanUrl);
     localStorage.setItem('smartwork_supabase_key', cleanKey);
-    // Remove demo param and reload
+    // Reload to apply
     window.location.href = window.location.pathname; 
 };
 
@@ -198,7 +189,7 @@ export const subscribeToNotifications = (userId: string, onNewNotification: (n: 
 // --- API Functions ---
 
 export const fetchEmployees = async (): Promise<Employee[]> => {
-  // 1. Explicit Demo Mode: Return Mock Data
+  // 1. If Demo (Explicit OR Missing Keys) -> Return Mock Data
   if (isDemo()) {
       return demoState.employees;
   }
@@ -206,8 +197,7 @@ export const fetchEmployees = async (): Promise<Employee[]> => {
   // 2. Try to fetch from DB
   const { data, error } = await supabase.from('employees').select('*').order('name'); 
   
-  // 3. If Error or No Data (which happens with Dummy Client), return EMPTY array.
-  // This triggers the "Setup/Demo" screen in App.tsx
+  // 3. If Error or No Data, return empty array (UI will handle it)
   if (error || !data) { 
       return []; 
   }
@@ -350,11 +340,9 @@ export const markAllNotificationsAsRead = async (userId: string) => {
 
 export const uploadAttachment = async (file: File): Promise<string | null> => {
     if (isDemo()) {
-        // Return a mock URL in demo mode
         return URL.createObjectURL(file);
     }
     
-    // We assume a bucket named 'attachments' exists.
     const fileExt = file.name.split('.').pop();
     const fileName = `${uuidv4()}.${fileExt}`;
     const filePath = `${fileName}`;

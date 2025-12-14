@@ -106,6 +106,7 @@ const App: React.FC = () => {
   // Config Modal State
   const [manualSupabaseUrl, setManualSupabaseUrl] = useState('');
   const [manualSupabaseKey, setManualSupabaseKey] = useState('');
+  const [configOpen, setConfigOpen] = useState(false);
 
   // Manager privileges
   const isManagerRole = currentUser.role === 'Manager';
@@ -159,10 +160,10 @@ const App: React.FC = () => {
 
   useEffect(() => {
       loadData();
-      // SAFETY TIMEOUT: Force loading to end after 2 seconds to allow Error Screen to show
+      // SAFETY TIMEOUT: Shortened to 800ms to allow UI to show quickly if data fails
       const timer = setTimeout(() => {
           setIsLoading(false);
-      }, 2000);
+      }, 800);
       return () => clearTimeout(timer);
   }, []);
 
@@ -389,57 +390,44 @@ const App: React.FC = () => {
         <div className="min-h-screen flex flex-col items-center justify-center bg-[#f3f4f6] p-8">
             <h2 className="text-2xl font-bold text-gray-800 mb-2">Vítejte v Chytré Docházce</h2>
             <p className="text-gray-600 mb-8 text-center max-w-md">
-               Aplikace nemá připojení k databázi. Jak chcete pokračovat?
+               Aplikace nemá připojení k databázi. Spusťte demo nebo připojte vlastní.
             </p>
             
-            {/* BIG DEMO BUTTON - HIGH VISIBILITY, NO ANIMATION */}
+            {/* BIG DEMO BUTTON - HIGH VISIBILITY */}
             <button 
-                onClick={() => { window.location.search = '?demo=true'; }} 
-                style={{ 
-                    backgroundColor: '#ea580c', 
-                    color: 'white', 
-                    padding: '16px 24px', 
-                    borderRadius: '12px', 
-                    fontWeight: 'bold', 
-                    fontSize: '18px', 
-                    border: 'none', 
-                    cursor: 'pointer', 
-                    boxShadow: '0 10px 15px -3px rgba(234, 88, 12, 0.3)', 
-                    marginBottom: '30px', 
-                    display: 'flex', 
-                    alignItems: 'center', 
-                    gap: '12px', 
-                    width: '100%', 
-                    maxWidth: '300px', 
-                    justifyContent: 'center',
-                    visibility: 'visible',
-                    opacity: 1
-                }}
+                onClick={() => { window.location.href = window.location.pathname + '?demo=true'; }} 
+                className="bg-orange-600 hover:bg-orange-700 text-white font-bold py-4 px-8 rounded-xl shadow-lg transform hover:scale-105 transition-all flex items-center gap-3 text-lg mb-8"
             >
                 <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 20 20" fill="currentColor">
                     <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM9.555 7.168A1 1 0 008 8v4a1 1 0 001.555.832l3-2a1 1 0 000-1.664l-3-2z" clipRule="evenodd" />
                 </svg>
-                Spustit Demo Verzi
+                SPUSTIT DEMO
             </button>
             
-            {/* Manual Config */}
-            <details className="w-full max-w-md bg-white p-4 rounded-lg border border-gray-200" style={{marginTop: '20px'}}>
-                <summary className="font-semibold text-gray-700 cursor-pointer flex justify-between items-center select-none">
+            {/* Manual Config Toggle */}
+            <div className="w-full max-w-md">
+                <button 
+                    onClick={() => setConfigOpen(!configOpen)}
+                    className="w-full flex justify-between items-center p-4 bg-white rounded-lg border border-gray-200 text-gray-700 font-medium hover:bg-gray-50 transition-colors"
+                >
                     <span>Mám vlastní databázi (Supabase)</span>
-                    <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <svg xmlns="http://www.w3.org/2000/svg" className={`h-5 w-5 transition-transform ${configOpen ? 'rotate-180' : ''}`} fill="none" viewBox="0 0 24 24" stroke="currentColor">
                         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
                     </svg>
-                </summary>
-                <div className="mt-4 pt-4 border-t border-gray-100">
-                    <input className="w-full p-3 border rounded mb-2 text-sm" placeholder="Supabase URL" value={manualSupabaseUrl} onChange={e => setManualSupabaseUrl(e.target.value)} />
-                    <input className="w-full p-3 border rounded mb-4 text-sm" placeholder="Supabase Anon Key" value={manualSupabaseKey} onChange={e => setManualSupabaseKey(e.target.value)} />
-                    <button onClick={handleSaveCredentials} className="w-full py-3 bg-indigo-600 text-white rounded font-medium hover:bg-indigo-700 transition-colors">Uložit a připojit</button>
-                </div>
-            </details>
+                </button>
+                
+                {configOpen && (
+                    <div className="mt-2 bg-white p-4 rounded-lg border border-gray-200 animate-fade-in-up">
+                        <input className="w-full p-3 border rounded mb-2 text-sm" placeholder="Supabase URL" value={manualSupabaseUrl} onChange={e => setManualSupabaseUrl(e.target.value)} />
+                        <input className="w-full p-3 border rounded mb-4 text-sm" placeholder="Supabase Anon Key" value={manualSupabaseKey} onChange={e => setManualSupabaseKey(e.target.value)} />
+                        <button onClick={handleSaveCredentials} className="w-full py-3 bg-indigo-600 text-white rounded font-medium hover:bg-indigo-700 transition-colors">Uložit a připojit</button>
+                    </div>
+                )}
+            </div>
             
              <div className="mt-8 text-center">
-                <button onClick={handleClearSettings} className="text-sm text-red-500 hover:text-red-700 underline font-bold">
-                    Tvrdý restart aplikace (Smazat nastavení)
+                <button onClick={handleClearSettings} className="text-sm text-red-400 hover:text-red-600 underline">
+                    Resetovat nastavení
                 </button>
             </div>
         </div>
