@@ -1,5 +1,5 @@
 
-const CACHE_NAME = 'smartwork-v9';
+const CACHE_NAME = 'smartwork-v11-force-fix';
 const ASSETS_TO_CACHE = [
   './',
   './index.html',
@@ -9,6 +9,9 @@ const ASSETS_TO_CACHE = [
 ];
 
 self.addEventListener('install', (event) => {
+  // Force immediate activation
+  self.skipWaiting();
+  
   event.waitUntil(
     caches.open(CACHE_NAME).then((cache) => {
       return Promise.all(
@@ -18,21 +21,16 @@ self.addEventListener('install', (event) => {
       );
     })
   );
-  // REMOVED self.skipWaiting() to allow "Update available" prompt
-});
-
-self.addEventListener('message', (event) => {
-  if (event.data && event.data.type === 'SKIP_WAITING') {
-    self.skipWaiting();
-  }
 });
 
 self.addEventListener('activate', (event) => {
+  // Claim clients immediately
   event.waitUntil(
     caches.keys().then((cacheNames) => {
       return Promise.all(
         cacheNames.map((cacheName) => {
           if (cacheName !== CACHE_NAME) {
+            console.log('Deleting old cache:', cacheName);
             return caches.delete(cacheName);
           }
         })
@@ -43,7 +41,7 @@ self.addEventListener('activate', (event) => {
 });
 
 self.addEventListener('fetch', (event) => {
-  // Navigation: Network First, then Cache (index.html)
+  // Network First for HTML to ensure latest version
   if (event.request.mode === 'navigate') {
     event.respondWith(
       fetch(event.request)
@@ -54,11 +52,10 @@ self.addEventListener('fetch', (event) => {
     return;
   }
 
-  // Assets: Stale-While-Revalidate or Network First
+  // Stale-While-Revalidate for other assets
   event.respondWith(
     caches.match(event.request).then((cachedResponse) => {
       const fetchPromise = fetch(event.request).then((networkResponse) => {
-        // Cache valid responses
         if (networkResponse && networkResponse.status === 200 && networkResponse.type === 'basic') {
           const responseToCache = networkResponse.clone();
           caches.open(CACHE_NAME).then((cache) => {
@@ -66,7 +63,8 @@ self.addEventListener('fetch', (event) => {
           });
         }
         return networkResponse;
-      });
+      }).catch(() => cachedResponse); // Return cached if network fails
+      
       return cachedResponse || fetchPromise;
     })
   );

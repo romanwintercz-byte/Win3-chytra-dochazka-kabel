@@ -46,9 +46,9 @@ const SUPPORT_ID = 'win3-support-id';
 
 const App: React.FC = () => {
   const [activeTab, setActiveTab] = useState<'overview' | 'report' | 'settings'>('overview');
-  const [isLoading, setIsLoading] = useState(true);
+  const [isLoading, setIsLoading] = useState(false); // Force false initially
   
-  // Data State - INITIALIZE WITH MOCKS to prevent empty state/setup screen flicker
+  // Data State - INITIALIZE WITH MOCKS DIRECTLY
   const [employees, setEmployees] = useState<Employee[]>(MOCK_EMPLOYEES);
   const [jobs, setJobs] = useState<Job[]>(MOCK_JOBS);
   const [entries, setEntries] = useState<TimeEntry[]>(MOCK_ENTRIES);
@@ -135,38 +135,36 @@ const App: React.FC = () => {
               fetchTimeEntries()
           ]);
 
-          // Safety check: if fetch returns empty (which it shouldn't due to service logic), stick with mocks
+          // CRITICAL: Only update state if we actually got data. 
           if (emps && emps.length > 0) {
               setEmployees(emps);
               setJobs(jbs);
               setEntries(entrs);
           } else {
-              console.warn("Fetched data was empty, keeping initial mock data.");
+              console.warn("Fetch returned empty data. Keeping previous state (Mocks).");
           }
           
           // Initialize User
           const savedId = localStorage.getItem('smartwork_current_user_id');
-          if (savedId && emps && emps.some(e => e.id === savedId && e.isActive !== false)) {
+          // Use the 'emps' variable if valid, otherwise fallback to current state 'employees'
+          const availableEmps = (emps && emps.length > 0) ? emps : employees;
+          
+          if (savedId && availableEmps.some(e => e.id === savedId && e.isActive !== false)) {
               setCurrentUserId(savedId);
           } else {
-              // Default to first user if not set or invalid
-              const firstActive = (emps || MOCK_EMPLOYEES).find(e => e.isActive !== false && e.id !== SUPPORT_ID);
+              const firstActive = availableEmps.find(e => e.isActive !== false && e.id !== SUPPORT_ID);
               if (firstActive) setCurrentUserId(firstActive.id);
           }
 
       } catch (error) {
-          console.error("Failed to load data, keeping mocks:", error);
-          // State already initialized with Mocks, so just ensure User ID is set
-          if (!currentUserId) {
-             setCurrentUserId(MOCK_EMPLOYEES[0].id);
-          }
+          console.error("Failed to load data:", error);
       } finally {
           if (!isBackground) setIsLoading(false);
       }
   };
 
   useEffect(() => {
-      // Set initial user immediately from mocks to prevent "Načítání..."
+      // Set initial user immediately to prevent flicker
       const savedId = localStorage.getItem('smartwork_current_user_id');
       if (savedId && MOCK_EMPLOYEES.some(e => e.id === savedId)) {
           setCurrentUserId(savedId);
@@ -175,8 +173,6 @@ const App: React.FC = () => {
       }
 
       loadData();
-      const timer = setTimeout(() => setIsLoading(false), 500); // Shorter timeout
-      return () => clearTimeout(timer);
   }, []);
 
   // --- REST OF APP LOGIC ---
@@ -374,17 +370,6 @@ const App: React.FC = () => {
 
   if (presentationMode) return <PresentationMode type={presentationMode} onClose={() => setPresentationMode(null)} />;
 
-  if (isLoading && employees.length === 0) {
-      return (
-          <div className="min-h-screen flex items-center justify-center bg-[#f3f4f6]">
-              <div className="flex flex-col items-center">
-                  <div className="w-12 h-12 border-4 border-indigo-600 border-t-transparent rounded-full animate-spin mb-4"></div>
-                  <h2 className="text-gray-700 font-semibold">Startuji aplikaci...</h2>
-              </div>
-          </div>
-      );
-  }
-
   return (
     <div className="flex flex-col md:flex-row min-h-screen bg-[#f3f4f6]">
       <Sidebar 
@@ -404,7 +389,7 @@ const App: React.FC = () => {
            <div className="flex flex-col">
              <div className="flex items-baseline gap-1">
                 <h1 className="font-bold text-lg leading-none">Chytrá</h1>
-                <span className="text-[9px] text-slate-400">v1.4.0</span>
+                <span className="text-[9px] text-slate-400">v1.5.0</span>
              </div>
              <span className="text-[10px] text-indigo-300 font-bold leading-none">DOCHÁZKA</span>
            </div>

@@ -9,6 +9,11 @@
     <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
     <meta name="apple-mobile-web-app-title" content="Chytrá docházka">
     
+    <!-- Anti-caching headers -->
+    <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate" />
+    <meta http-equiv="Pragma" content="no-cache" />
+    <meta http-equiv="Expires" content="0" />
+    
     <title>Chytrá docházka</title>
     <link rel="manifest" href="./manifest.json" />
     <link rel="apple-touch-icon" href="https://cdn-icons-png.flaticon.com/512/9512/9512839.png">
@@ -123,7 +128,6 @@
     <div id="root"></div>
     
     <script>
-      // Global error handler to catch white screen issues
       window.onerror = function(msg, url, line, col, error) {
         var overlay = document.getElementById('fatal-error');
         var details = document.getElementById('error-details');
@@ -134,9 +138,7 @@
         return false;
       };
       
-      // Catch promise rejections (often Supabase init fails here)
       window.addEventListener('unhandledrejection', function(event) {
-        // Ignore resizeobserver loops
         if (event.reason && event.reason.message && event.reason.message.includes('ResizeObserver')) return;
 
         var overlay = document.getElementById('fatal-error');
