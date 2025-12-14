@@ -5,12 +5,17 @@
 // Tato úprava se nejprve podívá, zda nejsou klíče nastavené na serveru (Vercel) s prefixem VITE_
 // Pokud ne, použije hodnoty zadané níže.
 
+// Helper pro detekci URL parametru ?demo=true
+const isUrlDemo = typeof window !== 'undefined' && new URLSearchParams(window.location.search).get('demo') === 'true';
+const isEnvDemo = (import.meta as any).env?.VITE_IS_DEMO_MODE === 'true';
+
 export const CREDENTIALS = {
     // PŘEPÍNAČ DEMO REŽIMU
     // Nyní to funguje chytře:
-    // 1. Pokud ve Vercelu nastavíš proměnnou VITE_IS_DEMO_MODE na "true", zapne se demo.
-    // 2. Pokud ne, použije se hodnota za || (zde false = ostrá verze).
-    IS_DEMO_MODE: (import.meta as any).env?.VITE_IS_DEMO_MODE === 'true' || false,
+    // 1. Env proměnná VITE_IS_DEMO_MODE (Vercel)
+    // 2. URL parametr ?demo=true (Záchrana)
+    // 3. Ruční hodnota (Fallback)
+    IS_DEMO_MODE: isEnvDemo || isUrlDemo || false,
 
     // 1. Supabase URL
     SUPABASE_URL: (import.meta as any).env?.VITE_SUPABASE_URL || 'https://afjsymtiupvcfccsrodi.supabase.co',

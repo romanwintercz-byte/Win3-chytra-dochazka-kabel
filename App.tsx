@@ -560,7 +560,22 @@ const App: React.FC = () => {
       return (
         <div className="min-h-screen flex flex-col items-center justify-center bg-[#f3f4f6] p-8">
             <h2 className="text-xl font-bold text-gray-800 mb-2">Chyba připojení</h2>
-            <p className="text-gray-600 mb-6">Nepodařilo se načíst data. Zkontrolujte připojení k internetu.</p>
+            <p className="text-gray-600 mb-6 text-center max-w-md">
+                Nepodařilo se načíst data z databáze. Zkontrolujte API klíče nebo internetové připojení. 
+                Pokud si chcete aplikaci jen vyzkoušet, spusťte Demo režim.
+            </p>
+            <div className="flex flex-col sm:flex-row gap-4 mb-6 w-full max-w-sm">
+                 <button 
+                    onClick={() => { window.location.search = '?demo=true'; }} 
+                    className="flex-1 px-6 py-3 bg-orange-600 text-white rounded-lg font-bold shadow-lg shadow-orange-200 hover:bg-orange-700 transition-all flex items-center justify-center gap-2"
+                 >
+                    <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" viewBox="0 0 20 20" fill="currentColor">
+                        <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM9.555 7.168A1 1 0 008 8v4a1 1 0 001.555.832l3-2a1 1 0 000-1.664l-3-2z" clipRule="evenodd" />
+                    </svg>
+                    Spustit Demo Verzi
+                </button>
+            </div>
+            
             <div className="flex gap-4">
                 <button onClick={() => window.location.reload()} className="px-6 py-2 bg-indigo-600 text-white rounded-lg">Zkusit znovu</button>
                 <button onClick={() => setIsAboutOpen(true)} className="px-6 py-2 bg-gray-200 text-gray-700 rounded-lg">O Aplikaci</button>
