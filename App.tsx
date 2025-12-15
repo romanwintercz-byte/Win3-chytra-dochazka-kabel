@@ -31,7 +31,6 @@ import {
     fetchNotifications, markNotificationAsRead, markAllNotificationsAsRead, createNotification,
     subscribeToPresence, subscribeToNotifications
 } from './services/supabase';
-import { MOCK_EMPLOYEES, MOCK_JOBS, MOCK_ENTRIES } from './services/mockData';
 
 const getCurrentMonth = () => {
   return new Date().toISOString().slice(0, 7);
@@ -47,11 +46,11 @@ const SUPPORT_ID = 'win3-support-id';
 const App: React.FC = () => {
   const [activeTab, setActiveTab] = useState<'overview' | 'report' | 'settings'>('overview');
   
-  // Data State - INITIALIZED EMPTY FIRST, THEN LOADED
-  // This prevents flash of mock data if we are in PROD mode
-  const [employees, setEmployees] = useState<Employee[]>(CREDENTIALS.IS_DEMO_MODE ? MOCK_EMPLOYEES : []);
-  const [jobs, setJobs] = useState<Job[]>(CREDENTIALS.IS_DEMO_MODE ? MOCK_JOBS : []);
-  const [entries, setEntries] = useState<TimeEntry[]>(CREDENTIALS.IS_DEMO_MODE ? MOCK_ENTRIES : []);
+  // Data State - Clean Initialization
+  const [employees, setEmployees] = useState<Employee[]>([]);
+  const [jobs, setJobs] = useState<Job[]>([]);
+  const [entries, setEntries] = useState<TimeEntry[]>([]);
+  const [isLoading, setIsLoading] = useState(true);
   
   // Reports State
   const [monthlyReports, setMonthlyReports] = useState<MonthStatus[]>([]);
@@ -127,6 +126,7 @@ const App: React.FC = () => {
   // Load Data
   const loadData = async () => {
       try {
+          setIsLoading(true);
           // Fetch data from Supabase
           let [emps, jbs, entrs] = await Promise.all([
               fetchEmployees(),
@@ -153,6 +153,8 @@ const App: React.FC = () => {
 
       } catch (error) {
           console.error("Failed to load data:", error);
+      } finally {
+          setIsLoading(false);
       }
   };
 
@@ -235,7 +237,7 @@ const App: React.FC = () => {
   // Handlers
   const handleRequestSwitchUser = (targetId: string) => {
       const targetEmp = employees.find(e => e.id === targetId);
-      if (targetEmp?.pinCode && !CREDENTIALS.IS_DEMO_MODE) {
+      if (targetEmp?.pinCode) {
           setPendingUserId(targetId);
           setIsPinModalOpen(true);
       } else {
@@ -359,6 +361,17 @@ const App: React.FC = () => {
 
   if (presentationMode) return <PresentationMode type={presentationMode} onClose={() => setPresentationMode(null)} />;
 
+  if (isLoading && employees.length === 0) {
+      return (
+          <div className="flex items-center justify-center min-h-screen bg-[#f3f4f6]">
+              <div className="flex flex-col items-center gap-4">
+                  <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-indigo-600"></div>
+                  <p className="text-gray-500 font-medium animate-pulse">Načítám docházku...</p>
+              </div>
+          </div>
+      );
+  }
+
   return (
     <div className="flex flex-col md:flex-row min-h-screen bg-[#f3f4f6]">
       <Sidebar 
@@ -378,7 +391,7 @@ const App: React.FC = () => {
            <div className="flex flex-col">
              <div className="flex items-baseline gap-1">
                 <h1 className="font-bold text-lg leading-none">Chytrá</h1>
-                <span className="text-[9px] text-slate-400">v2.4 PROD</span>
+                <span className="text-[9px] text-slate-400">v2.5 FINAL</span>
              </div>
              <span className="text-[10px] text-indigo-300 font-bold leading-none">DOCHÁZKA</span>
            </div>
@@ -401,16 +414,6 @@ const App: React.FC = () => {
 
       <main className="flex-1 p-0 overflow-y-auto flex flex-col h-screen md:h-auto">
         
-        {/* OFFLINE/DEMO MODE BANNER - REMOVED FOR PROD */}
-        {CREDENTIALS.IS_DEMO_MODE && (
-        <div className="bg-orange-500 text-white px-4 py-2 text-center text-sm font-bold flex items-center justify-center gap-2 shadow-md">
-            <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" viewBox="0 0 20 20" fill="currentColor">
-                <path fillRule="evenodd" d="M8.257 3.099c.765-1.36 2.722-1.36 3.486 0l5.58 9.92c.75 1.334-.213 2.98-1.742 2.98H4.42c-1.53 0-2.493-1.646-1.743-2.98l5.58-9.92zM11 13a1 1 0 11-2 0 1 1 0 012 0zm-1-8a1 1 0 00-1 1v3a1 1 0 002 0V6a1 1 0 00-1-1z" clipRule="evenodd" />
-            </svg>
-            OFFLINE VERZE - DATA SE NEUKLÁDAJÍ
-        </div>
-        )}
-
         {/* REVIEW MODE BANNER */}
         {reviewingUserId && (
           <div className="bg-indigo-600 text-white px-6 py-3 sticky top-0 md:top-0 z-40 flex justify-between items-center shadow-md">

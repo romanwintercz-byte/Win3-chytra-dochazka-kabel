@@ -1,21 +1,24 @@
 
-// CACHE KILLER SERVICE WORKER
+// CACHE KILLER SERVICE WORKER - v2.3
 // Tato verze slouží k vyčištění staré cache a vynucení stažení nové verze aplikace.
+// Změna verze v souboru vynutí přenačtení workeru prohlížečem.
 
-const CACHE_NAME = 'smartwork-reset-v999';
+const CACHE_NAME = 'smartwork-reset-v1000-force';
 
 self.addEventListener('install', (event) => {
   // Okamžitě převzít kontrolu, nečekat
+  console.log('SW: Instaluji Killer Worker...');
   self.skipWaiting();
 });
 
 self.addEventListener('activate', (event) => {
   // Okamžitě smazat VŠECHNY staré cache
+  console.log('SW: Aktivuji a mažu cache...');
   event.waitUntil(
     caches.keys().then((cacheNames) => {
       return Promise.all(
         cacheNames.map((cacheName) => {
-          console.log('MAŽU STAROU CACHE:', cacheName);
+          console.log('SW: MAŽU STAROU CACHE:', cacheName);
           return caches.delete(cacheName);
         })
       );
@@ -30,8 +33,8 @@ self.addEventListener('fetch', (event) => {
   // Tím zajistíme, že se načte nový index.html a App.tsx bez staré obrazovky
   event.respondWith(
     fetch(event.request).catch(() => {
-        // Fallback jen pokud není síť, ale pravděpodobně selže, což je v pořádku pro reset
-        return new Response("Jste offline a probíhá reset aplikace. Připojte se k internetu.", { status: 503 });
+        // Fallback jen pokud není síť
+        return new Response("Probíhá aktualizace aplikace. Prosím obnovte stránku online.", { status: 503 });
     })
   );
 });
