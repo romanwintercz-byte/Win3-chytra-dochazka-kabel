@@ -59,7 +59,7 @@ const AboutModal: React.FC<AboutModalProps> = ({ isOpen, onClose, onContactDevel
           </a>
 
           <div className="mt-8 text-xs text-gray-400">
-            Verze aplikace 1.4.0
+            Verze aplikace 1.5.2
           </div>
 
           {/* Service Section */}

@@ -1,40 +1,49 @@
 
-// CACHE KILLER SERVICE WORKER - v2.3
-// Tato verze slouží k vyčištění staré cache a vynucení stažení nové verze aplikace.
-// Změna verze v souboru vynutí přenačtení workeru prohlížečem.
+// CACHE KILLER SERVICE WORKER - v1.5.2
+// Tato verze agresivně maže starou cache.
+// Změna verze v názvu konstanty je klíčová pro detekci změny souboru.
 
-const CACHE_NAME = 'smartwork-reset-v1000-force';
+const CACHE_NAME = 'smartwork-reset-v1.5.2';
 
 self.addEventListener('install', (event) => {
-  // Okamžitě převzít kontrolu, nečekat
-  console.log('SW: Instaluji Killer Worker...');
+  // Okamžitě přeskočit čekání - "vykopnout" starý service worker
+  console.log('SW v1.5.2: Instalace a skipWaiting');
   self.skipWaiting();
 });
 
 self.addEventListener('activate', (event) => {
-  // Okamžitě smazat VŠECHNY staré cache
-  console.log('SW: Aktivuji a mažu cache...');
+  console.log('SW v1.5.2: Aktivace a čištění cache');
   event.waitUntil(
     caches.keys().then((cacheNames) => {
       return Promise.all(
         cacheNames.map((cacheName) => {
-          console.log('SW: MAŽU STAROU CACHE:', cacheName);
+          // Smazat vše, co není aktuální verze (což je v podstatě všechno)
+          console.log('SW: Mazání staré cache:', cacheName);
           return caches.delete(cacheName);
         })
       );
     })
   );
-  // Okamžitě začít ovládat všechny otevřené stránky
-  self.clients.claim();
+  // Okamžitě převzít kontrolu nad všemi otevřenými taby
+  return self.clients.claim();
 });
 
 self.addEventListener('fetch', (event) => {
-  // IGNOROVAT CACHE - VŽDY STAHOVAT ZE SÍTĚ
-  // Tím zajistíme, že se načte nový index.html a App.tsx bez staré obrazovky
+  // VŽDY jít na síť, nikdy nebrat index.html z cache
+  // Pokud selže síť, teprve pak nic (nebo offline stránka, pokud by existovala)
   event.respondWith(
-    fetch(event.request).catch(() => {
-        // Fallback jen pokud není síť
-        return new Response("Probíhá aktualizace aplikace. Prosím obnovte stránku online.", { status: 503 });
-    })
+    fetch(event.request)
+      .then(response => {
+        // Můžeme sem přidat logiku pro cachování nové verze, 
+        // ale pro jistotu teď necháme čistý network-only pro hlavní soubory
+        return response;
+      })
+      .catch(() => {
+        // Fallback
+        return new Response("Jste offline a probíhá aktualizace. Prosím připojte se k internetu.", { 
+            status: 503,
+            headers: { 'Content-Type': 'text/plain; charset=utf-8' }
+        });
+      })
   );
 });
