@@ -37,7 +37,7 @@ const Sidebar: React.FC<SidebarProps> = ({
             <h1 className="text-lg font-bold text-white leading-tight">Chytrá<br/>Docházka</h1>
             <div className="flex flex-col">
                 <span className="text-[10px] text-slate-400 group-hover:text-indigo-300 transition-colors">by Win3 Studio</span>
-                <span className="text-[9px] text-slate-600 font-mono mt-0.5">v1.5.2</span>
+                <span className="text-[9px] text-slate-600 font-mono mt-0.5">v1.5.3</span>
             </div>
           </div>
         </button>
