@@ -1,18 +1,18 @@
 
-// CACHE KILLER SERVICE WORKER - v1.5.3
+// CACHE KILLER SERVICE WORKER - v1.5.4
 // Tato verze agresivně maže starou cache.
 // Změna verze v názvu konstanty je klíčová pro detekci změny souboru.
 
-const CACHE_NAME = 'smartwork-reset-v1.5.3';
+const CACHE_NAME = 'smartwork-reset-v1.5.4';
 
 self.addEventListener('install', (event) => {
   // Okamžitě přeskočit čekání - "vykopnout" starý service worker
-  console.log('SW v1.5.3: Instalace a skipWaiting');
+  console.log('SW v1.5.4: Instalace a skipWaiting');
   self.skipWaiting();
 });
 
 self.addEventListener('activate', (event) => {
-  console.log('SW v1.5.3: Aktivace a čištění cache');
+  console.log('SW v1.5.4: Aktivace a čištění cache');
   event.waitUntil(
     caches.keys().then((cacheNames) => {
       return Promise.all(

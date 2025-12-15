@@ -1,3 +1,4 @@
+
 {
   "short_name": "Chytrá docházka",
   "name": "Chytrá docházka - Měsíční Výkazy",
@@ -13,8 +14,8 @@
       "sizes": "512x512"
     }
   ],
-  "start_url": "/",
-  "scope": "/",
+  "start_url": "./",
+  "scope": "./",
   "display": "standalone",
   "theme_color": "#0f172a",
   "background_color": "#f3f4f6",
