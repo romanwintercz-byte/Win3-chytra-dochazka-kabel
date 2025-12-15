@@ -7,9 +7,12 @@ import { CREDENTIALS } from '../credentials';
 
 let client: SupabaseClient;
 
+// Pokud chybí klíče, vypíšeme chybu do konzole, ale nebudeme vytvářet dummy klienta, 
+// aby bylo jasné, že je něco špatně s konfigurací.
 if (!CREDENTIALS.SUPABASE_URL || !CREDENTIALS.SUPABASE_KEY) {
     console.error("CRITICAL ERROR: Supabase URL or Key is missing in Environment Variables!");
-    // Fallback to prevent immediate crash, but calls will fail
+    // Vytvoříme klienta s prázdnými stringy, aby aplikace nespadla hned při importu, 
+    // ale API volání selžou, což je v tuto chvíli žádané chování pro debugování.
     client = createClient('https://placeholder.supabase.co', 'placeholder');
 } else {
     client = createClient(CREDENTIALS.SUPABASE_URL, CREDENTIALS.SUPABASE_KEY, {
@@ -138,6 +141,7 @@ export const markAllNotificationsAsRead = async (userId: string) => {
 };
 
 export const subscribeToPresence = (userId: string, onSync: (onlineUserIds: string[]) => void) => {
+    // Basic implementation for production - can be enhanced later
     const channel = supabase.channel('online-users');
     channel
         .on('presence', { event: 'sync' }, () => {

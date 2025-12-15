@@ -1,9 +1,9 @@
 
-// CACHE KILLER SERVICE WORKER - v1.5.0
+// CACHE KILLER SERVICE WORKER - v2.3
 // Tato verze slouží k vyčištění staré cache a vynucení stažení nové verze aplikace.
 // Změna verze v souboru vynutí přenačtení workeru prohlížečem.
 
-const CACHE_NAME = 'smartwork-reset-v1.5.0';
+const CACHE_NAME = 'smartwork-reset-v1000-force';
 
 self.addEventListener('install', (event) => {
   // Okamžitě převzít kontrolu, nečekat
