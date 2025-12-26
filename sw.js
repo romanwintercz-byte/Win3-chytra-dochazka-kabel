@@ -1,6 +1,6 @@
 
-// SMARTWORK PWA SERVICE WORKER - v1.6.5
-const CACHE_NAME = 'smartwork-core-v1.6.5';
+// SMARTWORK PWA SERVICE WORKER - v1.6.6
+const CACHE_NAME = 'smartwork-core-v1.6.6';
 
 self.addEventListener('install', (event) => {
   self.skipWaiting();
@@ -9,7 +9,9 @@ self.addEventListener('install', (event) => {
 self.addEventListener('activate', (event) => {
   event.waitUntil(
     caches.keys().then((keys) => Promise.all(
-      keys.map((key) => caches.delete(key))
+      keys.map((key) => {
+        if (key !== CACHE_NAME) return caches.delete(key);
+      })
     ))
   );
   return self.clients.claim();
@@ -18,14 +20,15 @@ self.addEventListener('activate', (event) => {
 self.addEventListener('fetch', (event) => {
   const { request } = event;
 
-  // HLAVNÍ PRAVIDLO: Vstup do aplikace (index.html) VŽDY ze sítě.
-  // To zabrání tomu, aby SW vracel poškozený soubor z cache.
+  // Navigace (index.html) se vždy pokusí o síť pro zamezení White Screen of Death
   if (request.mode === 'navigate') {
-    event.respondWith(fetch(request).catch(() => caches.match('./index.html')));
+    event.respondWith(
+      fetch(request).catch(() => caches.match('./index.html'))
+    );
     return;
   }
 
-  // Ignorovat Supabase a API
+  // Ignorovat externí API (Supabase)
   if (request.url.includes('supabase.co') || request.url.includes('google')) {
     return;
   }
@@ -44,7 +47,6 @@ self.addEventListener('fetch', (event) => {
   );
 });
 
-// Listener pro aktualizaci
 self.addEventListener('message', (event) => {
   if (event.data && event.data.type === 'SKIP_WAITING') {
     self.skipWaiting();

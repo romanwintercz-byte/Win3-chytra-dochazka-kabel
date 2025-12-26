@@ -13,9 +13,10 @@ if (!rootElement) {
 
 if ('serviceWorker' in navigator) {
   window.addEventListener('load', () => {
-    navigator.serviceWorker.register('./sw.js?v=1.6.5', { scope: './' })
+    // Registrace bez query stringu, který rozbíjel build proces
+    navigator.serviceWorker.register('./sw.js', { scope: './' })
       .then(registration => {
-        console.log('SW v1.6.5 Active');
+        console.log('SW v1.6.6 Active');
         
         registration.onupdatefound = () => {
           const installingWorker = registration.installing;

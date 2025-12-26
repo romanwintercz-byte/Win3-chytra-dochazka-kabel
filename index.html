@@ -14,7 +14,7 @@
     <meta name="apple-mobile-web-app-title" content="Docházka">
     
     <title>Chytrá docházka</title>
-    <link rel="manifest" href="./manifest.json?v=1.6.5" />
+    <link rel="manifest" href="./manifest.json" />
     <link rel="apple-touch-icon" href="https://cdn-icons-png.flaticon.com/512/9512/9512839.png">
     
     <script src="https://cdn.tailwindcss.com"></script>
@@ -55,38 +55,36 @@
         </svg>
       </div>
       <div class="loader-spinner"></div>
-      <p id="loader-status" style="color: #94a3b8; font-size: 11px; margin-top: 15px; font-weight: 500;">Ověřování verze 1.6.5...</p>
+      <p id="loader-status" style="color: #94a3b8; font-size: 11px; margin-top: 15px; font-weight: 500;">Spouštění systému 1.6.6...</p>
     </div>
 
     <div id="root"></div>
 
-    <script type="module">
-      // Globální příznak pro detekci úspěšného startu
-      window.APP_STARTED = false;
-      
-      import "./index.tsx?v=1.6.5";
+    <!-- Hlavní import aplikace bez query parametrů pro kompatibilitu s Vite buildem -->
+    <script type="module" src="./index.tsx"></script>
 
-      // Záchranný skript
+    <script>
+      // Globální příznak startu
+      window.APP_STARTED = false;
+
+      // Záchranný skript pro případ bílé obrazovky
       setTimeout(() => {
         if (!window.APP_STARTED) {
-          console.error("CRITICAL: App failed to start. Emergency reset initiated.");
-          const status = document.getElementById('loader-status');
-          if (status) status.innerText = "Opravuji poškozenou paměť...";
-          
+          console.warn("Nouzový reset mezipaměti z důvodu selhání startu.");
           if ('serviceWorker' in navigator) {
             navigator.serviceWorker.getRegistrations().then(regs => {
               for(let r of regs) r.unregister();
               caches.keys().then(keys => {
                 Promise.all(keys.map(k => caches.delete(k))).then(() => {
-                  window.location.href = window.location.pathname + '?reset=' + Date.now();
+                  window.location.reload(true);
                 });
               });
             });
           } else {
-             window.location.href = window.location.pathname + '?reset=' + Date.now();
+            window.location.reload(true);
           }
         }
-      }, 5000); // 5 vteřin limit na start
+      }, 6000);
     </script>
   <script type="module" src="/index.tsx"></script>
 </body>
