@@ -43,7 +43,7 @@ const initialMonthStatus: MonthStatus = {
 };
 
 const SUPPORT_ID = 'win3-support-id';
-const VERSION = '1.6.3';
+const VERSION = '1.6.4';
 
 const App: React.FC = () => {
   const [activeTab, setActiveTab] = useState<'overview' | 'report' | 'settings'>('overview');
@@ -131,10 +131,6 @@ const App: React.FC = () => {
           ]);
 
           console.log("Fetch success. Employees:", emps.length, "Jobs:", jbs.length, "Entries:", entrs.length);
-
-          if (emps.length === 0) {
-              console.warn("No employees found in database.");
-          }
 
           setEmployees(emps);
           setJobs(jbs);
