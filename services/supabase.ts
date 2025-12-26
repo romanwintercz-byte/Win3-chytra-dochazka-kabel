@@ -3,14 +3,16 @@ import { createClient } from '@supabase/supabase-js';
 import { Employee, Job, TimeEntry, MonthStatus, TimesheetStatus, Notification } from '../types';
 import { CREDENTIALS } from '../credentials';
 
-// Funkce pro bezpečné vytvoření klienta
 const getSupabaseClient = () => {
     if (!CREDENTIALS.SUPABASE_URL || !CREDENTIALS.SUPABASE_KEY) {
-        console.error("Supabase credentials are missing! Please set VITE_SUPABASE_URL and VITE_SUPABASE_KEY in environment variables.");
-        // Vrátíme null, aby aplikace nespadla při startu
         return null;
     }
-    return createClient(CREDENTIALS.SUPABASE_URL, CREDENTIALS.SUPABASE_KEY);
+    try {
+        return createClient(CREDENTIALS.SUPABASE_URL, CREDENTIALS.SUPABASE_KEY);
+    } catch (e) {
+        console.error("Supabase client initialization failed:", e);
+        return null;
+    }
 };
 
 const supabase = getSupabaseClient();
@@ -18,7 +20,10 @@ const supabase = getSupabaseClient();
 export const fetchEmployees = async (): Promise<Employee[]> => {
     if (!supabase) return [];
     const { data, error } = await supabase.from('employees').select('*').order('name');
-    if (error) throw error;
+    if (error) {
+        console.error("Error fetching employees:", error);
+        throw error;
+    }
     return data || [];
 };
 
@@ -178,8 +183,4 @@ export const uploadAttachment = async (file: File): Promise<string | null> => {
 
     const { data } = supabase.storage.from('documents').getPublicUrl(filePath);
     return data.publicUrl;
-};
-
-export const resetDemoData = () => {
-    console.warn("Reset demo dat není v produkční verzi dostupný.");
 };

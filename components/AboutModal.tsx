@@ -6,9 +6,10 @@ interface AboutModalProps {
   onClose: () => void;
   onContactDeveloper: () => void;
   onServiceLogin: () => void;
+  version: string;
 }
 
-const AboutModal: React.FC<AboutModalProps> = ({ isOpen, onClose, onContactDeveloper, onServiceLogin }) => {
+const AboutModal: React.FC<AboutModalProps> = ({ isOpen, onClose, onContactDeveloper, onServiceLogin, version }) => {
   if (!isOpen) return null;
 
   return (
@@ -59,7 +60,7 @@ const AboutModal: React.FC<AboutModalProps> = ({ isOpen, onClose, onContactDevel
           </a>
 
           <div className="mt-8 text-xs text-gray-400">
-            Verze aplikace 1.5.7
+            Verze aplikace {version}
           </div>
 
           {/* Service Section */}

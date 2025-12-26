@@ -1,7 +1,10 @@
 
 export const CREDENTIALS = {
-    IS_DEMO_MODE: false,
-    // Preferujeme process.env, který je v tomto prostředí standardem pro injektované klíče
-    SUPABASE_URL: process.env.VITE_SUPABASE_URL || (import.meta as any).env?.VITE_SUPABASE_URL || '',
-    SUPABASE_KEY: process.env.VITE_SUPABASE_KEY || (import.meta as any).env?.VITE_SUPABASE_KEY || ''
+    // Pokud jsou tyto klíče prázdné, aplikace nabídne Demo režim
+    SUPABASE_URL: (import.meta as any).env?.VITE_SUPABASE_URL || (window as any).process?.env?.VITE_SUPABASE_URL || '',
+    SUPABASE_KEY: (import.meta as any).env?.VITE_SUPABASE_KEY || (window as any).process?.env?.VITE_SUPABASE_KEY || ''
+};
+
+export const isSupabaseConfigured = () => {
+    return CREDENTIALS.SUPABASE_URL.length > 0 && CREDENTIALS.SUPABASE_KEY.length > 0;
 };

@@ -21,6 +21,8 @@ import MessageModal from './components/MessageModal';
 import { TimeEntry, MonthStatus, TimesheetStatus, Employee, Job, Notification } from './types';
 import { validateMonth } from './services/validationService';
 import { v4 as uuidv4 } from 'uuid';
+import { isSupabaseConfigured } from './credentials';
+import { MOCK_EMPLOYEES, MOCK_JOBS, MOCK_ENTRIES } from './services/mockData';
 import { 
     fetchEmployees, addEmployee, updateEmployee, updateEmployeeStatus, 
     fetchJobs, addJob, updateJobStatus,
@@ -41,14 +43,17 @@ const initialMonthStatus: MonthStatus = {
 };
 
 const SUPPORT_ID = 'win3-support-id';
+const VERSION = '1.5.9';
 
 const App: React.FC = () => {
   const [activeTab, setActiveTab] = useState<'overview' | 'report' | 'settings'>('overview');
+  const [useDemoData, setUseDemoData] = useState(false);
   
   const [employees, setEmployees] = useState<Employee[]>([]);
   const [jobs, setJobs] = useState<Job[]>([]);
   const [entries, setEntries] = useState<TimeEntry[]>([]);
   const [isLoading, setIsLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
   
   const [monthlyReports, setMonthlyReports] = useState<MonthStatus[]>([]);
   const [currentUserId, setCurrentUserId] = useState<string>('');
@@ -93,18 +98,38 @@ const App: React.FC = () => {
 
   const activeJobs = useMemo(() => jobs.filter(j => j.isActive), [jobs]);
 
-  const loadData = async () => {
+  const loadData = async (forceDemo: boolean = false) => {
+      setIsLoading(true);
+      setError(null);
+
+      // Pokud nejsou klíče a není vynuceno demo, zobrazíme chybu
+      if (!isSupabaseConfigured() && !forceDemo) {
+          setIsLoading(false);
+          setError("Chybí konfigurace Supabase (VITE_SUPABASE_URL / KEY).");
+          return;
+      }
+
+      if (forceDemo || !isSupabaseConfigured()) {
+          // Načtení MOCK dat
+          setEmployees(MOCK_EMPLOYEES);
+          setJobs(MOCK_JOBS);
+          setEntries(MOCK_ENTRIES);
+          setUseDemoData(true);
+          setCurrentUserId(MOCK_EMPLOYEES[1].id); // Přihlásit Karla
+          setIsLoading(false);
+          return;
+      }
+
       try {
-          setIsLoading(true);
           let [emps, jbs, entrs] = await Promise.all([
               fetchEmployees(),
               fetchJobs(),
               fetchTimeEntries()
           ]);
 
-          if (emps) setEmployees(emps);
-          if (jbs) setJobs(jbs);
-          if (entrs) setEntries(entrs);
+          setEmployees(emps);
+          setJobs(jbs);
+          setEntries(entrs);
           
           const savedId = localStorage.getItem('smartwork_current_user_id');
           if (savedId && emps?.some(e => e.id === savedId && e.isActive !== false)) {
@@ -112,8 +137,9 @@ const App: React.FC = () => {
           } else if (emps?.[0]) {
               setCurrentUserId(emps[0].id);
           }
-      } catch (error) {
-          console.error("Failed to load data:", error);
+      } catch (err: any) {
+          console.error("Failed to load data from Supabase:", err);
+          setError("Nepodařilo se spojit s databází. Zkontrolujte klíče nebo připojení.");
       } finally {
           setIsLoading(false);
       }
@@ -124,7 +150,7 @@ const App: React.FC = () => {
   useEffect(() => { setReviewingUserId(null); }, [currentUserId]);
 
   useEffect(() => {
-      if (currentUserId) {
+      if (currentUserId && !useDemoData) {
           const presenceChannel = subscribeToPresence(currentUserId, (ids) => setOnlineUserIds(new Set(ids)));
           const notificationChannel = subscribeToNotifications(currentUserId, (newNote) => setNotifications(prev => [newNote, ...prev]));
           const loadNotifications = async () => {
@@ -137,19 +163,21 @@ const App: React.FC = () => {
               notificationChannel.unsubscribe();
           };
       }
-  }, [currentUserId]);
+  }, [currentUserId, useDemoData]);
 
   useEffect(() => {
-    const loadReportsAndLocks = async () => {
-        try {
-            const reports = await fetchMonthlyReports(selectedMonth);
-            setMonthlyReports(reports);
-            const globalLock = await fetchGlobalLock(selectedMonth);
-            setIsGlobalLocked(globalLock);
-        } catch (e) {}
-    };
-    loadReportsAndLocks();
-  }, [selectedMonth]);
+    if (!useDemoData) {
+        const loadReportsAndLocks = async () => {
+            try {
+                const reports = await fetchMonthlyReports(selectedMonth);
+                setMonthlyReports(reports);
+                const globalLock = await fetchGlobalLock(selectedMonth);
+                setIsGlobalLocked(globalLock);
+            } catch (e) {}
+        };
+        loadReportsAndLocks();
+    }
+  }, [selectedMonth, useDemoData]);
 
   useEffect(() => {
       const userReport = monthlyReports.find(r => r.employeeId === targetUserId);
@@ -210,6 +238,10 @@ const App: React.FC = () => {
 
   const handleAddEntries = async (newEntries: TimeEntry[]) => {
     if (!canEdit) return alert("Měsíc je uzamčen.");
+    if (useDemoData) {
+        setEntries(prev => [...prev, ...newEntries]);
+        return;
+    }
     try { await addTimeEntriesBulk(newEntries); loadData(); } catch (e: any) { alert("Chyba: " + e.message); }
   };
 
@@ -220,7 +252,12 @@ const App: React.FC = () => {
     const today = new Date().toISOString().split('T')[0];
     const todayEntries = allUserEntries.filter(e => e.date === today);
     if (todayEntries.length > 0) if (!window.confirm(`Přepsat dnešek (${today})?`)) return;
-    if (todayEntries.length > 0) await deleteTimeEntriesForDate(targetUserId, today);
+    
+    if (useDemoData) {
+        setEntries(prev => prev.filter(e => !(e.employeeId === targetUserId && e.date === today)));
+    } else {
+        if (todayEntries.length > 0) await deleteTimeEntriesForDate(targetUserId, today);
+    }
     
     const newEntries = entriesToCopy.map(e => ({
         id: uuidv4(), employeeId: targetUserId, date: today, project: e.project, description: e.description, hours: e.hours, type: e.type
@@ -230,6 +267,16 @@ const App: React.FC = () => {
 
   const handleModalSubmit = async (date: string, submittedEntries: TimeEntry[]) => {
     if (!canEdit) return alert("Nelze upravovat záznamy.");
+    if (useDemoData) {
+        if (date === 'BULK_RANGE') setEntries(prev => [...prev, ...submittedEntries]);
+        else {
+            setEntries(prev => [
+                ...prev.filter(e => !(e.employeeId === targetUserId && e.date === date)),
+                ...submittedEntries
+            ]);
+        }
+        return;
+    }
     try {
         if (date === 'BULK_RANGE') await addTimeEntriesBulk(submittedEntries);
         else {
@@ -242,6 +289,10 @@ const App: React.FC = () => {
 
   const handleDeleteEntry = async (id: string) => {
     if (!canEdit) return alert("Nelze mazat.");
+    if (useDemoData) {
+        setEntries(prev => prev.filter(e => e.id !== id));
+        return;
+    }
     try { await deleteTimeEntry(id); setEntries(prev => prev.filter(e => e.id !== id)); } catch (e: any) { alert("Chyba: " + e.message); }
   };
 
@@ -257,16 +308,23 @@ const App: React.FC = () => {
 
   const handleStatusUpdate = async (newStatus: TimesheetStatus, comment?: string) => {
     const updatedReport: MonthStatus = { employeeId: targetUserId, month: selectedMonth, status: newStatus, managerComment: comment };
+    if (useDemoData) {
+        setMonthlyReports(prev => [
+            ...prev.filter(r => !(r.employeeId === targetUserId && r.month === selectedMonth)),
+            updatedReport
+        ]);
+        return;
+    }
     try { await upsertMonthlyReport(updatedReport); loadData(); } catch (e: any) { alert("Chyba: " + e.message); }
   };
 
   const handleMarkRead = async (id: string) => {
-      await markNotificationAsRead(id);
+      if (!useDemoData) await markNotificationAsRead(id);
       setNotifications(prev => prev.map(n => n.id === id ? { ...n, isRead: true } : n));
   };
 
   const handleMarkAllRead = async () => {
-      await markAllNotificationsAsRead(currentUserId);
+      if (!useDemoData) await markAllNotificationsAsRead(currentUserId);
       setNotifications(prev => prev.map(n => ({ ...n, isRead: true })));
   };
 
@@ -291,16 +349,31 @@ const App: React.FC = () => {
   const handleSendMessage = async (text: string) => {
       try {
           const formattedMessage = `Zpráva od ${currentUser.name}: ${text}`;
-          await createNotification(messageRecipientId, formattedMessage, 'info', currentUser.id);
-          alert('Zpráva odeslána.');
+          if (!useDemoData) await createNotification(messageRecipientId, formattedMessage, 'info', currentUser.id);
+          else alert('Zpráva odeslána (Demo).');
       } catch (e) { alert('Chyba při odesílání.'); }
   };
 
-  const handleAddEmployee = async (emp: Employee) => { try { await addEmployee(emp); loadData(); } catch (e: any) { alert("Chyba: " + e.message); } };
-  const handleUpdateEmployee = async (emp: Employee) => { try { await updateEmployee(emp); loadData(); } catch (e: any) { alert("Chyba: " + e.message); } };
-  const handleToggleEmployeeStatus = async (id: string, isActive: boolean) => { try { await updateEmployeeStatus(id, isActive); loadData(); } catch (e: any) { alert("Chyba: " + e.message); } };
-  const handleAddJob = async (job: Job) => { try { await addJob(job); loadData(); } catch (e: any) { alert("Chyba: " + e.message); } };
-  const handleToggleJobStatus = async (id: string, isActive: boolean) => { try { await updateJobStatus(id, isActive); loadData(); } catch (e: any) { alert("Chyba: " + e.message); } };
+  const handleAddEmployee = async (emp: Employee) => { 
+      if (useDemoData) { setEmployees(prev => [...prev, emp]); return; }
+      try { await addEmployee(emp); loadData(); } catch (e: any) { alert("Chyba: " + e.message); } 
+  };
+  const handleUpdateEmployee = async (emp: Employee) => { 
+      if (useDemoData) { setEmployees(prev => prev.map(e => e.id === emp.id ? emp : e)); return; }
+      try { await updateEmployee(emp); loadData(); } catch (e: any) { alert("Chyba: " + e.message); } 
+  };
+  const handleToggleEmployeeStatus = async (id: string, isActive: boolean) => { 
+      if (useDemoData) { setEmployees(prev => prev.map(e => e.id === id ? { ...e, isActive } : e)); return; }
+      try { await updateEmployeeStatus(id, isActive); loadData(); } catch (e: any) { alert("Chyba: " + e.message); } 
+  };
+  const handleAddJob = async (job: Job) => { 
+      if (useDemoData) { setJobs(prev => [...prev, job]); return; }
+      try { await addJob(job); loadData(); } catch (e: any) { alert("Chyba: " + e.message); } 
+  };
+  const handleToggleJobStatus = async (id: string, isActive: boolean) => { 
+      if (useDemoData) { setJobs(prev => prev.map(j => j.id === id ? { ...j, isActive } : j)); return; }
+      try { await updateJobStatus(id, isActive); loadData(); } catch (e: any) { alert("Chyba: " + e.message); } 
+  };
   const handleStartPresentation = (type: PresentationType) => setPresentationMode(type);
 
   if (presentationMode) return <PresentationMode type={presentationMode} onClose={() => setPresentationMode(null)} />;
@@ -308,9 +381,35 @@ const App: React.FC = () => {
   if (isLoading && employees.length === 0) {
       return (
           <div className="flex items-center justify-center min-h-screen bg-[#f3f4f6]">
-              <div className="flex flex-col items-center gap-4">
+              <div className="flex flex-col items-center gap-4 text-center p-6">
                   <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-indigo-600"></div>
-                  <p className="text-gray-500 font-medium animate-pulse">Načítám docházku...</p>
+                  <p className="text-gray-500 font-medium">Připojuji se k databázi...</p>
+              </div>
+          </div>
+      );
+  }
+
+  if (error && employees.length === 0) {
+      return (
+          <div className="flex items-center justify-center min-h-screen bg-[#f3f4f6]">
+              <div className="bg-white p-8 rounded-2xl shadow-xl max-w-md text-center">
+                  <div className="text-4xl mb-4">⚠️</div>
+                  <h3 className="text-xl font-bold text-gray-900 mb-2">Chyba připojení</h3>
+                  <p className="text-gray-500 mb-6">{error}</p>
+                  <div className="flex flex-col gap-3">
+                      <button 
+                        onClick={() => loadData(true)}
+                        className="bg-indigo-600 text-white px-6 py-3 rounded-xl font-bold hover:bg-indigo-700 transition-all"
+                      >
+                        Pokračovat v DEMO režimu
+                      </button>
+                      <button 
+                        onClick={() => window.location.reload()}
+                        className="text-gray-500 hover:text-gray-700 text-sm"
+                      >
+                        Zkusit znovu načíst
+                      </button>
+                  </div>
               </div>
           </div>
       );
@@ -322,6 +421,7 @@ const App: React.FC = () => {
         activeTab={activeTab} setActiveTab={setActiveTab} installPrompt={installPrompt} onInstall={handleInstallClick}
         currentUser={currentUser} employees={activeEmployees} onRequestSwitchUser={handleRequestSwitchUser} 
         onShowAbout={() => setIsAboutOpen(true)} onContactManager={handleContactManager} onlineUserIds={onlineUserIds} 
+        version={VERSION}
       />
 
       <div className="md:hidden bg-slate-900 text-white p-4 pt-[env(safe-area-inset-top,20px)] flex justify-between items-center sticky top-0 z-30 shadow-md">
@@ -334,7 +434,7 @@ const App: React.FC = () => {
            <div className="flex flex-col">
              <div className="flex items-baseline gap-1">
                 <h1 className="font-bold text-lg leading-none">Chytrá</h1>
-                <span className="text-[9px] text-slate-400">v1.5.7</span>
+                <span className="text-[9px] text-slate-400">v{VERSION}</span>
              </div>
              <span className="text-[10px] text-indigo-400 font-bold leading-none uppercase">Docházka</span>
            </div>
@@ -356,6 +456,12 @@ const App: React.FC = () => {
       </div>
 
       <main className="flex-1 p-0 overflow-y-auto flex flex-col h-screen md:h-auto">
+        {useDemoData && (
+            <div className="bg-amber-100 text-amber-800 px-4 py-1 text-[10px] font-bold uppercase tracking-widest text-center">
+                Spuštěno v DEMO režimu (Data se neukládají trvale)
+            </div>
+        )}
+        
         {reviewingUserId && (
           <div className="bg-indigo-600 text-white px-6 py-3 sticky top-0 md:top-0 z-40 flex justify-between items-center shadow-md animate-fade-in">
              <div className="flex items-center gap-3">
@@ -395,7 +501,7 @@ const App: React.FC = () => {
       </main>
       
       <HelpSystem />
-      <AboutModal isOpen={isAboutOpen} onClose={() => setIsAboutOpen(false)} onContactDeveloper={handleContactSupport} onServiceLogin={handleServiceLogin} />
+      <AboutModal isOpen={isAboutOpen} onClose={() => setIsAboutOpen(false)} onContactDeveloper={handleContactSupport} onServiceLogin={handleServiceLogin} version={VERSION} />
       <UpdatePrompt /> 
       <MobileNavigation activeTab={activeTab} setActiveTab={setActiveTab} currentUserRole={currentUser.role} />
       <EntryFormModal isOpen={isEntryModalOpen} onClose={() => setIsEntryModalOpen(false)} onSubmit={handleModalSubmit} initialDate={editingDate || undefined} existingEntries={entriesForEditingDate} currentUserId={targetUserId} jobs={activeJobs} allMonthEntries={monthlyUserEntries} />
