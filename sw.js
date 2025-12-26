@@ -1,6 +1,6 @@
 
-// SMARTWORK PWA SERVICE WORKER - v1.7.6
-const CACHE_NAME = 'smartwork-shim-v1.7.6';
+// SMARTWORK PWA SERVICE WORKER - v1.7.7
+const CACHE_NAME = 'smartwork-shim-v1.7.7';
 
 self.addEventListener('install', (event) => {
   self.skipWaiting();
@@ -18,17 +18,11 @@ self.addEventListener('activate', (event) => {
 
 self.addEventListener('fetch', (event) => {
   const { request } = event;
-
   if (request.mode === 'navigate') {
-    event.respondWith(
-      fetch(request).catch(() => caches.match('./index.html'))
-    );
+    event.respondWith(fetch(request).catch(() => caches.match('./index.html')));
     return;
   }
-
-  if (request.url.includes('supabase.co') || request.url.includes('google') || request.url.includes('ga.jspm.io')) {
-    return;
-  }
+  if (request.url.includes('supabase.co') || request.url.includes('google')) return;
 
   event.respondWith(
     fetch(request)
