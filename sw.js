@@ -1,6 +1,6 @@
 
-// SMARTWORK PWA SERVICE WORKER - v1.7.5
-const CACHE_NAME = 'smartwork-core-v1.7.5';
+// SMARTWORK PWA SERVICE WORKER - v1.7.6
+const CACHE_NAME = 'smartwork-shim-v1.7.6';
 
 self.addEventListener('install', (event) => {
   self.skipWaiting();
@@ -10,9 +10,7 @@ self.addEventListener('activate', (event) => {
   event.waitUntil(
     caches.keys().then((keys) => {
       return Promise.all(
-        keys.map((key) => {
-          if (key !== CACHE_NAME) return caches.delete(key);
-        })
+        keys.map((key) => caches.delete(key))
       );
     }).then(() => self.clients.claim())
   );
@@ -21,7 +19,6 @@ self.addEventListener('activate', (event) => {
 self.addEventListener('fetch', (event) => {
   const { request } = event;
 
-  // Navigace vždy ze sítě, aby se nenačetla stará verze index.html
   if (request.mode === 'navigate') {
     event.respondWith(
       fetch(request).catch(() => caches.match('./index.html'))
@@ -29,8 +26,7 @@ self.addEventListener('fetch', (event) => {
     return;
   }
 
-  // Ignorovat Supabase/Google
-  if (request.url.includes('supabase.co') || request.url.includes('google')) {
+  if (request.url.includes('supabase.co') || request.url.includes('google') || request.url.includes('ga.jspm.io')) {
     return;
   }
 
@@ -45,10 +41,4 @@ self.addEventListener('fetch', (event) => {
       })
       .catch(() => caches.match(request))
   );
-});
-
-self.addEventListener('message', (event) => {
-  if (event.data && event.data.type === 'SKIP_WAITING') {
-    self.skipWaiting();
-  }
 });
