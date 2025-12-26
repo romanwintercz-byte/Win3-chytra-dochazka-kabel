@@ -1,10 +1,12 @@
 
 export const CREDENTIALS = {
-    // Pokud jsou tyto klíče prázdné, aplikace nabídne Demo režim
+    // Vite vyžaduje prefix VITE_, ale Vercel někdy předává proměnné i přímo přes process.env
     SUPABASE_URL: (import.meta as any).env?.VITE_SUPABASE_URL || (window as any).process?.env?.VITE_SUPABASE_URL || '',
     SUPABASE_KEY: (import.meta as any).env?.VITE_SUPABASE_KEY || (window as any).process?.env?.VITE_SUPABASE_KEY || ''
 };
 
 export const isSupabaseConfigured = () => {
-    return CREDENTIALS.SUPABASE_URL.length > 0 && CREDENTIALS.SUPABASE_KEY.length > 0;
+    const hasUrl = CREDENTIALS.SUPABASE_URL && CREDENTIALS.SUPABASE_URL.startsWith('http');
+    const hasKey = CREDENTIALS.SUPABASE_KEY && CREDENTIALS.SUPABASE_KEY.length > 20;
+    return !!(hasUrl && hasKey);
 };

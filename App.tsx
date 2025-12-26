@@ -43,7 +43,7 @@ const initialMonthStatus: MonthStatus = {
 };
 
 const SUPPORT_ID = 'win3-support-id';
-const VERSION = '1.5.9';
+const VERSION = '1.6.0';
 
 const App: React.FC = () => {
   const [activeTab, setActiveTab] = useState<'overview' | 'report' | 'settings'>('overview');
@@ -102,30 +102,39 @@ const App: React.FC = () => {
       setIsLoading(true);
       setError(null);
 
-      // Pokud nejsou klíče a není vynuceno demo, zobrazíme chybu
-      if (!isSupabaseConfigured() && !forceDemo) {
+      const configured = isSupabaseConfigured();
+      console.log(`App v${VERSION}: Loading data. Configured: ${configured}, ForceDemo: ${forceDemo}`);
+
+      if (!configured && !forceDemo) {
           setIsLoading(false);
           setError("Chybí konfigurace Supabase (VITE_SUPABASE_URL / KEY).");
           return;
       }
 
-      if (forceDemo || !isSupabaseConfigured()) {
-          // Načtení MOCK dat
+      if (forceDemo || !configured) {
+          console.log("Using Mock Data");
           setEmployees(MOCK_EMPLOYEES);
           setJobs(MOCK_JOBS);
           setEntries(MOCK_ENTRIES);
           setUseDemoData(true);
-          setCurrentUserId(MOCK_EMPLOYEES[1].id); // Přihlásit Karla
+          setCurrentUserId(MOCK_EMPLOYEES[1].id);
           setIsLoading(false);
           return;
       }
 
       try {
+          console.log("Fetching from Supabase...");
           let [emps, jbs, entrs] = await Promise.all([
               fetchEmployees(),
               fetchJobs(),
               fetchTimeEntries()
           ]);
+
+          console.log("Fetch success. Employees:", emps.length, "Jobs:", jbs.length, "Entries:", entrs.length);
+
+          if (emps.length === 0) {
+              console.warn("No employees found in database.");
+          }
 
           setEmployees(emps);
           setJobs(jbs);
@@ -138,8 +147,8 @@ const App: React.FC = () => {
               setCurrentUserId(emps[0].id);
           }
       } catch (err: any) {
-          console.error("Failed to load data from Supabase:", err);
-          setError("Nepodařilo se spojit s databází. Zkontrolujte klíče nebo připojení.");
+          console.error("Critical Load Error:", err);
+          setError(`Chyba databáze: ${err.message || 'Neznámá chyba'}. Zkontrolujte práva (RLS) v Supabase.`);
       } finally {
           setIsLoading(false);
       }
@@ -166,7 +175,7 @@ const App: React.FC = () => {
   }, [currentUserId, useDemoData]);
 
   useEffect(() => {
-    if (!useDemoData) {
+    if (!useDemoData && currentUserId) {
         const loadReportsAndLocks = async () => {
             try {
                 const reports = await fetchMonthlyReports(selectedMonth);
@@ -177,7 +186,7 @@ const App: React.FC = () => {
         };
         loadReportsAndLocks();
     }
-  }, [selectedMonth, useDemoData]);
+  }, [selectedMonth, useDemoData, currentUserId]);
 
   useEffect(() => {
       const userReport = monthlyReports.find(r => r.employeeId === targetUserId);
@@ -383,7 +392,8 @@ const App: React.FC = () => {
           <div className="flex items-center justify-center min-h-screen bg-[#f3f4f6]">
               <div className="flex flex-col items-center gap-4 text-center p-6">
                   <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-indigo-600"></div>
-                  <p className="text-gray-500 font-medium">Připojuji se k databázi...</p>
+                  <p className="text-gray-500 font-medium">Načítám data z v{VERSION}...</p>
+                  <p className="text-xs text-gray-400">Pokud toto trvá dlouho, zkontrolujte konzoli prohlížeče (F12).</p>
               </div>
           </div>
       );
@@ -395,7 +405,9 @@ const App: React.FC = () => {
               <div className="bg-white p-8 rounded-2xl shadow-xl max-w-md text-center">
                   <div className="text-4xl mb-4">⚠️</div>
                   <h3 className="text-xl font-bold text-gray-900 mb-2">Chyba připojení</h3>
-                  <p className="text-gray-500 mb-6">{error}</p>
+                  <div className="bg-red-50 text-red-700 p-3 rounded-lg text-sm mb-6 font-mono text-left overflow-auto max-h-40">
+                      {error}
+                  </div>
                   <div className="flex flex-col gap-3">
                       <button 
                         onClick={() => loadData(true)}
