@@ -1,20 +1,22 @@
 
 {
-  "short_name": "Chytrá docházka",
-  "name": "Chytrá docházka - Měsíční Výkazy",
+  "short_name": "Docházka",
+  "name": "Chytrá docházka Win3",
   "icons": [
     {
       "src": "https://cdn-icons-png.flaticon.com/512/9512/9512839.png",
       "type": "image/png",
-      "sizes": "192x192"
+      "sizes": "192x192",
+      "purpose": "any maskable"
     },
     {
       "src": "https://cdn-icons-png.flaticon.com/512/9512/9512839.png",
       "type": "image/png",
-      "sizes": "512x512"
+      "sizes": "512x512",
+      "purpose": "any maskable"
     }
   ],
-  "start_url": "./",
+  "start_url": "./index.html",
   "scope": "./",
   "display": "standalone",
   "theme_color": "#0f172a",
