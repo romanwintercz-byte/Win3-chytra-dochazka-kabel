@@ -1,5 +1,9 @@
+
 {
   "name": "Chytrá docházka",
-  "description": "Chytrá aplikace pro evidenci pracovní doby, projektů a podkladů pro mzdy.",
-  "requestFramePermissions": []
+  "description": "Profesionální aplikace pro evidenci pracovní doby a projektů.",
+  "requestFramePermissions": [
+    "camera",
+    "microphone"
+  ]
 }
