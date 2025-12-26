@@ -4,7 +4,7 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover" />
-    <meta name="theme-color" content="#0f172a" />
+    <meta name="theme-color" content="#1e1b4b" />
     <meta name="apple-mobile-web-app-capable" content="yes">
     <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
     <meta name="apple-mobile-web-app-title" content="Chytrá docházka">
@@ -19,54 +19,51 @@
       body {
         font-family: 'Inter', sans-serif;
         background-color: #f3f4f6;
+        margin: 0;
+        padding: 0;
         overscroll-behavior-y: none;
       }
-      ::-webkit-scrollbar {
-        width: 6px;
-        height: 6px;
+      /* Úvodní loading animace */
+      #app-loader {
+        position: fixed;
+        inset: 0;
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        justify-content: center;
+        background-color: #0f172a;
+        z-index: 9999;
+        transition: opacity 0.5s ease-out;
       }
-      ::-webkit-scrollbar-track {
-        background: transparent;
+      .loader-logo {
+        width: 80px;
+        height: 80px;
+        background: #4f46e5;
+        border-radius: 20px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        margin-bottom: 20px;
+        box-shadow: 0 0 30px rgba(79, 70, 229, 0.4);
       }
-      ::-webkit-scrollbar-thumb {
-        background: #cbd5e1;
-        border-radius: 3px;
+      .loader-spinner {
+        width: 30px;
+        height: 30px;
+        border: 3px solid rgba(255,255,255,0.1);
+        border-top-color: #fff;
+        border-radius: 50%;
+        animation: spin 1s linear infinite;
       }
-      /* Custom Animations */
-      @keyframes fadeIn {
-        from { opacity: 0; }
-        to { opacity: 1; }
-      }
-      .animate-fade-in {
-        animation: fadeIn 0.2s ease-out forwards;
-      }
-
-      @keyframes fadeInUp {
-        from { opacity: 0; transform: translateY(10px); }
-        to { opacity: 1; transform: translateY(0); }
-      }
-      .animate-fade-in-up {
-        animation: fadeInUp 0.4s ease-out forwards;
-      }
-
-      @keyframes shake {
-        0%, 100% { transform: translateX(0); }
-        25% { transform: translateX(-5px); }
-        75% { transform: translateX(5px); }
-      }
-      .animate-shake {
-        animation: shake 0.3s ease-in-out;
-      }
-
-      @keyframes pulseSlow {
-        0%, 100% { opacity: 1; }
-        50% { opacity: 0.8; }
-      }
-      .animate-pulse-slow {
-        animation: pulseSlow 2s infinite;
-      }
+      @keyframes spin { to { transform: rotate(360deg); } }
+      
+      ::-webkit-scrollbar { width: 6px; height: 6px; }
+      ::-webkit-scrollbar-track { background: transparent; }
+      ::-webkit-scrollbar-thumb { background: #cbd5e1; border-radius: 3px; }
+      
+      @keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
+      .animate-fade-in { animation: fadeIn 0.2s ease-out forwards; }
     </style>
-  <script type="importmap">
+    <script type="importmap">
 {
   "imports": {
     "react-dom/": "https://aistudiocdn.com/react-dom@^19.2.0/",
@@ -82,12 +79,33 @@
     "@supabase/supabase-js": "https://aistudiocdn.com/@supabase/supabase-js@^2.39.0"
   }
 }
-</script>
-<link rel="stylesheet" href="/index.css">
+    </script>
+  <link rel="stylesheet" href="/index.css">
 </head>
   <body>
+    <!-- Fyzický loader, který zmizí po načtení Reactu -->
+    <div id="app-loader">
+      <div class="loader-logo">
+        <svg width="40" height="40" viewBox="0 0 100 100" fill="none" xmlns="http://www.w3.org/2000/svg">
+          <path d="M20 30 L40 75 L60 30 L80 75 L100 30" stroke="white" strokeWidth="12" strokeLinecap="round" strokeLinejoin="round"/>
+        </svg>
+      </div>
+      <div class="loader-spinner"></div>
+      <p style="color: #94a3b8; font-size: 12px; font-family: sans-serif; margin-top: 15px; font-weight: 500;">Načítání docházky...</p>
+    </div>
+
     <div id="root"></div>
     <script type="module" src="./index.tsx"></script>
+    <script>
+      // Schování loaderu po startu aplikace
+      window.addEventListener('load', () => {
+        setTimeout(() => {
+          const loader = document.getElementById('app-loader');
+          if (loader) loader.style.opacity = '0';
+          setTimeout(() => loader && loader.remove(), 500);
+        }, 800);
+      });
+    </script>
   <script type="module" src="/index.tsx"></script>
 </body>
 </html>
