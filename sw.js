@@ -1,6 +1,6 @@
 
-// SMARTWORK PWA SERVICE WORKER - v1.6.6
-const CACHE_NAME = 'smartwork-core-v1.6.6';
+// SMARTWORK PWA SERVICE WORKER - v1.7.0
+const CACHE_NAME = 'smartwork-v1.7.0';
 
 self.addEventListener('install', (event) => {
   self.skipWaiting();
@@ -8,32 +8,35 @@ self.addEventListener('install', (event) => {
 
 self.addEventListener('activate', (event) => {
   event.waitUntil(
-    caches.keys().then((keys) => Promise.all(
-      keys.map((key) => {
-        if (key !== CACHE_NAME) return caches.delete(key);
-      })
-    ))
+    caches.keys().then((keys) => {
+      return Promise.all(
+        keys.map((key) => {
+          // Smazat úplně všechno staré při aktivaci nové verze
+          return caches.delete(key);
+        })
+      );
+    }).then(() => self.clients.claim())
   );
-  return self.clients.claim();
 });
 
 self.addEventListener('fetch', (event) => {
   const { request } = event;
 
-  // Navigace (index.html) se vždy pokusí o síť pro zamezení White Screen of Death
+  // HLAVNÍ STRÁNKA: Vždy zkusit síť. Pokud selže (offline), zkusit cache.
   if (request.mode === 'navigate') {
     event.respondWith(
-      fetch(request).catch(() => caches.match('./index.html'))
+      fetch(request)
+        .catch(() => caches.match('./index.html'))
     );
     return;
   }
 
-  // Ignorovat externí API (Supabase)
+  // API a Supabase neřešíme přes SW cache
   if (request.url.includes('supabase.co') || request.url.includes('google')) {
     return;
   }
 
-  // Ostatní soubory: Network First
+  // Ostatní (JS, CSS, Obrázky): Network First, pak Cache
   event.respondWith(
     fetch(request)
       .then((response) => {

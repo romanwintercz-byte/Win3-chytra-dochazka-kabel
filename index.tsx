@@ -3,36 +3,37 @@ import React from 'react';
 import ReactDOM from 'react-dom/client';
 import App from './App';
 
+// Signalizace pro index.html, že JS kód byl úspěšně načten a spuštěn
+(window as any).APP_STARTED = true;
+
 const rootElement = document.getElementById('root');
 if (!rootElement) {
-  throw new Error("Could not find root element to mount to");
+  throw new Error("Root element not found");
 }
-
-// Signalizace pro index.html, že aplikace skutečně nastartovala
-(window as any).APP_STARTED = true;
 
 if ('serviceWorker' in navigator) {
   window.addEventListener('load', () => {
-    // Registrace bez query stringu, který rozbíjel build proces
     navigator.serviceWorker.register('./sw.js', { scope: './' })
       .then(registration => {
-        console.log('SW v1.6.6 Active');
+        console.log('ServiceWorker v1.7.0 registered');
         
         registration.onupdatefound = () => {
           const installingWorker = registration.installing;
           if (installingWorker) {
             installingWorker.onstatechange = () => {
               if (installingWorker.state === 'installed' && navigator.serviceWorker.controller) {
+                // Nový SW je připraven, upozorníme uživatele
                 window.dispatchEvent(new CustomEvent('swUpdated', { detail: installingWorker }));
               }
             };
           }
         };
       })
-      .catch(err => console.error('SW failed:', err));
+      .catch(err => console.warn('SW registration failed:', err));
   });
 
   navigator.serviceWorker.addEventListener('controllerchange', () => {
+    // Refresh stránky při aktivaci nového SW
     window.location.reload();
   });
 }
@@ -44,11 +45,11 @@ root.render(
   </React.StrictMode>
 );
 
-// Odstranění loaderu
+// Odstranění loaderu po krátké pauze pro hladký přechod
 setTimeout(() => {
   const loader = document.getElementById('app-loader');
   if (loader) {
     loader.style.opacity = '0';
-    setTimeout(() => loader.remove(), 500);
+    setTimeout(() => loader.remove(), 400);
   }
-}, 500);
+}, 300);
