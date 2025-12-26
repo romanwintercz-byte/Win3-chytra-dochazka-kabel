@@ -8,21 +8,35 @@ if (!rootElement) {
   throw new Error("Could not find root element to mount to");
 }
 
-// FORCE UPDATE STRATEGY
-// Místo odregistrování starého SW ho nahradíme novým "Killerem", 
-// který má instrukce okamžitě převzít kontrolu (skipWaiting) a smazat cache.
+// Robustnější registrace Service Workera
 if ('serviceWorker' in navigator) {
   window.addEventListener('load', () => {
-    // CRITICAL FIX: Použít relativní cestu './sw.js' místo absolutní '/sw.js'
-    // To zajistí funkčnost i v podadresářích na GitHub Pages.
-    navigator.serviceWorker.register('./sw.js').then(registration => {
-      console.log('SW Registered: ', registration);
-      
-      // Check for updates manually
-      registration.update();
-    }).catch(registrationError => {
-      console.log('SW registration failed: ', registrationError);
-    });
+    // Registrujeme SW s explicitním scope
+    navigator.serviceWorker.register('./sw.js', { scope: './' })
+      .then(registration => {
+        console.log('SW Registered (v1.6.3):', registration.scope);
+        
+        // Pokud je k dispozici nová verze, vyvoláme event pro UI
+        registration.onupdatefound = () => {
+          const installingWorker = registration.installing;
+          if (installingWorker) {
+            installingWorker.onstatechange = () => {
+              if (installingWorker.state === 'installed' && navigator.serviceWorker.controller) {
+                window.dispatchEvent(new CustomEvent('swUpdated', { detail: installingWorker }));
+              }
+            };
+          }
+        };
+
+        // Kontrola aktualizace každých 30 minut
+        setInterval(() => registration.update(), 1000 * 60 * 30);
+      })
+      .catch(err => console.error('SW registration failed:', err));
+  });
+
+  // Reakce na aktivaci nového SW (skipWaiting)
+  navigator.serviceWorker.addEventListener('controllerchange', () => {
+    window.location.reload();
   });
 }
 
