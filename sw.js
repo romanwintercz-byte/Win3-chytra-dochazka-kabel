@@ -1,26 +1,15 @@
 
-// SMARTWORK PWA SERVICE WORKER - v1.6.4
-const CACHE_NAME = 'smartwork-v1.6.4';
-
-const ASSETS_TO_CACHE = [
-  './index.html',
-  './manifest.json',
-  'https://cdn.tailwindcss.com'
-];
+// SMARTWORK PWA SERVICE WORKER - v1.6.5
+const CACHE_NAME = 'smartwork-core-v1.6.5';
 
 self.addEventListener('install', (event) => {
   self.skipWaiting();
-  event.waitUntil(
-    caches.open(CACHE_NAME).then((cache) => cache.addAll(ASSETS_TO_CACHE))
-  );
 });
 
 self.addEventListener('activate', (event) => {
   event.waitUntil(
     caches.keys().then((keys) => Promise.all(
-      keys.map((key) => {
-        if (key !== CACHE_NAME) return caches.delete(key);
-      })
+      keys.map((key) => caches.delete(key))
     ))
   );
   return self.clients.claim();
@@ -29,20 +18,19 @@ self.addEventListener('activate', (event) => {
 self.addEventListener('fetch', (event) => {
   const { request } = event;
 
-  // 1. Pro navigaci (vstup do aplikace) vždy zkusíme síť, při výpadku vrátíme index.html
+  // HLAVNÍ PRAVIDLO: Vstup do aplikace (index.html) VŽDY ze sítě.
+  // To zabrání tomu, aby SW vracel poškozený soubor z cache.
   if (request.mode === 'navigate') {
-    event.respondWith(
-      fetch(request).catch(() => caches.match('./index.html'))
-    );
+    event.respondWith(fetch(request).catch(() => caches.match('./index.html')));
     return;
   }
 
-  // 2. Ostatní požadavky (Supabase, obrázky) necháme projít standardně
+  // Ignorovat Supabase a API
   if (request.url.includes('supabase.co') || request.url.includes('google')) {
     return;
   }
 
-  // 3. Ostatní soubory: Network first, fallback na cache
+  // Ostatní soubory: Network First
   event.respondWith(
     fetch(request)
       .then((response) => {
@@ -54,4 +42,11 @@ self.addEventListener('fetch', (event) => {
       })
       .catch(() => caches.match(request))
   );
+});
+
+// Listener pro aktualizaci
+self.addEventListener('message', (event) => {
+  if (event.data && event.data.type === 'SKIP_WAITING') {
+    self.skipWaiting();
+  }
 });

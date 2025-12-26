@@ -8,15 +8,15 @@ if (!rootElement) {
   throw new Error("Could not find root element to mount to");
 }
 
-// Robustnější registrace Service Workera
+// Signalizace pro index.html, že aplikace skutečně nastartovala
+(window as any).APP_STARTED = true;
+
 if ('serviceWorker' in navigator) {
   window.addEventListener('load', () => {
-    // Registrujeme SW s explicitním scope
-    navigator.serviceWorker.register('./sw.js', { scope: './' })
+    navigator.serviceWorker.register('./sw.js?v=1.6.5', { scope: './' })
       .then(registration => {
-        console.log('SW Registered (v1.6.3):', registration.scope);
+        console.log('SW v1.6.5 Active');
         
-        // Pokud je k dispozici nová verze, vyvoláme event pro UI
         registration.onupdatefound = () => {
           const installingWorker = registration.installing;
           if (installingWorker) {
@@ -27,14 +27,10 @@ if ('serviceWorker' in navigator) {
             };
           }
         };
-
-        // Kontrola aktualizace každých 30 minut
-        setInterval(() => registration.update(), 1000 * 60 * 30);
       })
-      .catch(err => console.error('SW registration failed:', err));
+      .catch(err => console.error('SW failed:', err));
   });
 
-  // Reakce na aktivaci nového SW (skipWaiting)
   navigator.serviceWorker.addEventListener('controllerchange', () => {
     window.location.reload();
   });
@@ -46,3 +42,12 @@ root.render(
     <App />
   </React.StrictMode>
 );
+
+// Odstranění loaderu
+setTimeout(() => {
+  const loader = document.getElementById('app-loader');
+  if (loader) {
+    loader.style.opacity = '0';
+    setTimeout(() => loader.remove(), 500);
+  }
+}, 500);

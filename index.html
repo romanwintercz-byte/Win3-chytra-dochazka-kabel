@@ -4,73 +4,46 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover" />
+    <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate" />
+    <meta http-equiv="Pragma" content="no-cache" />
+    <meta http-equiv="Expires" content="0" />
+    
     <meta name="theme-color" content="#1e1b4b" />
     <meta name="apple-mobile-web-app-capable" content="yes">
     <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
-    <meta name="apple-mobile-web-app-title" content="Chytrá docházka">
+    <meta name="apple-mobile-web-app-title" content="Docházka">
     
     <title>Chytrá docházka</title>
-    <link rel="manifest" href="./manifest.json" />
+    <link rel="manifest" href="./manifest.json?v=1.6.5" />
     <link rel="apple-touch-icon" href="https://cdn-icons-png.flaticon.com/512/9512/9512839.png">
     
     <script src="https://cdn.tailwindcss.com"></script>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    
     <style>
-      body {
-        font-family: 'Inter', sans-serif;
-        background-color: #f3f4f6;
-        margin: 0;
-        padding: 0;
-        overscroll-behavior-y: none;
-      }
-      #app-loader {
-        position: fixed;
-        inset: 0;
-        display: flex;
-        flex-direction: column;
-        align-items: center;
-        justify-content: center;
-        background-color: #0f172a;
-        z-index: 9999;
-        transition: opacity 0.5s ease-out;
-      }
-      .loader-logo {
-        width: 80px;
-        height: 80px;
-        background: #4f46e5;
-        border-radius: 20px;
-        display: flex;
-        align-items: center;
-        justify-content: center;
-        margin-bottom: 20px;
-        box-shadow: 0 0 30px rgba(79, 70, 229, 0.4);
-      }
-      .loader-spinner {
-        width: 30px;
-        height: 30px;
-        border: 3px solid rgba(255,255,255,0.1);
-        border-top-color: #fff;
-        border-radius: 50%;
-        animation: spin 1s linear infinite;
-      }
+      body { font-family: 'Inter', sans-serif; background-color: #0f172a; margin: 0; padding: 0; overscroll-behavior-y: none; color: white; }
+      #app-loader { position: fixed; inset: 0; display: flex; flex-direction: column; align-items: center; justify-content: center; background-color: #0f172a; z-index: 9999; }
+      .loader-logo { width: 80px; height: 80px; background: #4f46e5; border-radius: 20px; display: flex; align-items: center; justify-content: center; margin-bottom: 20px; box-shadow: 0 0 30px rgba(79, 70, 229, 0.4); }
+      .loader-spinner { width: 30px; height: 30px; border: 3px solid rgba(255,255,255,0.1); border-top-color: #fff; border-radius: 50%; animation: spin 1s linear infinite; }
       @keyframes spin { to { transform: rotate(360deg); } }
     </style>
+
     <script type="importmap">
-{
-  "imports": {
-    "react-dom/": "https://aistudiocdn.com/react-dom@^19.2.0/",
-    "@google/genai": "https://aistudiocdn.com/@google/genai@^1.30.0",
-    "uuid": "https://aistudiocdn.com/uuid@^13.0.0",
-    "react/": "https://aistudiocdn.com/react@^19.2.0/",
-    "react": "https://aistudiocdn.com/react@^19.2.0",
-    "recharts": "https://aistudiocdn.com/recharts@^3.4.1",
-    "jspdf": "https://aistudiocdn.com/jspdf@^2.5.1",
-    "jspdf-autotable": "https://aistudiocdn.com/jspdf-autotable@^3.8.2",
-    "@vitejs/plugin-react": "https://aistudiocdn.com/@vitejs/plugin-react@^5.1.1",
-    "vite": "https://aistudiocdn.com/vite@^7.2.4",
-    "@supabase/supabase-js": "https://aistudiocdn.com/@supabase/supabase-js@^2.39.0"
-  }
-}
+    {
+      "imports": {
+        "react-dom/": "https://aistudiocdn.com/react-dom@^19.2.0/",
+        "@google/genai": "https://aistudiocdn.com/@google/genai@^1.30.0",
+        "uuid": "https://aistudiocdn.com/uuid@^13.0.0",
+        "react/": "https://aistudiocdn.com/react@^19.2.0/",
+        "react": "https://aistudiocdn.com/react@^19.2.0",
+        "recharts": "https://aistudiocdn.com/recharts@^3.4.1",
+        "jspdf": "https://aistudiocdn.com/jspdf@^2.5.1",
+        "jspdf-autotable": "https://aistudiocdn.com/jspdf-autotable@^3.8.2",
+        "@vitejs/plugin-react": "https://aistudiocdn.com/@vitejs/plugin-react@^5.1.1",
+        "vite": "https://aistudiocdn.com/vite@^7.2.4",
+        "@supabase/supabase-js": "https://aistudiocdn.com/@supabase/supabase-js@^2.39.0"
+      }
+    }
     </script>
   <link rel="stylesheet" href="/index.css">
 </head>
@@ -82,45 +55,38 @@
         </svg>
       </div>
       <div class="loader-spinner"></div>
-      <p id="loader-text" style="color: #94a3b8; font-size: 12px; font-family: sans-serif; margin-top: 15px; font-weight: 500;">Načítání docházky...</p>
+      <p id="loader-status" style="color: #94a3b8; font-size: 11px; margin-top: 15px; font-weight: 500;">Ověřování verze 1.6.5...</p>
     </div>
 
     <div id="root"></div>
-    <script type="module" src="./index.tsx"></script>
-    
-    <script>
-      // Záchranný skript proti bílé obrazovce
-      window.addEventListener('load', () => {
-        // 1. Schování loaderu po startu (standardní cesta)
-        setTimeout(() => {
-          const loader = document.getElementById('app-loader');
-          if (loader) {
-            loader.style.opacity = '0';
-            setTimeout(() => loader.remove(), 500);
-          }
-        }, 1500);
 
-        // 2. Detekce "White Screen of Death" v Standalone režimu
-        if (window.matchMedia('(display-mode: standalone)').matches) {
-          setTimeout(() => {
-            const root = document.getElementById('root');
-            if (root && root.innerHTML.trim() === "") {
-              console.warn("Detecting white screen, clearing cache and reloading...");
-              const loaderText = document.getElementById('loader-text');
-              if (loaderText) loaderText.innerText = "Opravuji zobrazení...";
-              
-              if ('serviceWorker' in navigator) {
-                navigator.serviceWorker.getRegistrations().then(registrations => {
-                  for(let registration of registrations) registration.unregister();
-                  window.location.reload(true);
+    <script type="module">
+      // Globální příznak pro detekci úspěšného startu
+      window.APP_STARTED = false;
+      
+      import "./index.tsx?v=1.6.5";
+
+      // Záchranný skript
+      setTimeout(() => {
+        if (!window.APP_STARTED) {
+          console.error("CRITICAL: App failed to start. Emergency reset initiated.");
+          const status = document.getElementById('loader-status');
+          if (status) status.innerText = "Opravuji poškozenou paměť...";
+          
+          if ('serviceWorker' in navigator) {
+            navigator.serviceWorker.getRegistrations().then(regs => {
+              for(let r of regs) r.unregister();
+              caches.keys().then(keys => {
+                Promise.all(keys.map(k => caches.delete(k))).then(() => {
+                  window.location.href = window.location.pathname + '?reset=' + Date.now();
                 });
-              } else {
-                window.location.reload(true);
-              }
-            }
-          }, 4000); // Pokud po 4 vteřinách není v root nic vykresleno, zkusíme reload
+              });
+            });
+          } else {
+             window.location.href = window.location.pathname + '?reset=' + Date.now();
+          }
         }
-      });
+      }, 5000); // 5 vteřin limit na start
     </script>
   <script type="module" src="/index.tsx"></script>
 </body>

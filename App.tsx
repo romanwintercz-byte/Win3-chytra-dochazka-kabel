@@ -43,7 +43,7 @@ const initialMonthStatus: MonthStatus = {
 };
 
 const SUPPORT_ID = 'win3-support-id';
-const VERSION = '1.6.4';
+const VERSION = '1.6.5';
 
 const App: React.FC = () => {
   const [activeTab, setActiveTab] = useState<'overview' | 'report' | 'settings'>('overview');
@@ -103,16 +103,13 @@ const App: React.FC = () => {
       setError(null);
 
       const configured = isSupabaseConfigured();
-      console.log(`App v${VERSION}: Loading data. Configured: ${configured}, ForceDemo: ${forceDemo}`);
-
       if (!configured && !forceDemo) {
           setIsLoading(false);
-          setError("Chybí konfigurace Supabase (VITE_SUPABASE_URL / KEY).");
+          setError("Chybí konfigurace Supabase.");
           return;
       }
 
       if (forceDemo || !configured) {
-          console.log("Using Mock Data");
           setEmployees(MOCK_EMPLOYEES);
           setJobs(MOCK_JOBS);
           setEntries(MOCK_ENTRIES);
@@ -123,14 +120,11 @@ const App: React.FC = () => {
       }
 
       try {
-          console.log("Fetching from Supabase...");
           let [emps, jbs, entrs] = await Promise.all([
               fetchEmployees(),
               fetchJobs(),
               fetchTimeEntries()
           ]);
-
-          console.log("Fetch success. Employees:", emps.length, "Jobs:", jbs.length, "Entries:", entrs.length);
 
           setEmployees(emps);
           setJobs(jbs);
@@ -143,8 +137,7 @@ const App: React.FC = () => {
               setCurrentUserId(emps[0].id);
           }
       } catch (err: any) {
-          console.error("Critical Load Error:", err);
-          setError(`Chyba databáze: ${err.message || 'Neznámá chyba'}. Zkontrolujte práva (RLS) v Supabase.`);
+          setError(`Chyba databáze: ${err.message || 'Neznámá chyba'}.`);
       } finally {
           setIsLoading(false);
       }
@@ -355,7 +348,7 @@ const App: React.FC = () => {
       try {
           const formattedMessage = `Zpráva od ${currentUser.name}: ${text}`;
           if (!useDemoData) await createNotification(messageRecipientId, formattedMessage, 'info', currentUser.id);
-          else alert('Zpráva odeslána (Demo).');
+          else alert('Zpráva odeslána.');
       } catch (e) { alert('Chyba při odesílání.'); }
   };
 
@@ -385,39 +378,10 @@ const App: React.FC = () => {
 
   if (isLoading && employees.length === 0) {
       return (
-          <div className="flex items-center justify-center min-h-screen bg-[#f3f4f6]">
-              <div className="flex flex-col items-center gap-4 text-center p-6">
-                  <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-indigo-600"></div>
-                  <p className="text-gray-500 font-medium">Načítám data z v{VERSION}...</p>
-                  <p className="text-xs text-gray-400">Pokud toto trvá dlouho, zkontrolujte konzoli prohlížeče (F12).</p>
-              </div>
-          </div>
-      );
-  }
-
-  if (error && employees.length === 0) {
-      return (
-          <div className="flex items-center justify-center min-h-screen bg-[#f3f4f6]">
-              <div className="bg-white p-8 rounded-2xl shadow-xl max-w-md text-center">
-                  <div className="text-4xl mb-4">⚠️</div>
-                  <h3 className="text-xl font-bold text-gray-900 mb-2">Chyba připojení</h3>
-                  <div className="bg-red-50 text-red-700 p-3 rounded-lg text-sm mb-6 font-mono text-left overflow-auto max-h-40">
-                      {error}
-                  </div>
-                  <div className="flex flex-col gap-3">
-                      <button 
-                        onClick={() => loadData(true)}
-                        className="bg-indigo-600 text-white px-6 py-3 rounded-xl font-bold hover:bg-indigo-700 transition-all"
-                      >
-                        Pokračovat v DEMO režimu
-                      </button>
-                      <button 
-                        onClick={() => window.location.reload()}
-                        className="text-gray-500 hover:text-gray-700 text-sm"
-                      >
-                        Zkusit znovu načíst
-                      </button>
-                  </div>
+          <div className="flex items-center justify-center min-h-screen bg-[#0f172a] text-white">
+              <div className="flex flex-col items-center gap-4">
+                  <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-indigo-500"></div>
+                  <p className="text-sm font-medium">Startování systému v{VERSION}...</p>
               </div>
           </div>
       );
@@ -466,7 +430,7 @@ const App: React.FC = () => {
       <main className="flex-1 p-0 overflow-y-auto flex flex-col h-screen md:h-auto">
         {useDemoData && (
             <div className="bg-amber-100 text-amber-800 px-4 py-1 text-[10px] font-bold uppercase tracking-widest text-center">
-                Spuštěno v DEMO režimu (Data se neukládají trvale)
+                DEMO REŽIM (Data se neukládají trvale)
             </div>
         )}
         
@@ -490,7 +454,7 @@ const App: React.FC = () => {
                  <SmartInput onEntriesAdded={handleAddEntries} currentUserId={targetUserId} onManualEntry={handleOpenManualEntry} onCopyLastDay={handleCopyLastDay} lastActiveDay={lastActiveDay} selectedMonth={selectedMonth} existingEntries={monthlyUserEntries} />
               )}
               {isStatusLocked && !canEdit && !isGlobalLocked && (
-                <div className="bg-yellow-50 border border-yellow-200 text-yellow-800 px-4 py-3 rounded-lg mb-6 flex items-center gap-2"><span className="font-medium text-sm">Měsíc je odeslán nebo schválen. Editace není povolena.</span></div>
+                <div className="bg-yellow-50 border border-yellow-200 text-yellow-800 px-4 py-3 rounded-lg mb-6 flex items-center gap-2"><span className="font-medium text-sm">Měsíc je odeslán nebo schválen.</span></div>
               )}
               <div className="mb-8"><Dashboard entries={monthlyUserEntries} selectedMonth={selectedMonth} /></div>
               <ValidationStatus issues={validationIssues} />
