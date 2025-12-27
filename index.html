@@ -14,7 +14,7 @@
     <link rel="manifest" href="./manifest.json" />
     <link rel="apple-touch-icon" href="https://cdn-icons-png.flaticon.com/512/9512/9512839.png">
     
-    <!-- Polyfill pro es-moduly -->
+    <!-- Polyfill pro es-moduly (Zásadní pro Safari) -->
     <script async src="https://ga.jspm.io/npm:es-module-shims@1.10.1/dist/es-module-shims.js"></script>
 
     <script src="https://cdn.tailwindcss.com"></script>
@@ -75,25 +75,25 @@
         </svg>
       </div>
       <div class="loader-spinner"></div>
-      <p id="loader-status" style="color: #94a3b8; font-size: 13px; margin-top: 20px;">Načítání v1.8.5...</p>
+      <p id="loader-status" style="color: #94a3b8; font-size: 13px; margin-top: 20px;">Načítání v1.8.6...</p>
       <div id="error-display"></div>
       <button id="reset-btn" onclick="emergencyReset()">OPRAVIT A RESETOVAT</button>
     </div>
 
     <div id="root"></div>
 
-    <script type="module-shim" src="./index.tsx"></script>
+    <!-- Klíčové: type="module-shim" -->
+    <script type="module-shim" src="./index.tsx" crossorigin="anonymous"></script>
 
     <script>
       window.APP_STARTED = false;
       
-      // Diagnostika chyb přímo na displej
       window.onerror = function(msg, url, line, col, error) {
         const errDiv = document.getElementById('error-display');
         const btn = document.getElementById('reset-btn');
         if (errDiv) {
           errDiv.style.display = 'block';
-          errDiv.innerText = "CHYBA: " + msg + "\nLinka: " + line;
+          errDiv.innerText = "CHYBA: " + msg + (line ? "\nLine: " + line : "");
         }
         if (btn) btn.style.display = 'block';
         return false;
@@ -102,17 +102,23 @@
       async function emergencyReset() {
         if (confirm("Vymazat data a restartovat aplikaci?")) {
           localStorage.clear();
+          sessionStorage.clear();
           if ('caches' in window) {
             const keys = await caches.keys();
             await Promise.all(keys.map(k => caches.delete(k)));
+          }
+          if ('serviceWorker' in navigator) {
+            const regs = await navigator.serviceWorker.getRegistrations();
+            for(let r of regs) await r.unregister();
           }
           window.location.reload();
         }
       }
 
+      // Timeout pro zobrazení tlačítka
       setTimeout(() => {
         if (!window.APP_STARTED) {
-          document.getElementById('loader-status').innerText = "Problém se startem. Zkuste tlačítko níže.";
+          document.getElementById('loader-status').innerText = "Problém se startem. Zkuste reset.";
           document.getElementById('reset-btn').style.display = "block";
         }
       }, 10000);
