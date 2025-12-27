@@ -43,7 +43,7 @@ const initialMonthStatus: MonthStatus = {
 };
 
 const SUPPORT_ID = 'win3-support-id';
-const VERSION = '1.7.5';
+const VERSION = '1.7.8';
 
 const App: React.FC = () => {
   const [activeTab, setActiveTab] = useState<'overview' | 'report' | 'settings'>('overview');
@@ -103,18 +103,22 @@ const App: React.FC = () => {
       setError(null);
 
       const configured = isSupabaseConfigured();
-      if (!configured && !forceDemo) {
-          setIsLoading(false);
-          setError("Chybí konfigurace Supabase.");
-          return;
-      }
-
+      
+      // FIX: Pokud není Supabase nebo chceme demo, načteme demo data hned
       if (forceDemo || !configured) {
+          console.warn("Načítám DEMO data (Supabase není nastaven).");
           setEmployees(MOCK_EMPLOYEES);
           setJobs(MOCK_JOBS);
           setEntries(MOCK_ENTRIES);
           setUseDemoData(true);
-          setCurrentUserId(MOCK_EMPLOYEES[1].id);
+          
+          const savedId = localStorage.getItem('smartwork_current_user_id');
+          if (savedId && MOCK_EMPLOYEES.some(e => e.id === savedId)) {
+              setCurrentUserId(savedId);
+          } else {
+              setCurrentUserId(MOCK_EMPLOYEES[1].id);
+          }
+          
           setIsLoading(false);
           return;
       }
@@ -381,7 +385,7 @@ const App: React.FC = () => {
           <div className="flex items-center justify-center min-h-screen bg-[#0f172a] text-white">
               <div className="flex flex-col items-center gap-4">
                   <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-indigo-500"></div>
-                  <p className="text-sm font-medium">Startování systému v{VERSION}...</p>
+                  <p className="text-sm font-medium">Načítání dat v{VERSION}...</p>
               </div>
           </div>
       );
