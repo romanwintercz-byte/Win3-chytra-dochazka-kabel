@@ -14,7 +14,7 @@
     <link rel="manifest" href="./manifest.json" />
     <link rel="apple-touch-icon" href="https://cdn-icons-png.flaticon.com/512/9512/9512839.png">
     
-    <!-- Polyfill pro starší Safari a Chrome na iOS (iOS < 16.4) -->
+    <!-- Polyfill pro starší Safari a Chrome na iOS (Klíčové pro iPhone 13) -->
     <script async src="https://ga.jspm.io/npm:es-module-shims@1.10.1/dist/es-module-shims.js"></script>
 
     <script src="https://cdn.tailwindcss.com"></script>
@@ -30,7 +30,7 @@
       #error-log { display: none; margin-top: 20px; background: #1e293b; color: #f87171; padding: 15px; border-radius: 10px; font-family: monospace; font-size: 11px; max-width: 100%; word-break: break-all; text-align: left; border: 1px solid #334155; }
     </style>
 
-    <!-- POUZE JEDEN IMPORTMAP-SHIM - To je jediné funkční řešení pro iPhone -->
+    <!-- JEDINÝ DEFINOVANÝ IMPORTMAP PŘES SHIM (Oprava pro iPhone) -->
     <script type="importmap-shim">
     {
       "imports": {
@@ -75,14 +75,14 @@
         </svg>
       </div>
       <div class="loader-spinner"></div>
-      <p id="loader-status" style="color: #94a3b8; font-size: 14px; margin-top: 20px; font-weight: 500;">Spouštění verze v1.8.3...</p>
+      <p id="loader-status" style="color: #94a3b8; font-size: 14px; margin-top: 20px; font-weight: 500;">Spouštění verze v1.8.4...</p>
       <div id="error-log"></div>
       <button id="reset-btn" onclick="emergencyReset()">OPRAVIT A RESETOVAT</button>
     </div>
 
     <div id="root"></div>
 
-    <!-- Klíčové: type="module-shim" pro es-module-shims -->
+    <!-- Spuštění přes module-shim -->
     <script type="module-shim" src="./index.tsx" crossorigin="anonymous"></script>
 
     <script>
@@ -92,14 +92,14 @@
         const log = document.getElementById('error-log');
         if (log) {
           log.style.display = 'block';
-          log.innerText = "CHYBA: " + msg + " (" + line + ":" + col + ")";
+          log.innerText = "CHYBA NAČÍTÁNÍ: " + msg;
         }
         document.getElementById('reset-btn').style.display = 'block';
         return false;
       };
 
       async function emergencyReset() {
-        if (confirm("Opravit aplikaci a vyčistit paměť?")) {
+        if (confirm("Resetovat aplikaci a vyčistit mezipaměť?")) {
           localStorage.clear();
           sessionStorage.clear();
           if ('caches' in window) {
@@ -114,12 +114,13 @@
         }
       }
 
+      // Prodloužený timeout pro iPhone na 12 sekund
       setTimeout(() => {
         if (!window.APP_STARTED) {
-          document.getElementById('loader-status').innerText = "Aplikace se spouští déle, zkuste reset.";
+          document.getElementById('loader-status').innerText = "Načítání trvá déle (pomalá síť?), zkuste reset.";
           document.getElementById('reset-btn').style.display = "block";
         }
-      }, 8000);
+      }, 12000);
     </script>
   <script type="module" src="/index.tsx"></script>
 </body>
