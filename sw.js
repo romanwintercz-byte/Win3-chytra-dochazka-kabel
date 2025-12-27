@@ -1,6 +1,6 @@
 
-// SMARTWORK PWA SERVICE WORKER - v1.7.8
-const CACHE_NAME = 'smartwork-shim-v1.7.8';
+// SMARTWORK PWA SERVICE WORKER - v1.8.0
+const CACHE_NAME = 'smartwork-v1.8.0';
 
 self.addEventListener('install', (event) => {
   self.skipWaiting();
@@ -10,7 +10,11 @@ self.addEventListener('activate', (event) => {
   event.waitUntil(
     caches.keys().then((keys) => {
       return Promise.all(
-        keys.map((key) => caches.delete(key))
+        keys.map((key) => {
+          if (key !== CACHE_NAME) {
+            return caches.delete(key);
+          }
+        })
       );
     }).then(() => self.clients.claim())
   );
@@ -18,21 +22,21 @@ self.addEventListener('activate', (event) => {
 
 self.addEventListener('fetch', (event) => {
   const { request } = event;
+  if (request.url.includes('supabase.co') || request.url.includes('google')) return;
+
   if (request.mode === 'navigate') {
     event.respondWith(fetch(request).catch(() => caches.match('./index.html')));
     return;
   }
-  if (request.url.includes('supabase.co') || request.url.includes('google')) return;
 
   event.respondWith(
-    fetch(request)
-      .then((response) => {
-        if (response && response.status === 200) {
-          const copy = response.clone();
-          caches.open(CACHE_NAME).then((cache) => cache.put(request, copy));
-        }
-        return response;
-      })
-      .catch(() => caches.match(request))
+    caches.match(request).then((response) => {
+      return response || fetch(request).then((networkResponse) => {
+        if (!networkResponse || networkResponse.status !== 200) return networkResponse;
+        const cacheCopy = networkResponse.clone();
+        caches.open(CACHE_NAME).then((cache) => cache.put(request, cacheCopy));
+        return networkResponse;
+      });
+    })
   );
 });
