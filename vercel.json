@@ -3,7 +3,6 @@
   "github": {
     "silent": true
   },
-  "ignoreBuildCommand": "bash -c '[ \"$VERCEL_GIT_COMMIT_REF\" == \"gh-pages\" ] && exit 0 || exit 1'",
   "rewrites": [
     {
       "source": "/(.*)",
