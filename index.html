@@ -14,7 +14,7 @@
     <link rel="manifest" href="./manifest.json" />
     <link rel="apple-touch-icon" href="https://cdn-icons-png.flaticon.com/512/9512/9512839.png">
     
-    <!-- Polyfill pro es-moduly (Zásadní pro Safari) -->
+    <!-- Polyfill pro es-moduly (Kritické pro Safari na iPhone) -->
     <script async src="https://ga.jspm.io/npm:es-module-shims@1.10.1/dist/es-module-shims.js"></script>
 
     <script src="https://cdn.tailwindcss.com"></script>
@@ -26,11 +26,11 @@
       .loader-logo { width: 80px; height: 80px; background: #4f46e5; border-radius: 20px; display: flex; align-items: center; justify-content: center; margin-bottom: 20px; box-shadow: 0 0 30px rgba(79, 70, 229, 0.4); }
       .loader-spinner { width: 30px; height: 30px; border: 3px solid rgba(255,255,255,0.1); border-top-color: #fff; border-radius: 50%; animation: spin 1s linear infinite; }
       @keyframes spin { to { transform: rotate(360deg); } }
-      #reset-btn { display: none; margin-top: 20px; background: #ef4444; color: white; padding: 14px 28px; border-radius: 12px; font-size: 14px; font-weight: bold; border: none; cursor: pointer; }
+      #reset-btn { display: none; margin-top: 20px; background: #ef4444; color: white; padding: 14px 28px; border-radius: 12px; font-size: 14px; font-weight: bold; border: none; cursor: pointer; z-index: 10000; }
       #error-display { display: none; margin-top: 20px; background: #334155; color: #f87171; padding: 12px; border-radius: 8px; font-family: monospace; font-size: 10px; max-width: 90%; word-break: break-all; text-align: left; }
     </style>
 
-    <!-- POUZE JEDEN BLOK MAPY - To je pro Safari zásadní -->
+    <!-- JEDINÁ IMPORTNÍ MAPA - Žádný duplicitní blok nesmí existovat -->
     <script type="importmap-shim">
     {
       "imports": {
@@ -75,53 +75,54 @@
         </svg>
       </div>
       <div class="loader-spinner"></div>
-      <p id="loader-status" style="color: #94a3b8; font-size: 13px; margin-top: 20px;">Načítání v1.8.6...</p>
+      <p id="loader-status" style="color: #94a3b8; font-size: 13px; margin-top: 20px;">Spouštění v1.8.7...</p>
       <div id="error-display"></div>
       <button id="reset-btn" onclick="emergencyReset()">OPRAVIT A RESETOVAT</button>
     </div>
 
     <div id="root"></div>
 
-    <!-- Klíčové: type="module-shim" -->
-    <script type="module-shim" src="./index.tsx" crossorigin="anonymous"></script>
+    <!-- Použití module-shim je pro iPhone zásadní -->
+    <script type="module-shim" src="./index.tsx"></script>
 
     <script>
       window.APP_STARTED = false;
       
       window.onerror = function(msg, url, line, col, error) {
-        const errDiv = document.getElementById('error-display');
-        const btn = document.getElementById('reset-btn');
+        var errDiv = document.getElementById('error-display');
+        var btn = document.getElementById('reset-btn');
         if (errDiv) {
           errDiv.style.display = 'block';
-          errDiv.innerText = "CHYBA: " + msg + (line ? "\nLine: " + line : "");
+          errDiv.innerText = "CHYBA: " + msg + (line ? "\nLinka: " + line : "");
         }
         if (btn) btn.style.display = 'block';
         return false;
       };
 
-      async function emergencyReset() {
-        if (confirm("Vymazat data a restartovat aplikaci?")) {
+      window.emergencyReset = function() {
+        if (confirm("Resetovat aplikaci a vyčistit mezipaměť iPhonu?")) {
           localStorage.clear();
           sessionStorage.clear();
           if ('caches' in window) {
-            const keys = await caches.keys();
-            await Promise.all(keys.map(k => caches.delete(k)));
+            caches.keys().then(function(names) {
+              for (var name of names) caches.delete(name);
+            });
           }
           if ('serviceWorker' in navigator) {
-            const regs = await navigator.serviceWorker.getRegistrations();
-            for(let r of regs) await r.unregister();
+            navigator.serviceWorker.getRegistrations().then(function(regs) {
+              for(var r of regs) r.unregister();
+            });
           }
-          window.location.reload();
+          setTimeout(function() { window.location.reload(true); }, 500);
         }
-      }
+      };
 
-      // Timeout pro zobrazení tlačítka
-      setTimeout(() => {
+      setTimeout(function() {
         if (!window.APP_STARTED) {
-          document.getElementById('loader-status').innerText = "Problém se startem. Zkuste reset.";
+          document.getElementById('loader-status').innerText = "Problém se startem. Zkuste tlačítko níže.";
           document.getElementById('reset-btn').style.display = "block";
         }
-      }, 10000);
+      }, 8000);
     </script>
   <script type="module" src="/index.tsx"></script>
 </body>
