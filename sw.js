@@ -1,5 +1,5 @@
-// SMARTWORK PWA SERVICE WORKER - v1.8.4
-const CACHE_NAME = 'smartwork-v1.8.4';
+// SMARTWORK PWA SERVICE WORKER - v1.8.5
+const CACHE_NAME = 'smartwork-v1.8.5';
 
 self.addEventListener('install', (event) => {
   self.skipWaiting();
@@ -21,7 +21,6 @@ self.addEventListener('activate', (event) => {
 
 self.addEventListener('fetch', (event) => {
   const { request } = event;
-  // Neukládáme do cache volání API a externí moduly z esm.sh (necháváme na prohlížeči)
   if (request.url.includes('supabase.co') || request.url.includes('google') || request.url.includes('esm.sh')) return;
 
   if (request.mode === 'navigate') {
