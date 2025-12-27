@@ -6,13 +6,12 @@
     <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate" />
     
     <meta name="theme-color" content="#0f172a" />
-    <!-- Zakázání standalone režimu pro iPhone - ikona na ploše nyní otevře standardní Safari -->
     <meta name="apple-mobile-web-app-capable" content="no">
     <meta name="apple-mobile-web-app-status-bar-style" content="default">
     <meta name="apple-mobile-web-app-title" content="Docházka">
     
     <title>Chytrá docházka</title>
-    <link rel="manifest" href="./manifest.json" />
+    <link rel="manifest" href="./manifest.json?v=1.9.2" />
     <link rel="apple-touch-icon" href="https://cdn-icons-png.flaticon.com/512/9512/9512839.png">
     
     <!-- Polyfill pro es-moduly (Zásadní pro Safari) -->
@@ -31,7 +30,7 @@
       #error-display { display: none; margin-top: 20px; background: #334155; color: #f87171; padding: 12px; border-radius: 8px; font-family: monospace; font-size: 10px; max-width: 90%; word-break: break-all; text-align: left; }
     </style>
 
-    <!-- JEDINÁ IMPORTNÍ MAPA (type="importmap-shim" pro Safari) -->
+    <!-- JEDINÁ IMPORTNÍ MAPA (Safari potřebuje pouze verzi s -shim) -->
     <script type="importmap-shim">
     {
       "imports": {
@@ -59,14 +58,14 @@
         </svg>
       </div>
       <div class="loader-spinner"></div>
-      <p id="loader-status" style="color: #94a3b8; font-size: 13px; margin-top: 20px;">Spouštění v1.9.1...</p>
+      <p id="loader-status" style="color: #94a3b8; font-size: 13px; margin-top: 20px;">Spouštění v1.9.2...</p>
       <div id="error-display"></div>
       <button id="reset-btn" onclick="emergencyReset()">OPRAVIT A RESETOVAT</button>
     </div>
 
     <div id="root"></div>
 
-    <script type="module-shim" src="./index.tsx"></script>
+    <script type="module-shim" src="./index.tsx?v=1.9.2"></script>
 
     <script>
       window.APP_STARTED = false;
