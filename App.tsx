@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect, useMemo } from 'react';
 import Sidebar from './components/Sidebar';
 import SmartInput from './components/SmartInput';
@@ -43,7 +42,7 @@ const initialMonthStatus: MonthStatus = {
 };
 
 const SUPPORT_ID = 'win3-support-id';
-const VERSION = '1.7.8';
+const VERSION = '1.8.2';
 
 const App: React.FC = () => {
   const [activeTab, setActiveTab] = useState<'overview' | 'report' | 'settings'>('overview');
@@ -104,7 +103,6 @@ const App: React.FC = () => {
 
       const configured = isSupabaseConfigured();
       
-      // FIX: Pokud není Supabase nebo chceme demo, načteme demo data hned
       if (forceDemo || !configured) {
           console.warn("Načítám DEMO data (Supabase není nastaven).");
           setEmployees(MOCK_EMPLOYEES);

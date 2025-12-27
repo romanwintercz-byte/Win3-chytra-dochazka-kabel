@@ -1,4 +1,3 @@
-
 import React from 'react';
 import ReactDOM from 'react-dom/client';
 import App from './App';
@@ -15,7 +14,7 @@ if ('serviceWorker' in navigator) {
   window.addEventListener('load', () => {
     navigator.serviceWorker.register('./sw.js', { scope: './' })
       .then(registration => {
-        console.log('ServiceWorker v1.7.0 registered');
+        console.log('ServiceWorker v1.8.2 registered');
         
         registration.onupdatefound = () => {
           const installingWorker = registration.installing;
