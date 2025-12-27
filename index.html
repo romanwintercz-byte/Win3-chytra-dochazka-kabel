@@ -30,7 +30,7 @@
       #error-display { display: none; margin-top: 20px; background: #334155; color: #f87171; padding: 12px; border-radius: 8px; font-family: monospace; font-size: 10px; max-width: 90%; word-break: break-all; text-align: left; }
     </style>
 
-    <!-- JEDINÁ IMPORTNÍ MAPA - iPhone nesnese druhou bez -shim -->
+    <!-- JEDINÁ IMPORTNÍ MAPA - iPhone nesnese druhou -->
     <script type="importmap-shim">
     {
       "imports": {
@@ -75,7 +75,7 @@
         </svg>
       </div>
       <div class="loader-spinner"></div>
-      <p id="loader-status" style="color: #94a3b8; font-size: 13px; margin-top: 20px;">Spouštění v1.8.8...</p>
+      <p id="loader-status" style="color: #94a3b8; font-size: 13px; margin-top: 20px;">Spouštění v1.8.9...</p>
       <div id="error-display"></div>
       <button id="reset-btn" onclick="emergencyReset()">OPRAVIT A RESETOVAT</button>
     </div>
@@ -93,15 +93,14 @@
         var btn = document.getElementById('reset-btn');
         if (errDiv) {
           errDiv.style.display = 'block';
-          errDiv.innerText = "CHYBA: " + msg + (line ? "\nLinka: " + line : "");
+          errDiv.innerText = "CHYBA: " + msg + (line ? "\nL:" + line : "");
         }
         if (btn) btn.style.display = 'block';
         return false;
       };
 
-      // Reset musí být globální a nezávislý
       window.emergencyReset = function() {
-        if (confirm("Resetovat aplikaci a vyčistit mezipaměť iPhonu?")) {
+        if (confirm("Opravit aplikaci? Smažou se dočasná data.")) {
           localStorage.clear();
           sessionStorage.clear();
           if ('caches' in window) {
@@ -114,15 +113,14 @@
               for(var r of regs) r.unregister();
             });
           }
-          alert("Vyčištěno. Stránka se nyní restartuje.");
-          setTimeout(function() { window.location.reload(true); }, 500);
+          alert("Vyčištěno. Restartuji...");
+          setTimeout(function() { window.location.href = 'index.html?r=' + Date.now(); }, 500);
         }
       };
 
-      // Kontrolní timeout
       setTimeout(function() {
         if (!window.APP_STARTED) {
-          document.getElementById('loader-status').innerText = "Aplikace nenaběhla. Zkuste opravu.";
+          document.getElementById('loader-status').innerText = "Vyskytl se problém. Zkuste opravu.";
           document.getElementById('reset-btn').style.display = "block";
         }
       }, 7000);
