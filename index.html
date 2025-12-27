@@ -15,7 +15,7 @@
     <link rel="manifest" href="./manifest.json" />
     <link rel="apple-touch-icon" href="https://cdn-icons-png.flaticon.com/512/9512/9512839.png">
     
-    <!-- Polyfill pro starší Safari (iOS < 16.4) -->
+    <!-- Polyfill pro starší Safari a Chrome na iOS (iOS < 16.4) -->
     <script async src="https://ga.jspm.io/npm:es-module-shims@1.10.1/dist/es-module-shims.js"></script>
 
     <script src="https://cdn.tailwindcss.com"></script>
@@ -31,6 +31,7 @@
       #error-log { display: none; margin-top: 20px; background: #1e293b; color: #f87171; padding: 15px; border-radius: 10px; font-family: monospace; font-size: 11px; max-width: 100%; word-break: break-all; text-align: left; border: 1px solid #334155; }
     </style>
 
+    <!-- Jednotný importmap pro všechny prohlížeče přes shim -->
     <script type="importmap-shim">
     {
       "imports": {
@@ -75,7 +76,7 @@
         </svg>
       </div>
       <div class="loader-spinner"></div>
-      <p id="loader-status" style="color: #94a3b8; font-size: 14px; margin-top: 20px; font-weight: 500;">Načítání systému v1.8.0...</p>
+      <p id="loader-status" style="color: #94a3b8; font-size: 14px; margin-top: 20px; font-weight: 500;">Načítání systému v1.8.1...</p>
       <div id="error-log"></div>
       <button id="reset-btn" onclick="emergencyReset()">OPRAVIT A RESETOVAT</button>
     </div>
@@ -98,7 +99,7 @@
       };
 
       async function emergencyReset() {
-        if (confirm("Resetovat aplikaci?")) {
+        if (confirm("Resetovat aplikaci a vyčistit paměť?")) {
           localStorage.clear();
           sessionStorage.clear();
           if ('caches' in window) {
