@@ -62,16 +62,17 @@ const ReportingModule: React.FC<ReportingModuleProps> = ({
       let regular = 0, overtime = 0, trips = 0, absence = 0, total = 0;
 
       filteredEntries.forEach(e => {
+          const h = Number(e.hours) || 0;
           if (isProductiveWork(e.type)) {
               const pName = e.project || 'Ostatní';
-              byProject[pName] = (byProject[pName] || 0) + e.hours;
-              if (e.type === WorkType.OVERTIME) overtime += e.hours;
-              else if (e.type === WorkType.BUSINESS_TRIP) trips += e.hours;
-              else regular += e.hours;
+              byProject[pName] = (byProject[pName] || 0) + h;
+              if (e.type === WorkType.OVERTIME) overtime += h;
+              else if (e.type === WorkType.BUSINESS_TRIP) trips += h;
+              else regular += h;
           } else {
-              absence += e.hours;
+              absence += h;
           }
-          total += e.hours;
+          total += h;
       });
 
       return { byProject, regular, overtime, trips, absence, total };
@@ -83,9 +84,8 @@ const ReportingModule: React.FC<ReportingModuleProps> = ({
     
     try {
         const doc = new jsPDF({ orientation: 'p', unit: 'mm', format: 'a4' });
-        let currentFont = 'helvetica'; // Fallback font
+        let currentFont = 'helvetica';
 
-        // Bezpečný převod na Base64
         const arrayBufferToBase64 = (buffer: ArrayBuffer) => {
             const bytes = new Uint8Array(buffer);
             let binary = '';
@@ -95,7 +95,7 @@ const ReportingModule: React.FC<ReportingModuleProps> = ({
             return window.btoa(binary);
         };
 
-        // Pokus o načtení fontů pro diakritiku (v samostatném bloku, aby nezpůsobil pád)
+        // Pokus o fonty (Roboto pro CZ znaky)
         try {
             const fontUrl = 'https://cdnjs.cloudflare.com/ajax/libs/pdfmake/0.1.66/fonts/Roboto/Roboto-Regular.ttf';
             const boldUrl = 'https://cdnjs.cloudflare.com/ajax/libs/pdfmake/0.1.66/fonts/Roboto/Roboto-Medium.ttf';
@@ -113,18 +113,15 @@ const ReportingModule: React.FC<ReportingModuleProps> = ({
 
                 doc.addFileToVFS('Roboto-Regular.ttf', arrayBufferToBase64(fontBytes));
                 doc.addFont('Roboto-Regular.ttf', 'Roboto', 'normal');
-                
                 doc.addFileToVFS('Roboto-Bold.ttf', arrayBufferToBase64(boldBytes));
                 doc.addFont('Roboto-Bold.ttf', 'Roboto', 'bold');
-                
                 currentFont = 'Roboto';
             }
-        } catch (fontErr) {
-            console.warn("Písmo Roboto se nepodařilo načíst, používám helvetica. Diakritika může být poškozena.", fontErr);
+        } catch (fErr) {
+            console.warn("Fallback to Helvetica due to font load error", fErr);
         }
 
         doc.setFont(currentFont, 'normal');
-
         const period = monthFilter === 'all' ? 'Celá historie' : monthFilter;
         const empName = employeeFilter !== 'all' ? getEmployeeName(employeeFilter) : 'Všichni zaměstnanci';
 
@@ -137,7 +134,7 @@ const ReportingModule: React.FC<ReportingModuleProps> = ({
         doc.text("MĚSÍČNÍ VÝKAZ PRÁCE", 14, 13);
         doc.setFontSize(8);
         doc.setFont(currentFont, 'normal');
-        doc.text("Chytrá docházka by Win3 Studio", 196, 13, { align: 'right' });
+        doc.text("v1.9.12 | Chytrá docházka Win3", 196, 13, { align: 'right' });
 
         // INFO
         doc.setTextColor(15, 23, 42);
@@ -151,9 +148,9 @@ const ReportingModule: React.FC<ReportingModuleProps> = ({
         doc.text(period, 40, 33);
         doc.setFontSize(7);
         doc.setTextColor(150);
-        doc.text(`Export: ${new Date().toLocaleString('cs-CZ')}`, 196, 28, { align: 'right' });
+        doc.text(`Vygenerováno: ${new Date().toLocaleString('cs-CZ')}`, 196, 28, { align: 'right' });
 
-        // SOUHRN
+        // SOUHRN MĚSÍCE
         autoTable(doc, {
             startY: 38,
             head: [['SOUHRN MĚSÍCE', 'HODINY']],
@@ -167,13 +164,12 @@ const ReportingModule: React.FC<ReportingModuleProps> = ({
             theme: 'grid',
             styles: { font: currentFont, fontSize: 7, cellPadding: 1.5 },
             headStyles: { fillColor: [79, 70, 229], textColor: 255 },
-            columnStyles: { 0: { cellWidth: 40 }, 1: { cellWidth: 15, halign: 'right' } },
-            margin: { left: 14 }
+            columnStyles: { 1: { cellWidth: 15, halign: 'right' } },
+            margin: { left: 14, right: 14 }
         });
 
         // PROJEKTY
-        // Fix: Explicitly cast hours to number to prevent TS error about property 'toFixed' on unknown type.
-        const projectRows = Object.entries(aggregatedData.byProject).map(([name, hours]) => [name.substring(0, 50), (hours as number).toFixed(1)]);
+        const projectRows = Object.entries(aggregatedData.byProject).map(([name, hours]) => [name.substring(0, 70), Number(hours).toFixed(1)]);
         if (projectRows.length > 0) {
             autoTable(doc, {
                 startY: (doc as any).lastAutoTable.cursor.y + 5,
@@ -182,28 +178,23 @@ const ReportingModule: React.FC<ReportingModuleProps> = ({
                 theme: 'grid',
                 styles: { font: currentFont, fontSize: 7, cellPadding: 1.5 },
                 headStyles: { fillColor: [51, 65, 85], textColor: 255 },
-                columnStyles: { 0: { cellWidth: 80 }, 1: { cellWidth: 15, halign: 'right' } },
-                margin: { left: 14 }
+                columnStyles: { 1: { cellWidth: 15, halign: 'right' } },
+                margin: { left: 14, right: 14 }
             });
         }
 
         // DENNÍ VÝPIS
-        const dailyData: Record<string, { projects: string[], hours: number, types: string[] }> = {};
+        const dailyData: Record<string, { projects: string[], hours: number }> = {};
         filteredEntries.forEach(e => {
-            if (!dailyData[e.date]) dailyData[e.date] = { projects: [], hours: 0, types: [] };
-            if (e.project && !dailyData[e.date].projects.includes(e.project)) dailyData[e.date].projects.push(e.project);
-            dailyData[e.date].hours += e.hours;
-            if (!dailyData[e.date].types.includes(e.type)) dailyData[e.date].types.push(e.type);
+            if (!dailyData[e.date]) dailyData[e.date] = { projects: [], hours: 0 };
+            const desc = e.project || e.type;
+            if (!dailyData[e.date].projects.includes(desc)) dailyData[e.date].projects.push(desc);
+            dailyData[e.date].hours += Number(e.hours);
         });
 
         const logRows = Object.entries(dailyData).sort().map(([date, data]) => {
-            const dateParts = date.split('-');
-            const displayDate = `${dateParts[2].replace(/^0/, '')}.${dateParts[1].replace(/^0/, '')}.`;
-            return [
-                displayDate,
-                data.projects.join(', ').substring(0, 65) || data.types.join(', '),
-                data.hours.toFixed(1)
-            ];
+            const parts = date.split('-');
+            return [`${parts[2]}.${parts[1]}.`, data.projects.join(', ').substring(0, 80), data.hours.toFixed(1)];
         });
 
         autoTable(doc, {
@@ -213,25 +204,25 @@ const ReportingModule: React.FC<ReportingModuleProps> = ({
             theme: 'striped',
             styles: { font: currentFont, fontSize: 6.5, cellPadding: 1.2 },
             headStyles: { fillColor: [241, 245, 249], textColor: [71, 85, 105], fontStyle: 'bold' },
-            columnStyles: { 0: { cellWidth: 15 }, 1: { cellWidth: 'auto' }, 2: { cellWidth: 10, halign: 'right' } },
-            margin: { left: 14, bottom: 25 },
+            columnStyles: { 0: { cellWidth: 15 }, 2: { cellWidth: 10, halign: 'right' } },
+            margin: { left: 14, right: 14, bottom: 25 },
             didDrawPage: (data) => {
-                const pageHeight = doc.internal.pageSize.height;
+                const ph = doc.internal.pageSize.height;
                 doc.setDrawColor(220);
-                doc.line(14, pageHeight - 18, 70, pageHeight - 18);
-                doc.line(140, pageHeight - 18, 196, pageHeight - 18);
+                doc.line(14, ph - 18, 70, ph - 18);
+                doc.line(140, ph - 18, 196, ph - 18);
                 doc.setFontSize(6);
                 doc.setTextColor(160);
-                doc.text("Podpis zaměstnance", 14, pageHeight - 14);
-                doc.text("Podpis nadřízeného", 140, pageHeight - 14);
-                doc.text(`Strana ${data.pageNumber}`, 105, pageHeight - 8, { align: 'center' });
+                doc.text("Podpis zaměstnance", 14, ph - 14);
+                doc.text("Podpis nadřízeného", 140, ph - 14);
+                doc.text(`Strana ${data.pageNumber}`, 105, ph - 8, { align: 'center' });
             }
         });
 
         doc.save(`Vykaz_${empName.replace(/\s+/g, '_')}_${period}.pdf`);
     } catch (e) {
-        console.error("PDF Fatal Error:", e);
-        alert("Generování PDF selhalo. Zkuste prosím vymazat mezipaměť (tlačítko Opravit v loaderu) a zkuste to znovu.");
+        console.error("Fatal PDF Error:", e);
+        alert("Generování PDF selhalo. Pravděpodobně chybí knihovna jspdf v import mapě. Zkuste tlačítko Opravit v úvodním loaderu.");
     } finally {
         setIsGeneratingPdf(false);
     }
