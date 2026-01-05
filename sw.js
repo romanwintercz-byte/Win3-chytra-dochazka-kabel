@@ -1,5 +1,5 @@
-// SMARTWORK PWA SERVICE WORKER - v1.9.17
-const CACHE_NAME = 'smartwork-v1.9.17';
+// SMARTWORK PWA SERVICE WORKER - v1.9.18
+const CACHE_NAME = 'smartwork-v1.9.18';
 
 self.addEventListener('install', (event) => {
   self.skipWaiting();

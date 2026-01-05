@@ -29,7 +29,7 @@
       #error-display { display: none; margin-top: 20px; background: #334155; color: #f87171; padding: 12px; border-radius: 8px; font-family: monospace; font-size: 10px; max-width: 90%; word-break: break-all; text-align: left; }
     </style>
 
-    <!-- JEDINÁ FUNKČNÍ IMPORT MAPA (v1.9.17) -->
+    <!-- JEDINÁ FUNKČNÍ IMPORT MAPA (v1.9.18) -->
     <script>
       (function() {
         const im = {
@@ -52,6 +52,8 @@
         script.textContent = JSON.stringify(im);
         document.currentScript.after(script);
       })();
+    </script>
+<link rel="stylesheet" href="/index.css">
 </head>
   <body>
     <div id="app-loader">
@@ -61,14 +63,14 @@
         </svg>
       </div>
       <div class="loader-spinner"></div>
-      <p id="loader-status" style="color: #94a3b8; font-size: 13px; margin-top: 20px;">Spouštění v1.9.17...</p>
+      <p id="loader-status" style="color: #94a3b8; font-size: 13px; margin-top: 20px;">Spouštění v1.9.18...</p>
       <div id="error-display"></div>
       <button id="reset-btn" onclick="emergencyReset()">OPRAVIT A RESETOVAT</button>
     </div>
 
     <div id="root"></div>
 
-    <script type="module-shim" src="./index.tsx?v=1.9.17"></script>
+    <script type="module-shim" src="./index.tsx?v=1.9.18"></script>
 
     <script>
       window.APP_STARTED = false;
@@ -110,5 +112,6 @@
         }
       }, 7000);
     </script>
-  </body>
+  <script type="module" src="/index.tsx"></script>
+</body>
 </html>
