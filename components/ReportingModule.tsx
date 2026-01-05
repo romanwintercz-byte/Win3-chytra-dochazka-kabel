@@ -26,7 +26,6 @@ const ReportingModule: React.FC<ReportingModuleProps> = ({
   useEffect(() => { if (selectedMonth) setMonthFilter(selectedMonth); }, [selectedMonth]);
 
   const getEmployeeName = (id: string) => employees.find(e => e.id === id)?.name || 'Neznámý';
-
   const isProductiveWork = (type: WorkType) => [WorkType.REGULAR, WorkType.OVERTIME, WorkType.BUSINESS_TRIP].includes(type);
 
   const projectOptions = useMemo(() => {
@@ -83,22 +82,31 @@ const ReportingModule: React.FC<ReportingModuleProps> = ({
     setIsGeneratingPdf(true);
     
     try {
-        const doc = new jsPDF();
+        const doc = new jsPDF({ orientation: 'p', unit: 'mm', format: 'a4' });
         
-        // Font loading for Czech diacritics
+        // Helper pro robustní Base64 konverzi
+        const arrayBufferToBase64 = (buffer: ArrayBuffer) => {
+            let binary = '';
+            const bytes = new Uint8Array(buffer);
+            const len = bytes.byteLength;
+            for (let i = 0; i < len; i++) {
+                binary += String.fromCharCode(bytes[i]);
+            }
+            return window.btoa(binary);
+        };
+
+        // Načtení fontů pro diakritiku
         const fontUrl = 'https://cdnjs.cloudflare.com/ajax/libs/pdfmake/0.1.66/fonts/Roboto/Roboto-Regular.ttf';
         const fontBytes = await fetch(fontUrl).then(res => res.arrayBuffer());
-        const filename = 'Roboto-Regular.ttf';
-        const base64Font = btoa(new Uint8Array(fontBytes).reduce((data, byte) => data + String.fromCharCode(byte), ''));
-        doc.addFileToVFS(filename, base64Font);
-        doc.addFont(filename, 'Roboto', 'normal');
+        const base64Font = arrayBufferToBase64(fontBytes);
+        doc.addFileToVFS('Roboto-Regular.ttf', base64Font);
+        doc.addFont('Roboto-Regular.ttf', 'Roboto', 'normal');
         
         const boldUrl = 'https://cdnjs.cloudflare.com/ajax/libs/pdfmake/0.1.66/fonts/Roboto/Roboto-Medium.ttf';
         const boldBytes = await fetch(boldUrl).then(res => res.arrayBuffer());
-        const boldFilename = 'Roboto-Bold.ttf';
-        const base64Bold = btoa(new Uint8Array(boldBytes).reduce((data, byte) => data + String.fromCharCode(byte), ''));
-        doc.addFileToVFS(boldFilename, base64Bold);
-        doc.addFont(boldFilename, 'Roboto', 'bold');
+        const base64Bold = arrayBufferToBase64(boldBytes);
+        doc.addFileToVFS('Roboto-Bold.ttf', base64Bold);
+        doc.addFont('Roboto-Bold.ttf', 'Roboto', 'bold');
 
         doc.setFont('Roboto', 'normal');
 
@@ -106,36 +114,33 @@ const ReportingModule: React.FC<ReportingModuleProps> = ({
         const empName = employeeFilter !== 'all' ? getEmployeeName(employeeFilter) : 'Všichni zaměstnanci';
 
         // HEADER
-        doc.setFillColor(15, 23, 42); // slate-900
-        doc.rect(0, 0, 210, 25, 'F');
+        doc.setFillColor(15, 23, 42); 
+        doc.rect(0, 0, 210, 20, 'F');
         doc.setTextColor(255, 255, 255);
-        doc.setFontSize(18);
+        doc.setFontSize(14);
         doc.setFont('Roboto', 'bold');
-        doc.text("MĚSÍČNÍ VÝKAZ PRÁCE", 14, 17);
-        doc.setFontSize(9);
-        doc.setFont('Roboto', 'normal');
-        doc.text("Chytrá docházka by Win3 Studio", 160, 17, { align: 'right' });
-
-        // IDENTIFICATION
-        doc.setTextColor(15, 23, 42);
-        doc.setFontSize(10);
-        doc.text(`Zaměstnanec:`, 14, 35);
-        doc.setFont('Roboto', 'bold');
-        doc.text(empName, 40, 35);
-        
-        doc.setFont('Roboto', 'normal');
-        doc.text(`Období:`, 14, 42);
-        doc.setFont('Roboto', 'bold');
-        doc.text(period, 40, 42);
-
-        doc.setFont('Roboto', 'normal');
+        doc.text("MĚSÍČNÍ VÝKAZ PRÁCE", 14, 13);
         doc.setFontSize(8);
-        doc.setTextColor(100);
-        doc.text(`Vygenerováno: ${new Date().toLocaleString('cs-CZ')}`, 196, 35, { align: 'right' });
+        doc.setFont('Roboto', 'normal');
+        doc.text("Chytrá docházka by Win3 Studio", 196, 13, { align: 'right' });
 
-        // SECTION A: SUMMARY
+        // INFO
+        doc.setTextColor(15, 23, 42);
+        doc.setFontSize(9);
+        doc.text(`Zaměstnanec:`, 14, 28);
+        doc.setFont('Roboto', 'bold');
+        doc.text(empName, 40, 28);
+        doc.setFont('Roboto', 'normal');
+        doc.text(`Období:`, 14, 33);
+        doc.setFont('Roboto', 'bold');
+        doc.text(period, 40, 33);
+        doc.setFontSize(7);
+        doc.setTextColor(150);
+        doc.text(`Exportováno: ${new Date().toLocaleString('cs-CZ')}`, 196, 28, { align: 'right' });
+
+        // TABULKA A: SOUHRN (Vždy jedna strana - zmenšeno)
         autoTable(doc, {
-            startY: 48,
+            startY: 38,
             head: [['SOUHRN MĚSÍCE', 'HODINY']],
             body: [
                 ['Běžná práce', aggregatedData.regular.toFixed(1)],
@@ -145,29 +150,28 @@ const ReportingModule: React.FC<ReportingModuleProps> = ({
                 [{ content: 'CELKEM K VÝPLATĚ', styles: { fontStyle: 'bold' } }, { content: aggregatedData.total.toFixed(1), styles: { fontStyle: 'bold' } }]
             ],
             theme: 'grid',
-            styles: { font: 'Roboto', fontSize: 8, cellPadding: 2 },
-            headStyles: { fillColor: [79, 70, 229], textColor: 255 }, // indigo-600
-            columnStyles: { 0: { cellWidth: 50 }, 1: { cellWidth: 20, halign: 'right' } },
+            styles: { font: 'Roboto', fontSize: 7, cellPadding: 1.5 },
+            headStyles: { fillColor: [79, 70, 229], textColor: 255 },
+            columnStyles: { 0: { cellWidth: 40 }, 1: { cellWidth: 15, halign: 'right' } },
             margin: { left: 14 }
         });
 
-        // SECTION B: PROJECTS
-        // Fix: Explicitly cast 'hours' to number to avoid TypeScript 'unknown' inference error from Object.entries
-        const projectRows = Object.entries(aggregatedData.byProject).map(([name, hours]) => [name.substring(0, 40), (hours as number).toFixed(1)]);
+        // TABULKA B: PROJEKTY
+        const projectRows = Object.entries(aggregatedData.byProject).map(([name, hours]) => [name.substring(0, 50), (hours as number).toFixed(1)]);
         if (projectRows.length > 0) {
             autoTable(doc, {
-                startY: (doc as any).lastAutoTable.cursor.y + 10,
+                startY: (doc as any).lastAutoTable.cursor.y + 5,
                 head: [['ROZPIS PODLE PROJEKTŮ / ZAKÁZEK', 'HODINY']],
                 body: projectRows,
                 theme: 'grid',
-                styles: { font: 'Roboto', fontSize: 8, cellPadding: 2 },
-                headStyles: { fillColor: [51, 65, 85], textColor: 255 }, // slate-700
-                columnStyles: { 0: { cellWidth: 100 }, 1: { cellWidth: 20, halign: 'right' } },
+                styles: { font: 'Roboto', fontSize: 7, cellPadding: 1.5 },
+                headStyles: { fillColor: [51, 65, 85], textColor: 255 },
+                columnStyles: { 0: { cellWidth: 80 }, 1: { cellWidth: 15, halign: 'right' } },
                 margin: { left: 14 }
             });
         }
 
-        // SECTION C: DETAILED LOG (Grouped by date, single line per day)
+        // TABULKA C: DENNÍ VÝPIS (Jeden řádek na den)
         const dailyData: Record<string, { projects: string[], hours: number, types: string[] }> = {};
         filteredEntries.forEach(e => {
             if (!dailyData[e.date]) dailyData[e.date] = { projects: [], hours: 0, types: [] };
@@ -181,42 +185,37 @@ const ReportingModule: React.FC<ReportingModuleProps> = ({
             const dayName = dateObj.toLocaleDateString('cs-CZ', { weekday: 'short' });
             return [
                 `${dateObj.getDate()}.${dateObj.getMonth() + 1}. (${dayName})`,
-                data.projects.join(', ').substring(0, 50) || data.types.join(', '),
+                data.projects.join(', ').substring(0, 65) || data.types.join(', '),
                 data.hours.toFixed(1)
             ];
         });
 
         autoTable(doc, {
-            startY: (doc as any).lastAutoTable.cursor.y + 10,
+            startY: (doc as any).lastAutoTable.cursor.y + 5,
             head: [['DATUM', 'ČINNOST / PROJEKT', 'HOD']],
             body: logRows,
             theme: 'striped',
-            styles: { font: 'Roboto', fontSize: 7, cellPadding: 1.5 },
+            styles: { font: 'Roboto', fontSize: 6.5, cellPadding: 1.2 },
             headStyles: { fillColor: [241, 245, 249], textColor: [71, 85, 105], fontStyle: 'bold' },
-            columnStyles: { 0: { cellWidth: 25 }, 1: { cellWidth: 'auto' }, 2: { cellWidth: 15, halign: 'right' } },
-            margin: { left: 14, bottom: 40 },
+            columnStyles: { 0: { cellWidth: 20 }, 1: { cellWidth: 'auto' }, 2: { cellWidth: 10, halign: 'right' } },
+            margin: { left: 14, bottom: 25 },
             didDrawPage: (data) => {
-                // FOOTER WITH SIGNATURES - only on last page
-                const pageSize = doc.internal.pageSize;
-                const pageHeight = pageSize.height ? pageSize.height : pageSize.getHeight();
-                
-                doc.setDrawColor(200);
-                doc.line(14, pageHeight - 30, 80, pageHeight - 30);
-                doc.line(130, pageHeight - 30, 196, pageHeight - 30);
-                
-                doc.setFontSize(7);
-                doc.setTextColor(150);
-                doc.text("Podpis zaměstnance", 14, pageHeight - 25);
-                doc.text("Podpis nadřízeného", 130, pageHeight - 25);
-                
-                doc.text(`Aplikace Chytrá docházka - win3.cz - Strana ${data.pageNumber}`, 105, pageHeight - 10, { align: 'center' });
+                const pageHeight = doc.internal.pageSize.height;
+                doc.setDrawColor(220);
+                doc.line(14, pageHeight - 18, 70, pageHeight - 18);
+                doc.line(140, pageHeight - 18, 196, pageHeight - 18);
+                doc.setFontSize(6);
+                doc.setTextColor(160);
+                doc.text("Podpis zaměstnance", 14, pageHeight - 14);
+                doc.text("Podpis nadřízeného", 140, pageHeight - 14);
+                doc.text(`Strana ${data.pageNumber}`, 105, pageHeight - 8, { align: 'center' });
             }
         });
 
-        doc.save(`Vykaz_prace_${empName.replace(/\s+/g, '_')}_${period}.pdf`);
+        doc.save(`Vykaz_${empName.replace(/\s+/g, '_')}_${period}.pdf`);
     } catch (e) {
-        console.error(e);
-        alert("Chyba při generování PDF. Zkuste to prosím znovu.");
+        console.error("PDF Error:", e);
+        alert("Chyba při generování PDF. Pravděpodobně problém s připojením k fontům.");
     } finally {
         setIsGeneratingPdf(false);
     }

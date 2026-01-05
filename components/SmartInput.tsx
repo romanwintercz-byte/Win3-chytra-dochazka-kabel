@@ -1,4 +1,3 @@
-
 import React from 'react';
 import { TimeEntry, Job, WorkType } from '../types';
 import { v4 as uuidv4 } from 'uuid';
@@ -46,7 +45,8 @@ const SmartInput: React.FC<SmartInputProps> = ({
 
     for (let d = 1; d <= daysInMonth; d++) {
         const dateObj = new Date(year, month - 1, d);
-        const isoDate = dateObj.toISOString().split('T')[0];
+        // FIX: Použití lokálního času místo ISO pro eliminaci timezone shiftu
+        const isoDate = `${dateObj.getFullYear()}-${String(dateObj.getMonth() + 1).padStart(2, '0')}-${String(dateObj.getDate()).padStart(2, '0')}`;
         const dayOfWeek = dateObj.getDay();
         const isWeekend = dayOfWeek === 0 || dayOfWeek === 6;
 
@@ -85,7 +85,6 @@ const SmartInput: React.FC<SmartInputProps> = ({
       </div>
       
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-        {/* 1. COPY LAST DAY */}
         <button
           onClick={onCopyLastDay}
           disabled={!lastActiveDay}
@@ -106,7 +105,6 @@ const SmartInput: React.FC<SmartInputProps> = ({
             </span>
         </button>
 
-        {/* 2. PREFILL HOLIDAYS */}
         <button
           onClick={handlePrefillHolidays}
           className="flex flex-col items-center justify-center p-4 rounded-xl border border-indigo-200 bg-indigo-50 hover:bg-indigo-100 hover:border-indigo-300 transition-all text-indigo-700 group"
@@ -120,7 +118,6 @@ const SmartInput: React.FC<SmartInputProps> = ({
             <span className="text-xs mt-1 opacity-70">Automaticky (8h)</span>
         </button>
 
-        {/* 3. TEMPLATES - VACATION */}
         <button
           onClick={() => addTemplate(WorkType.VACATION, 8)}
           className="flex flex-col items-center justify-center p-4 rounded-xl border border-green-200 bg-green-50 hover:bg-green-100 hover:border-green-300 transition-all text-green-700"
@@ -134,7 +131,6 @@ const SmartInput: React.FC<SmartInputProps> = ({
             <span className="text-xs mt-1 opacity-70">Jeden klik</span>
         </button>
 
-        {/* 4. MANUAL ENTRY */}
         <button
           onClick={onManualEntry}
           className="flex flex-col items-center justify-center p-4 rounded-xl border border-gray-200 bg-white hover:border-indigo-300 hover:shadow-md transition-all text-gray-700 hover:text-indigo-600 group"
