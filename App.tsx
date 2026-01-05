@@ -17,6 +17,7 @@ import NotificationBell from './components/NotificationBell';
 import PinPadModal from './components/PinPadModal'; 
 import UpdatePrompt from './components/UpdatePrompt';
 import MessageModal from './components/MessageModal'; 
+import MonthNavigator from './components/MonthNavigator';
 import { TimeEntry, MonthStatus, TimesheetStatus, Employee, Job, Notification } from './types';
 import { validateMonth } from './services/validationService';
 import { v4 as uuidv4 } from 'uuid';
@@ -42,7 +43,7 @@ const initialMonthStatus: MonthStatus = {
 };
 
 const SUPPORT_ID = 'win3-support-id';
-const VERSION = '1.9.5';
+const VERSION = '1.9.6';
 
 const App: React.FC = () => {
   const [activeTab, setActiveTab] = useState<'overview' | 'report' | 'settings'>('overview');
@@ -329,11 +330,21 @@ const App: React.FC = () => {
 
         {activeTab === 'overview' && (
             <div className="p-4 md:p-8 pt-6">
+              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-2">
+                <h2 className="text-xl font-bold text-slate-900">Přehled docházky</h2>
+                <MonthNavigator selectedMonth={selectedMonth} onMonthChange={setSelectedMonth} />
+              </div>
+
               <ApprovalWorkflow status={monthStatus} onUpdateStatus={handleStatusUpdate} isManagerMode={isManagerMode} validationIssues={validationIssues} />
+              
               {isManagerMode && !reviewingUserId && <TeamOverview employees={activeEmployees} allEntries={entries} selectedMonth={selectedMonth} onInspect={setReviewingUserId} currentUserRole={currentUser.role} reports={monthlyReports} onMessage={handleOpenMessage} onlineUserIds={onlineUserIds} />}
+              
               {canEdit && <SmartInput onEntriesAdded={handleAddEntries} currentUserId={targetUserId} onManualEntry={() => setIsEntryModalOpen(true)} onCopyLastDay={handleCopyLastDay} lastActiveDay={lastActiveDay} selectedMonth={selectedMonth} existingEntries={monthlyUserEntries} />}
+              
               <div className="mb-8"><Dashboard entries={monthlyUserEntries} selectedMonth={selectedMonth} /></div>
+              
               <ValidationStatus issues={validationIssues} />
+              
               <h3 className="text-lg font-semibold text-slate-900 mb-4">Záznamy ({selectedMonth}) - {targetUser.name}</h3>
               <TimesheetTable entries={monthlyUserEntries} onDelete={handleDeleteEntry} onEdit={(d) => { setEditingDate(d); setIsEntryModalOpen(true); }} isLocked={isStatusLocked} canEdit={canEdit} />
             </div>

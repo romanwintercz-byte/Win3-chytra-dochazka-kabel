@@ -17,8 +17,8 @@
     "jspdf": "^4.0.0",
     "jspdf-autotable": "^5.0.7",
     "vite": "^7.3.0",
-    "@vitejs/plugin-react": "^5.1.2",
-    "@supabase/supabase-js": "^2.89.0"
+    "@supabase/supabase-js": "^2.89.0",
+    "@vitejs/plugin-react": "^5.1.2"
   },
   "devDependencies": {
     "@types/node": "^22.14.0",
