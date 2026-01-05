@@ -42,7 +42,7 @@ const initialMonthStatus: MonthStatus = {
 };
 
 const SUPPORT_ID = 'win3-support-id';
-const VERSION = '1.9.3';
+const VERSION = '1.9.5';
 
 const App: React.FC = () => {
   const [activeTab, setActiveTab] = useState<'overview' | 'report' | 'settings'>('overview');
@@ -104,19 +104,14 @@ const App: React.FC = () => {
       const configured = isSupabaseConfigured();
       
       if (forceDemo || !configured) {
-          console.warn("Načítám DEMO data (Supabase není nastaven).");
+          console.warn("Načítám DEMO data.");
           setEmployees(MOCK_EMPLOYEES);
           setJobs(MOCK_JOBS);
           setEntries(MOCK_ENTRIES);
           setUseDemoData(true);
-          
           const savedId = localStorage.getItem('smartwork_current_user_id');
-          if (savedId && MOCK_EMPLOYEES.some(e => e.id === savedId)) {
-              setCurrentUserId(savedId);
-          } else {
-              setCurrentUserId(MOCK_EMPLOYEES[1].id);
-          }
-          
+          if (savedId && MOCK_EMPLOYEES.some(e => e.id === savedId)) setCurrentUserId(savedId);
+          else setCurrentUserId(MOCK_EMPLOYEES[1].id);
           setIsLoading(false);
           return;
       }
@@ -127,19 +122,14 @@ const App: React.FC = () => {
               fetchJobs(),
               fetchTimeEntries()
           ]);
-
           setEmployees(emps);
           setJobs(jbs);
           setEntries(entrs);
-          
           const savedId = localStorage.getItem('smartwork_current_user_id');
-          if (savedId && emps?.some(e => e.id === savedId && e.isActive !== false)) {
-              setCurrentUserId(savedId);
-          } else if (emps?.[0]) {
-              setCurrentUserId(emps[0].id);
-          }
+          if (savedId && emps?.some(e => e.id === savedId && e.isActive !== false)) setCurrentUserId(savedId);
+          else if (emps?.[0]) setCurrentUserId(emps[0].id);
       } catch (err: any) {
-          setError(`Chyba databáze: ${err.message || 'Neznámá chyba'}.`);
+          setError(`Chyba: ${err.message}`);
       } finally {
           setIsLoading(false);
       }
@@ -203,46 +193,30 @@ const App: React.FC = () => {
   }, [monthlyUserEntries, selectedMonth]);
 
   useEffect(() => {
-    const handleBeforeInstallPrompt = (e: any) => {
-      e.preventDefault();
-      setInstallPrompt(e);
-    };
+    const handleBeforeInstallPrompt = (e: any) => { e.preventDefault(); setInstallPrompt(e); };
     window.addEventListener('beforeinstallprompt', handleBeforeInstallPrompt);
     return () => window.removeEventListener('beforeinstallprompt', handleBeforeInstallPrompt);
   }, []);
 
   useEffect(() => { setIsManagerMode(currentUser.role === 'Manager'); }, [currentUser]);
-  useEffect(() => { if (activeTab === 'settings' && !isManagerMode) setActiveTab('overview'); }, [activeTab, isManagerMode]);
 
   const handleRequestSwitchUser = (targetId: string) => {
       const targetEmp = employees.find(e => e.id === targetId);
-      if (targetEmp?.pinCode) {
-          setPendingUserId(targetId);
-          setIsPinModalOpen(true);
-      } else {
-          setCurrentUserId(targetId);
-      }
+      if (targetEmp?.pinCode) { setPendingUserId(targetId); setIsPinModalOpen(true); }
+      else setCurrentUserId(targetId);
   };
 
   const handlePinSuccess = () => {
       if (pendingUserId) setCurrentUserId(pendingUserId);
-      setIsPinModalOpen(false);
-      setPendingUserId(null);
+      setIsPinModalOpen(false); setPendingUserId(null);
   };
 
-  const handleInstallClick = () => {
-    if (!installPrompt) return;
-    installPrompt.prompt();
-    installPrompt.userChoice.then(() => setInstallPrompt(null));
-  };
+  const handleInstallClick = () => { if (installPrompt) { installPrompt.prompt(); setInstallPrompt(null); } };
 
   const handleAddEntries = async (newEntries: TimeEntry[]) => {
-    if (!canEdit) return alert("Měsíc je uzamčen.");
-    if (useDemoData) {
-        setEntries(prev => [...prev, ...newEntries]);
-        return;
-    }
-    try { await addTimeEntriesBulk(newEntries); loadData(); } catch (e: any) { alert("Chyba: " + e.message); }
+    if (!canEdit) return alert("Zamčeno.");
+    if (useDemoData) { setEntries(prev => [...prev, ...newEntries]); return; }
+    try { await addTimeEntriesBulk(newEntries); loadData(); } catch (e: any) { alert("Chyba."); }
   };
 
   const handleCopyLastDay = async ( ) => {
@@ -250,15 +224,6 @@ const App: React.FC = () => {
     const entriesToCopy = allUserEntries.filter(e => e.date === lastActiveDay);
     if (entriesToCopy.length === 0) return;
     const today = new Date().toISOString().split('T')[0];
-    const todayEntries = allUserEntries.filter(e => e.date === today);
-    if (todayEntries.length > 0) if (!window.confirm(`Přepsat dnešek (${today})?`)) return;
-    
-    if (useDemoData) {
-        setEntries(prev => prev.filter(e => !(e.employeeId === targetUserId && e.date === today)));
-    } else {
-        if (todayEntries.length > 0) await deleteTimeEntriesForDate(targetUserId, today);
-    }
-    
     const newEntries = entriesToCopy.map(e => ({
         id: uuidv4(), employeeId: targetUserId, date: today, project: e.project, description: e.description, hours: e.hours, type: e.type
     }));
@@ -266,115 +231,44 @@ const App: React.FC = () => {
   };
 
   const handleModalSubmit = async (date: string, submittedEntries: TimeEntry[]) => {
-    if (!canEdit) return alert("Nelze upravovat záznamy.");
+    if (!canEdit) return alert("Zamčeno.");
     if (useDemoData) {
         if (date === 'BULK_RANGE') setEntries(prev => [...prev, ...submittedEntries]);
-        else {
-            setEntries(prev => [
-                ...prev.filter(e => !(e.employeeId === targetUserId && e.date === date)),
-                ...submittedEntries
-            ]);
-        }
+        else setEntries(prev => [...prev.filter(e => !(e.employeeId === targetUserId && e.date === date)), ...submittedEntries]);
         return;
     }
     try {
         if (date === 'BULK_RANGE') await addTimeEntriesBulk(submittedEntries);
-        else {
-            await deleteTimeEntriesForDate(targetUserId, date);
-            if (submittedEntries.length > 0) await addTimeEntriesBulk(submittedEntries);
-        }
+        else { await deleteTimeEntriesForDate(targetUserId, date); if (submittedEntries.length > 0) await addTimeEntriesBulk(submittedEntries); }
         loadData();
-    } catch (e: any) { alert("Chyba: " + e.message); }
+    } catch (e: any) { alert("Chyba."); }
   };
 
   const handleDeleteEntry = async (id: string) => {
-    if (!canEdit) return alert("Nelze mazat.");
-    if (useDemoData) {
-        setEntries(prev => prev.filter(e => e.id !== id));
-        return;
-    }
-    try { await deleteTimeEntry(id); setEntries(prev => prev.filter(e => e.id !== id)); } catch (e: any) { alert("Chyba: " + e.message); }
-  };
-
-  const handleEditDay = (date: string) => {
-    if (!canEdit) return alert("Nelze upravovat.");
-    setEditingDate(date); setIsEntryModalOpen(true);
-  };
-
-  const handleOpenManualEntry = () => {
-    if (!canEdit) return alert("Nelze přidávat.");
-    setEditingDate(new Date().toISOString().split('T')[0]); setIsEntryModalOpen(true);
+    if (!canEdit) return alert("Zamčeno.");
+    if (useDemoData) { setEntries(prev => prev.filter(e => e.id !== id)); return; }
+    try { await deleteTimeEntry(id); setEntries(prev => prev.filter(e => e.id !== id)); } catch (e: any) { alert("Chyba."); }
   };
 
   const handleStatusUpdate = async (newStatus: TimesheetStatus, comment?: string) => {
     const updatedReport: MonthStatus = { employeeId: targetUserId, month: selectedMonth, status: newStatus, managerComment: comment };
     if (useDemoData) {
-        setMonthlyReports(prev => [
-            ...prev.filter(r => !(r.employeeId === targetUserId && r.month === selectedMonth)),
-            updatedReport
-        ]);
+        setMonthlyReports(prev => [...prev.filter(r => !(r.employeeId === targetUserId && r.month === selectedMonth)), updatedReport]);
         return;
     }
-    try { await upsertMonthlyReport(updatedReport); loadData(); } catch (e: any) { alert("Chyba: " + e.message); }
+    try { await upsertMonthlyReport(updatedReport); loadData(); } catch (e: any) { alert("Chyba."); }
   };
 
-  const handleMarkRead = async (id: string) => {
-      if (!useDemoData) await markNotificationAsRead(id);
-      setNotifications(prev => prev.map(n => n.id === id ? { ...n, isRead: true } : n));
-  };
+  const handleMarkRead = async (id: string) => { if (!useDemoData) await markNotificationAsRead(id); setNotifications(prev => prev.map(n => n.id === id ? { ...n, isRead: true } : n)); };
+  const handleMarkAllRead = async () => { if (!useDemoData) await markAllNotificationsAsRead(currentUserId); setNotifications(prev => prev.map(n => ({ ...n, isRead: true }))); };
+  const handleOpenMessage = (recipientId: string, recipientName: string) => { setMessageRecipientId(recipientId); setMessageRecipientName(recipientName); setIsMessageModalOpen(true); };
+  const handleSendMessage = async (text: string) => { try { if (!useDemoData) await createNotification(messageRecipientId, text, 'info', currentUser.id); else alert('Zasláno.'); } catch (e) { alert('Chyba.'); } };
 
-  const handleMarkAllRead = async () => {
-      if (!useDemoData) await markAllNotificationsAsRead(currentUserId);
-      setNotifications(prev => prev.map(n => ({ ...n, isRead: true })));
-  };
-
-  const handleOpenMessage = (recipientId: string, recipientName: string) => {
-      setMessageRecipientId(recipientId); setMessageRecipientName(recipientName); setIsMessageModalOpen(true);
-  };
-
-  const handleContactManager = () => {
-      const manager = employees.find(e => e.role === 'Manager' && e.id !== SUPPORT_ID);
-      if (manager) handleOpenMessage(manager.id, manager.name);
-      else alert('V systému není nastaven žádný manažer.');
-  };
-
-  const handleContactSupport = () => { handleOpenMessage(SUPPORT_ID, 'Win3 Support'); setIsAboutOpen(false); };
-  
-  const handleServiceLogin = () => {
-      const supportUser = employees.find(e => e.id === SUPPORT_ID);
-      if (supportUser) { handleRequestSwitchUser(SUPPORT_ID); setIsAboutOpen(false); }
-      else alert('Servisní účet nenalezen.');
-  };
-
-  const handleSendMessage = async (text: string) => {
-      try {
-          const formattedMessage = `Zpráva od ${currentUser.name}: ${text}`;
-          if (!useDemoData) await createNotification(messageRecipientId, formattedMessage, 'info', currentUser.id);
-          else alert('Zpráva odeslána.');
-      } catch (e) { alert('Chyba při odesílání.'); }
-  };
-
-  const handleAddEmployee = async (emp: Employee) => { 
-      if (useDemoData) { setEmployees(prev => [...prev, emp]); return; }
-      try { await addEmployee(emp); loadData(); } catch (e: any) { alert("Chyba: " + e.message); } 
-  };
-  const handleUpdateEmployee = async (emp: Employee) => { 
-      if (useDemoData) { setEmployees(prev => prev.map(e => e.id === emp.id ? emp : e)); return; }
-      try { await updateEmployee(emp); loadData(); } catch (e: any) { alert("Chyba: " + e.message); } 
-  };
-  const handleToggleEmployeeStatus = async (id: string, isActive: boolean) => { 
-      if (useDemoData) { setEmployees(prev => prev.map(e => e.id === id ? { ...e, isActive } : e)); return; }
-      try { await updateEmployeeStatus(id, isActive); loadData(); } catch (e: any) { alert("Chyba: " + e.message); } 
-  };
-  const handleAddJob = async (job: Job) => { 
-      if (useDemoData) { setJobs(prev => [...prev, job]); return; }
-      try { await addJob(job); loadData(); } catch (e: any) { alert("Chyba: " + e.message); } 
-  };
-  const handleToggleJobStatus = async (id: string, isActive: boolean) => { 
-      if (useDemoData) { setJobs(prev => prev.map(j => j.id === id ? { ...j, isActive } : j)); return; }
-      try { await updateJobStatus(id, isActive); loadData(); } catch (e: any) { alert("Chyba: " + e.message); } 
-  };
-  const handleStartPresentation = (type: PresentationType) => setPresentationMode(type);
+  const handleAddEmployee = async (emp: Employee) => { if (useDemoData) setEmployees(prev => [...prev, emp]); else { await addEmployee(emp); loadData(); } };
+  const handleUpdateEmployee = async (emp: Employee) => { if (useDemoData) setEmployees(prev => prev.map(e => e.id === emp.id ? emp : e)); else { await updateEmployee(emp); loadData(); } };
+  const handleToggleEmployeeStatus = async (id: string, isActive: boolean) => { if (useDemoData) setEmployees(prev => prev.map(e => e.id === id ? { ...e, isActive } : e)); else { await updateEmployeeStatus(id, isActive); loadData(); } };
+  const handleAddJob = async (job: Job) => { if (useDemoData) setJobs(prev => [...prev, job]); else { await addJob(job); loadData(); } };
+  const handleToggleJobStatus = async (id: string, isActive: boolean) => { if (useDemoData) setJobs(prev => prev.map(j => j.id === id ? { ...j, isActive } : j)); else { await updateJobStatus(id, isActive); loadData(); } };
 
   if (presentationMode) return <PresentationMode type={presentationMode} onClose={() => setPresentationMode(null)} />;
 
@@ -383,7 +277,7 @@ const App: React.FC = () => {
           <div className="flex items-center justify-center min-h-screen bg-[#0f172a] text-white">
               <div className="flex flex-col items-center gap-4">
                   <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-indigo-500"></div>
-                  <p className="text-sm font-medium">Načítání dat v{VERSION}...</p>
+                  <p className="text-sm font-medium">Načítání v{VERSION}...</p>
               </div>
           </div>
       );
@@ -394,7 +288,7 @@ const App: React.FC = () => {
       <Sidebar 
         activeTab={activeTab} setActiveTab={setActiveTab} installPrompt={installPrompt} onInstall={handleInstallClick}
         currentUser={currentUser} employees={activeEmployees} onRequestSwitchUser={handleRequestSwitchUser} 
-        onShowAbout={() => setIsAboutOpen(true)} onContactManager={handleContactManager} onlineUserIds={onlineUserIds} 
+        onShowAbout={() => setIsAboutOpen(true)} onContactManager={() => handleOpenMessage('mgr', 'Manažer')} onlineUserIds={onlineUserIds} 
         version={VERSION}
       />
 
@@ -416,52 +310,32 @@ const App: React.FC = () => {
         <div className="flex items-center gap-2">
            <NotificationBell notifications={notifications} onMarkAsRead={handleMarkRead} onMarkAllAsRead={handleMarkAllRead} />
            <div className="flex items-center gap-2 bg-slate-800 rounded-full pl-1 pr-3 py-1 border border-slate-700 relative">
-              <div className="relative">
-                  <img src={currentUser.avatar} className="w-6 h-6 rounded-full" alt="User" />
-                  {onlineUserIds.has(currentUser.id) && <div className="absolute bottom-0 right-0 w-2 h-2 bg-green-500 rounded-full border border-slate-800"></div>}
-              </div>
+              <img src={currentUser.avatar} className="w-6 h-6 rounded-full" alt="User" />
               <select value={currentUserId} onChange={(e) => handleRequestSwitchUser(e.target.value)} className="bg-transparent text-white text-xs font-medium border-none focus:ring-0 p-0 max-w-[100px] truncate cursor-pointer outline-none">
-                {activeEmployees.map(emp => (
-                  <option key={emp.id} value={emp.id} className="text-black">{emp.name}</option>
-                ))}
+                {activeEmployees.map(emp => <option key={emp.id} value={emp.id} className="text-black">{emp.name}</option>)}
               </select>
            </div>
         </div>
       </div>
 
       <main className="flex-1 p-0 overflow-y-auto flex flex-col h-screen md:h-auto">
-        {useDemoData && (
-            <div className="bg-amber-100 text-amber-800 px-4 py-1 text-[10px] font-bold uppercase tracking-widest text-center">
-                DEMO REŽIM (Data se neukládají trvale)
-            </div>
-        )}
-        
+        {useDemoData && <div className="bg-amber-100 text-amber-800 px-4 py-1 text-[10px] font-bold uppercase tracking-widest text-center">DEMO REŽIM</div>}
         {reviewingUserId && (
           <div className="bg-indigo-600 text-white px-6 py-3 sticky top-0 md:top-0 z-40 flex justify-between items-center shadow-md animate-fade-in">
-             <div className="flex items-center gap-3">
-                <div className="bg-white/20 p-2 rounded-full"><svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" /><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542 7-4.477 0-8.268-2.943-9.542-7z" /></svg></div>
-                <div><div className="text-xs uppercase font-bold text-indigo-200">Režim kontroly</div><div className="font-bold text-sm">Právě kontrolujete: {targetUser.name}</div></div>
-             </div>
-             <button onClick={() => setReviewingUserId(null)} className="bg-white text-indigo-600 px-4 py-2 rounded-lg text-sm font-bold shadow-sm hover:bg-indigo-50 transition-colors">Zavřít</button>
+             <div className="font-bold text-sm">Kontrola: {targetUser.name}</div>
+             <button onClick={() => setReviewingUserId(null)} className="bg-white text-indigo-600 px-4 py-2 rounded-lg text-sm font-bold">Zavřít</button>
           </div>
         )}
 
         {activeTab === 'overview' && (
             <div className="p-4 md:p-8 pt-6">
               <ApprovalWorkflow status={monthStatus} onUpdateStatus={handleStatusUpdate} isManagerMode={isManagerMode} validationIssues={validationIssues} />
-              {isManagerMode && !reviewingUserId && (
-                <TeamOverview employees={activeEmployees} allEntries={entries} selectedMonth={selectedMonth} onInspect={setReviewingUserId} currentUserRole={currentUser.role} reports={monthlyReports} onMessage={handleOpenMessage} onlineUserIds={onlineUserIds} />
-              )}
-              {canEdit && (
-                 <SmartInput onEntriesAdded={handleAddEntries} currentUserId={targetUserId} onManualEntry={handleOpenManualEntry} onCopyLastDay={handleCopyLastDay} lastActiveDay={lastActiveDay} selectedMonth={selectedMonth} existingEntries={monthlyUserEntries} />
-              )}
-              {isStatusLocked && !canEdit && !isGlobalLocked && (
-                <div className="bg-yellow-50 border border-yellow-200 text-yellow-800 px-4 py-3 rounded-lg mb-6 flex items-center gap-2"><span className="font-medium text-sm">Měsíc je odeslán nebo schválen.</span></div>
-              )}
+              {isManagerMode && !reviewingUserId && <TeamOverview employees={activeEmployees} allEntries={entries} selectedMonth={selectedMonth} onInspect={setReviewingUserId} currentUserRole={currentUser.role} reports={monthlyReports} onMessage={handleOpenMessage} onlineUserIds={onlineUserIds} />}
+              {canEdit && <SmartInput onEntriesAdded={handleAddEntries} currentUserId={targetUserId} onManualEntry={() => setIsEntryModalOpen(true)} onCopyLastDay={handleCopyLastDay} lastActiveDay={lastActiveDay} selectedMonth={selectedMonth} existingEntries={monthlyUserEntries} />}
               <div className="mb-8"><Dashboard entries={monthlyUserEntries} selectedMonth={selectedMonth} /></div>
               <ValidationStatus issues={validationIssues} />
-              <h3 className="text-lg font-semibold text-gray-800 mb-4">Záznamy ({selectedMonth}) - {targetUser.name}</h3>
-              <TimesheetTable entries={monthlyUserEntries} onDelete={handleDeleteEntry} onEdit={handleEditDay} isLocked={isStatusLocked} canEdit={canEdit} />
+              <h3 className="text-lg font-semibold text-slate-900 mb-4">Záznamy ({selectedMonth}) - {targetUser.name}</h3>
+              <TimesheetTable entries={monthlyUserEntries} onDelete={handleDeleteEntry} onEdit={(d) => { setEditingDate(d); setIsEntryModalOpen(true); }} isLocked={isStatusLocked} canEdit={canEdit} />
             </div>
           )}
 
@@ -470,12 +344,12 @@ const App: React.FC = () => {
           )}
 
           {activeTab === 'settings' && isManagerMode && (
-            <div className="p-4 md:p-8 pt-6 space-y-6"><AdminPanel employees={employees} onAddEmployee={handleAddEmployee} onUpdateEmployee={handleUpdateEmployee} onToggleEmployeeStatus={handleToggleEmployeeStatus} jobs={jobs} onAddJob={handleAddJob} onToggleJobStatus={handleToggleJobStatus} currentUser={currentUser} onStartPresentation={handleStartPresentation} /></div>
+            <div className="p-4 md:p-8 pt-6 space-y-6"><AdminPanel employees={employees} onAddEmployee={handleAddEmployee} onUpdateEmployee={handleUpdateEmployee} onToggleEmployeeStatus={handleToggleEmployeeStatus} jobs={jobs} onAddJob={handleAddJob} onToggleJobStatus={handleToggleJobStatus} currentUser={currentUser} onStartPresentation={setPresentationMode} /></div>
           )}
       </main>
       
       <HelpSystem />
-      <AboutModal isOpen={isAboutOpen} onClose={() => setIsAboutOpen(false)} onContactDeveloper={handleContactSupport} onServiceLogin={handleServiceLogin} version={VERSION} />
+      <AboutModal isOpen={isAboutOpen} onClose={() => setIsAboutOpen(false)} onContactDeveloper={() => handleOpenMessage('dev', 'Vývojář')} onServiceLogin={() => {}} version={VERSION} />
       <UpdatePrompt /> 
       <MobileNavigation activeTab={activeTab} setActiveTab={setActiveTab} currentUserRole={currentUser.role} />
       <EntryFormModal isOpen={isEntryModalOpen} onClose={() => setIsEntryModalOpen(false)} onSubmit={handleModalSubmit} initialDate={editingDate || undefined} existingEntries={entriesForEditingDate} currentUserId={targetUserId} jobs={activeJobs} allMonthEntries={monthlyUserEntries} />
