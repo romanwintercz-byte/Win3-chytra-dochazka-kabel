@@ -83,42 +83,44 @@ const ReportingModule: React.FC<ReportingModuleProps> = ({
     
     try {
         const doc = new jsPDF({ orientation: 'p', unit: 'mm', format: 'a4' });
-        let currentFont = 'Helvetica';
+        let currentFont = 'helvetica'; // Fallback font
 
-        // Helper pro robustní Base64 konverzi
+        // Bezpečný převod na Base64
         const arrayBufferToBase64 = (buffer: ArrayBuffer) => {
-            let binary = '';
             const bytes = new Uint8Array(buffer);
-            const len = bytes.byteLength;
-            for (let i = 0; i < len; i++) {
+            let binary = '';
+            for (let i = 0; i < bytes.byteLength; i++) {
                 binary += String.fromCharCode(bytes[i]);
             }
             return window.btoa(binary);
         };
 
-        // Pokus o načtení fontů pro diakritiku
+        // Pokus o načtení fontů pro diakritiku (v samostatném bloku, aby nezpůsobil pád)
         try {
             const fontUrl = 'https://cdnjs.cloudflare.com/ajax/libs/pdfmake/0.1.66/fonts/Roboto/Roboto-Regular.ttf';
-            const fontBytes = await fetch(fontUrl, { cache: 'force-cache' }).then(res => {
-                if (!res.ok) throw new Error("Font fetch failed");
-                return res.arrayBuffer();
-            });
-            const base64Font = arrayBufferToBase64(fontBytes);
-            doc.addFileToVFS('Roboto-Regular.ttf', base64Font);
-            doc.addFont('Roboto-Regular.ttf', 'Roboto', 'normal');
-            
             const boldUrl = 'https://cdnjs.cloudflare.com/ajax/libs/pdfmake/0.1.66/fonts/Roboto/Roboto-Medium.ttf';
-            const boldBytes = await fetch(boldUrl, { cache: 'force-cache' }).then(res => {
-                if (!res.ok) throw new Error("Bold font fetch failed");
-                return res.arrayBuffer();
-            });
-            const base64Bold = arrayBufferToBase64(boldBytes);
-            doc.addFileToVFS('Roboto-Bold.ttf', base64Bold);
-            doc.addFont('Roboto-Bold.ttf', 'Roboto', 'bold');
-            
-            currentFont = 'Roboto';
+
+            const [fontRes, boldRes] = await Promise.all([
+                fetch(fontUrl, { cache: 'force-cache' }),
+                fetch(boldUrl, { cache: 'force-cache' })
+            ]);
+
+            if (fontRes.ok && boldRes.ok) {
+                const [fontBytes, boldBytes] = await Promise.all([
+                    fontRes.arrayBuffer(),
+                    boldRes.arrayBuffer()
+                ]);
+
+                doc.addFileToVFS('Roboto-Regular.ttf', arrayBufferToBase64(fontBytes));
+                doc.addFont('Roboto-Regular.ttf', 'Roboto', 'normal');
+                
+                doc.addFileToVFS('Roboto-Bold.ttf', arrayBufferToBase64(boldBytes));
+                doc.addFont('Roboto-Bold.ttf', 'Roboto', 'bold');
+                
+                currentFont = 'Roboto';
+            }
         } catch (fontErr) {
-            console.warn("Nepodařilo se načíst Roboto font, používám výchozí Helvetica. Diakritika může být poškozená.", fontErr);
+            console.warn("Písmo Roboto se nepodařilo načíst, používám helvetica. Diakritika může být poškozena.", fontErr);
         }
 
         doc.setFont(currentFont, 'normal');
@@ -149,9 +151,9 @@ const ReportingModule: React.FC<ReportingModuleProps> = ({
         doc.text(period, 40, 33);
         doc.setFontSize(7);
         doc.setTextColor(150);
-        doc.text(`Exportováno: ${new Date().toLocaleString('cs-CZ')}`, 196, 28, { align: 'right' });
+        doc.text(`Export: ${new Date().toLocaleString('cs-CZ')}`, 196, 28, { align: 'right' });
 
-        // TABULKA A: SOUHRN
+        // SOUHRN
         autoTable(doc, {
             startY: 38,
             head: [['SOUHRN MĚSÍCE', 'HODINY']],
@@ -169,7 +171,8 @@ const ReportingModule: React.FC<ReportingModuleProps> = ({
             margin: { left: 14 }
         });
 
-        // TABULKA B: PROJEKTY
+        // PROJEKTY
+        // Fix: Explicitly cast hours to number to prevent TS error about property 'toFixed' on unknown type.
         const projectRows = Object.entries(aggregatedData.byProject).map(([name, hours]) => [name.substring(0, 50), (hours as number).toFixed(1)]);
         if (projectRows.length > 0) {
             autoTable(doc, {
@@ -184,7 +187,7 @@ const ReportingModule: React.FC<ReportingModuleProps> = ({
             });
         }
 
-        // TABULKA C: DENNÍ VÝPIS
+        // DENNÍ VÝPIS
         const dailyData: Record<string, { projects: string[], hours: number, types: string[] }> = {};
         filteredEntries.forEach(e => {
             if (!dailyData[e.date]) dailyData[e.date] = { projects: [], hours: 0, types: [] };
@@ -195,11 +198,9 @@ const ReportingModule: React.FC<ReportingModuleProps> = ({
 
         const logRows = Object.entries(dailyData).sort().map(([date, data]) => {
             const dateParts = date.split('-');
-            const dayNum = dateParts[2].replace(/^0/, '');
-            const monthNum = dateParts[1].replace(/^0/, '');
-            
+            const displayDate = `${dateParts[2].replace(/^0/, '')}.${dateParts[1].replace(/^0/, '')}.`;
             return [
-                `${dayNum}.${monthNum}.`,
+                displayDate,
                 data.projects.join(', ').substring(0, 65) || data.types.join(', '),
                 data.hours.toFixed(1)
             ];
@@ -229,8 +230,8 @@ const ReportingModule: React.FC<ReportingModuleProps> = ({
 
         doc.save(`Vykaz_${empName.replace(/\s+/g, '_')}_${period}.pdf`);
     } catch (e) {
-        console.error("PDF Error Detail:", e);
-        alert("Chyba při generování PDF. Zkuste prosím aplikaci restartovat nebo použít jiný prohlížeč.");
+        console.error("PDF Fatal Error:", e);
+        alert("Generování PDF selhalo. Zkuste prosím vymazat mezipaměť (tlačítko Opravit v loaderu) a zkuste to znovu.");
     } finally {
         setIsGeneratingPdf(false);
     }
