@@ -43,7 +43,7 @@ const initialMonthStatus: MonthStatus = {
 };
 
 const SUPPORT_ID = 'win3-support-id';
-const VERSION = '1.9.18';
+const VERSION = '1.9.19';
 
 const App: React.FC = () => {
   const [activeTab, setActiveTab] = useState<'overview' | 'report' | 'settings'>('overview');
@@ -269,7 +269,6 @@ const App: React.FC = () => {
   const handleUpdateEmployee = async (emp: Employee) => { if (useDemoData) setEmployees(prev => prev.map(e => e.id === emp.id ? emp : e)); else { await updateEmployee(emp); loadData(); } };
   const handleToggleEmployeeStatus = async (id: string, isActive: boolean) => { if (useDemoData) setEmployees(prev => prev.map(e => e.id === id ? { ...e, isActive } : e)); else { await updateEmployeeStatus(id, isActive); loadData(); } };
   
-  // FIX: Line 271 corrected to use 'job' instead of 'emp'
   const handleAddJob = async (job: Job) => { if (useDemoData) setJobs(prev => [...prev, job]); else { await addJob(job); loadData(); } };
   const handleToggleJobStatus = async (id: string, isActive: boolean) => { if (useDemoData) setJobs(prev => prev.map(j => j.id === id ? { ...j, isActive } : j)); else { await updateJobStatus(id, isActive); loadData(); } };
 
@@ -321,7 +320,7 @@ const App: React.FC = () => {
         </div>
       </div>
 
-      <main className="flex-1 p-0 overflow-y-auto flex flex-col h-screen md:h-auto">
+      <main className="flex-1 p-0 overflow-y-auto flex flex-col h-screen md:h-auto no-print">
         {useDemoData && <div className="bg-amber-100 text-amber-800 px-4 py-1 text-[10px] font-bold uppercase tracking-widest text-center">DEMO REŽIM</div>}
         {reviewingUserId && (
           <div className="bg-indigo-600 text-white px-6 py-3 sticky top-0 md:top-0 z-40 flex justify-between items-center shadow-md animate-fade-in">

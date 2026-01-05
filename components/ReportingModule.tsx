@@ -78,175 +78,170 @@ const ReportingModule: React.FC<ReportingModuleProps> = ({
       return { byProject, regular, overtime, trips, absence, total };
   }, [filteredEntries]);
 
+  // --- EXCEL (CSV) EXPORT ---
+  const exportToCSV = () => {
+    if (filteredEntries.length === 0) return alert("Nejsou data k exportu.");
+    
+    const empName = employeeFilter !== 'all' ? getEmployeeName(employeeFilter) : 'Všichni';
+    const period = monthFilter === 'all' ? 'Historie' : monthFilter;
+
+    // BOM pro správné zobrazení v českém Excelu
+    const BOM = "\uFEFF";
+    const headers = ["Datum", "Zaměstnanec", "Projekt", "Činnost", "Hodiny", "Typ"].join(";");
+    const rows = filteredEntries.map(e => [
+        new Date(e.date).toLocaleDateString('cs-CZ'),
+        getEmployeeName(e.employeeId),
+        e.project || "",
+        e.description || "",
+        e.hours.toString().replace('.', ','),
+        e.type
+    ].join(";"));
+
+    const csvContent = BOM + headers + "\n" + rows.join("\n");
+    const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement("a");
+    link.setAttribute("href", url);
+    link.setAttribute("download", `Vykaz_${empName.replace(/\s/g, '_')}_${period}.csv`);
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+  };
+
+  // --- TISK (A4) ---
+  const handlePrint = () => {
+    const printMount = document.getElementById('print-mount');
+    if (!printMount) return;
+
+    const empName = employeeFilter !== 'all' ? getEmployeeName(employeeFilter) : 'Všichni zaměstnanci';
+    const period = monthFilter === 'all' ? 'Všechna období' : monthFilter;
+
+    // Generování HTML pro tisk
+    printMount.innerHTML = `
+      <div class="print-report">
+        <div class="header">
+          <div>
+            <h1 style="margin:0; font-size:24px; color:black">MĚSÍČNÍ VÝKAZ PRÁCE</h1>
+            <p style="margin:5px 0; color:black">Chytrá docházka Win3</p>
+          </div>
+          <div style="text-align:right; color:black">
+            <p style="margin:0"><b>Období:</b> ${period}</p>
+            <p style="margin:0"><b>Zaměstnanec:</b> ${empName}</p>
+          </div>
+        </div>
+
+        <h2 style="font-size:16px; margin-bottom:10px; color:black">Souhrn hodin</h2>
+        <table>
+          <thead>
+            <tr><th>Typ práce</th><th class="text-right">Hodin</th></tr>
+          </thead>
+          <tbody>
+            <tr><td>Běžná práce</td><td class="text-right">${aggregatedData.regular.toFixed(1)}</td></tr>
+            <tr><td>Přesčasy</td><td class="text-right">${aggregatedData.overtime.toFixed(1)}</td></tr>
+            <tr><td>Služební cesty</td><td class="text-right">${aggregatedData.trips.toFixed(1)}</td></tr>
+            <tr><td>Absence (dovolená, nemoc...)</td><td class="text-right">${aggregatedData.absence.toFixed(1)}</td></tr>
+            <tr class="font-bold"><td>CELKEM K VÝPLATĚ</td><td class="text-right">${aggregatedData.total.toFixed(1)}</td></tr>
+          </tbody>
+        </table>
+
+        <h2 style="font-size:16px; margin:20px 0 10px 0; color:black">Denní rozpis</h2>
+        <table>
+          <thead>
+            <tr><th>Datum</th><th>Projekt / Činnost</th><th class="text-right">Hodin</th></tr>
+          </thead>
+          <tbody>
+            ${filteredEntries.map(e => `
+              <tr>
+                <td>${new Date(e.date).toLocaleDateString('cs-CZ')}</td>
+                <td>${e.project || e.type} ${e.description ? '- ' + e.description : ''}</td>
+                <td class="text-right">${Number(e.hours).toFixed(1)}</td>
+              </tr>
+            `).join('')}
+          </tbody>
+        </table>
+
+        <div class="signatures">
+          <div class="sig-box">Podpis zaměstnance</div>
+          <div class="sig-box">Podpis nadřízeného</div>
+        </div>
+      </div>
+    `;
+
+    window.print();
+  };
+
   const generatePDF = async () => {
     if (filteredEntries.length === 0) return alert("Nejsou k dispozici žádná data pro export.");
     setIsGeneratingPdf(true);
     
     try {
         const doc = new jsPDF({ orientation: 'p', unit: 'mm', format: 'a4' });
-        let currentFont = 'helvetica';
-
-        const arrayBufferToBase64 = (buffer: ArrayBuffer) => {
-            const bytes = new Uint8Array(buffer);
-            let binary = '';
-            for (let i = 0; i < bytes.byteLength; i++) {
-                binary += String.fromCharCode(bytes[i]);
-            }
-            return window.btoa(binary);
-        };
-
-        // Pokus o fonty (Roboto pro CZ znaky)
-        try {
-            const fontUrl = 'https://cdnjs.cloudflare.com/ajax/libs/pdfmake/0.1.66/fonts/Roboto/Roboto-Regular.ttf';
-            const boldUrl = 'https://cdnjs.cloudflare.com/ajax/libs/pdfmake/0.1.66/fonts/Roboto/Roboto-Medium.ttf';
-
-            const [fontRes, boldRes] = await Promise.all([
-                fetch(fontUrl, { cache: 'force-cache' }),
-                fetch(boldUrl, { cache: 'force-cache' })
-            ]);
-
-            if (fontRes.ok && boldRes.ok) {
-                const [fontBytes, boldBytes] = await Promise.all([
-                    fontRes.arrayBuffer(),
-                    boldRes.arrayBuffer()
-                ]);
-
-                doc.addFileToVFS('Roboto-Regular.ttf', arrayBufferToBase64(fontBytes));
-                doc.addFont('Roboto-Regular.ttf', 'Roboto', 'normal');
-                doc.addFileToVFS('Roboto-Bold.ttf', arrayBufferToBase64(boldBytes));
-                doc.addFont('Roboto-Bold.ttf', 'Roboto', 'bold');
-                currentFont = 'Roboto';
-            }
-        } catch (fErr) {
-            console.warn("Fallback to Helvetica due to font load error", fErr);
-        }
-
-        doc.setFont(currentFont, 'normal');
+        doc.setFont('helvetica', 'normal');
         const period = monthFilter === 'all' ? 'Celá historie' : monthFilter;
         const empName = employeeFilter !== 'all' ? getEmployeeName(employeeFilter) : 'Všichni zaměstnanci';
 
-        // HEADER
-        doc.setFillColor(15, 23, 42); 
-        doc.rect(0, 0, 210, 20, 'F');
-        doc.setTextColor(255, 255, 255);
         doc.setFontSize(14);
-        doc.setFont(currentFont, 'bold');
-        doc.text("MĚSÍČNÍ VÝKAZ PRÁCE", 14, 13);
-        doc.setFontSize(8);
-        doc.setFont(currentFont, 'normal');
-        doc.text("v1.9.12 | Chytrá docházka Win3", 196, 13, { align: 'right' });
-
-        // INFO
-        doc.setTextColor(15, 23, 42);
+        doc.text("MĚSÍČNÍ VÝKAZ PRÁCE", 14, 15);
         doc.setFontSize(9);
-        doc.text(`Zaměstnanec:`, 14, 28);
-        doc.setFont(currentFont, 'bold');
-        doc.text(empName, 40, 28);
-        doc.setFont(currentFont, 'normal');
-        doc.text(`Období:`, 14, 33);
-        doc.setFont(currentFont, 'bold');
-        doc.text(period, 40, 33);
-        doc.setFontSize(7);
-        doc.setTextColor(150);
-        doc.text(`Vygenerováno: ${new Date().toLocaleString('cs-CZ')}`, 196, 28, { align: 'right' });
+        doc.text(`Zaměstnanec: ${empName}`, 14, 25);
+        doc.text(`Období: ${period}`, 14, 30);
 
-        // SOUHRN MĚSÍCE
         autoTable(doc, {
-            startY: 38,
-            head: [['SOUHRN MĚSÍCE', 'HODINY']],
+            startY: 35,
+            head: [['Typ práce', 'Hodiny']],
             body: [
                 ['Běžná práce', aggregatedData.regular.toFixed(1)],
                 ['Přesčasy', aggregatedData.overtime.toFixed(1)],
                 ['Služební cesty', aggregatedData.trips.toFixed(1)],
-                ['Absence (dovolená, nemoc...)', aggregatedData.absence.toFixed(1)],
-                [{ content: 'CELKEM K VÝPLATĚ', styles: { fontStyle: 'bold' } }, { content: aggregatedData.total.toFixed(1), styles: { fontStyle: 'bold' } }]
+                ['Absence', aggregatedData.absence.toFixed(1)],
+                ['CELKEM', aggregatedData.total.toFixed(1)]
             ],
-            theme: 'grid',
-            styles: { font: currentFont, fontSize: 7, cellPadding: 1.5 },
-            headStyles: { fillColor: [79, 70, 229], textColor: 255 },
-            columnStyles: { 1: { cellWidth: 15, halign: 'right' } },
-            margin: { left: 14, right: 14 }
-        });
-
-        // PROJEKTY
-        const projectRows = Object.entries(aggregatedData.byProject).map(([name, hours]) => [name.substring(0, 70), Number(hours).toFixed(1)]);
-        if (projectRows.length > 0) {
-            autoTable(doc, {
-                startY: (doc as any).lastAutoTable.cursor.y + 5,
-                head: [['ROZPIS PODLE PROJEKTŮ / ZAKÁZEK', 'HODINY']],
-                body: projectRows,
-                theme: 'grid',
-                styles: { font: currentFont, fontSize: 7, cellPadding: 1.5 },
-                headStyles: { fillColor: [51, 65, 85], textColor: 255 },
-                columnStyles: { 1: { cellWidth: 15, halign: 'right' } },
-                margin: { left: 14, right: 14 }
-            });
-        }
-
-        // DENNÍ VÝPIS
-        const dailyData: Record<string, { projects: string[], hours: number }> = {};
-        filteredEntries.forEach(e => {
-            if (!dailyData[e.date]) dailyData[e.date] = { projects: [], hours: 0 };
-            const desc = e.project || e.type;
-            if (!dailyData[e.date].projects.includes(desc)) dailyData[e.date].projects.push(desc);
-            dailyData[e.date].hours += Number(e.hours);
-        });
-
-        const logRows = Object.entries(dailyData).sort().map(([date, data]) => {
-            const parts = date.split('-');
-            return [`${parts[2]}.${parts[1]}.`, data.projects.join(', ').substring(0, 80), data.hours.toFixed(1)];
+            theme: 'grid'
         });
 
         autoTable(doc, {
-            startY: (doc as any).lastAutoTable.cursor.y + 5,
-            head: [['DATUM', 'ČINNOST / PROJEKT', 'HOD']],
-            body: logRows,
-            theme: 'striped',
-            styles: { font: currentFont, fontSize: 6.5, cellPadding: 1.2 },
-            headStyles: { fillColor: [241, 245, 249], textColor: [71, 85, 105], fontStyle: 'bold' },
-            columnStyles: { 0: { cellWidth: 15 }, 2: { cellWidth: 10, halign: 'right' } },
-            margin: { left: 14, right: 14, bottom: 25 },
-            didDrawPage: (data) => {
-                const ph = doc.internal.pageSize.height;
-                doc.setDrawColor(220);
-                doc.line(14, ph - 18, 70, ph - 18);
-                doc.line(140, ph - 18, 196, ph - 18);
-                doc.setFontSize(6);
-                doc.setTextColor(160);
-                doc.text("Podpis zaměstnance", 14, ph - 14);
-                doc.text("Podpis nadřízeného", 140, ph - 14);
-                doc.text(`Strana ${data.pageNumber}`, 105, ph - 8, { align: 'center' });
-            }
+            startY: (doc as any).lastAutoTable.cursor.y + 10,
+            head: [['Datum', 'Projekt', 'Hodin']],
+            body: filteredEntries.map(e => [new Date(e.date).toLocaleDateString('cs-CZ'), e.project || e.type, e.hours.toFixed(1)]),
+            theme: 'striped'
         });
 
         doc.save(`Vykaz_${empName.replace(/\s+/g, '_')}_${period}.pdf`);
     } catch (e) {
-        console.error("Fatal PDF Error:", e);
-        alert("Generování PDF selhalo. Pravděpodobně chybí knihovna jspdf v import mapě. Zkuste tlačítko Opravit v úvodním loaderu.");
+        alert("Generování PDF selhalo. Použijte tlačítko TISK nebo EXCEL.");
     } finally {
         setIsGeneratingPdf(false);
     }
   };
 
   return (
-    <div className="space-y-6 animate-fade-in">
+    <div className="space-y-6 animate-fade-in no-print">
         <div className="bg-white p-6 rounded-xl shadow-sm border border-gray-100">
-            <div className="flex justify-between items-center mb-4">
-                <h3 className="text-lg font-semibold text-slate-900">Filtry a export</h3>
-                <button 
-                  onClick={generatePDF} 
-                  disabled={isGeneratingPdf}
-                  className="flex items-center gap-2 px-4 py-2 bg-indigo-600 text-white rounded-lg font-bold hover:bg-indigo-700 transition-all shadow-md active:scale-95 disabled:opacity-50"
-                >
-                    {isGeneratingPdf ? (
-                        <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin"></div>
-                    ) : (
-                        <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
-                        </svg>
-                    )}
-                    Exportovat do PDF
-                </button>
+            <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 mb-6">
+                <h3 className="text-lg font-semibold text-slate-900">Filtry a exporty</h3>
+                <div className="flex flex-wrap gap-2 w-full sm:w-auto">
+                    <button 
+                      onClick={handlePrint}
+                      className="flex-1 sm:flex-none flex items-center justify-center gap-2 px-4 py-2 bg-slate-800 text-white rounded-lg font-bold hover:bg-slate-900 transition-all shadow-md active:scale-95"
+                    >
+                        <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 17h2a2 2 0 002-2v-4a2 2 0 00-2-2H5a2 2 0 00-2 2v4a2 2 0 002 2h2m2 4h6a2 2 0 002-2v-4a2 2 0 00-2-2H9a2 2 0 00-2 2v4a2 2 0 002 2zm8-12V5a2 2 0 00-2-2H9a2 2 0 00-2 2v4h10z" /></svg>
+                        Tisk (A4)
+                    </button>
+                    <button 
+                      onClick={exportToCSV}
+                      className="flex-1 sm:flex-none flex items-center justify-center gap-2 px-4 py-2 bg-green-600 text-white rounded-lg font-bold hover:bg-green-700 transition-all shadow-md active:scale-95"
+                    >
+                        <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" /></svg>
+                        Excel (CSV)
+                    </button>
+                    <button 
+                      onClick={generatePDF} 
+                      disabled={isGeneratingPdf}
+                      className="flex-1 sm:flex-none flex items-center justify-center gap-2 px-4 py-2 bg-indigo-600 text-white rounded-lg font-bold hover:bg-indigo-700 transition-all shadow-md active:scale-95 disabled:opacity-50"
+                    >
+                        {isGeneratingPdf ? <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin"></div> : "PDF"}
+                    </button>
+                </div>
             </div>
             
             <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
@@ -282,15 +277,15 @@ const ReportingModule: React.FC<ReportingModuleProps> = ({
         {activeView === 'stats' && (
         <div className="space-y-6">
             <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-                <div className="bg-white p-4 rounded-xl shadow-sm border border-gray-100">
+                <div className="bg-white p-4 rounded-xl shadow-sm border border-gray-100 text-slate-900">
                     <p className="text-xs text-slate-500 uppercase font-bold mb-1">Práce</p>
                     <p className="text-2xl font-bold text-indigo-600">{aggregatedData.regular.toFixed(1)} h</p>
                 </div>
-                <div className="bg-white p-4 rounded-xl shadow-sm border border-gray-100">
+                <div className="bg-white p-4 rounded-xl shadow-sm border border-gray-100 text-slate-900">
                     <p className="text-xs text-slate-500 uppercase font-bold mb-1">Přesčas</p>
                     <p className={`text-2xl font-bold ${aggregatedData.overtime > 0 ? 'text-orange-600' : 'text-slate-900'}`}>{aggregatedData.overtime.toFixed(1)} h</p>
                 </div>
-                <div className="bg-white p-4 rounded-xl shadow-sm border border-gray-100">
+                <div className="bg-white p-4 rounded-xl shadow-sm border border-gray-100 text-slate-900">
                     <p className="text-xs text-slate-500 uppercase font-bold mb-1">Absence</p>
                     <p className="text-2xl font-bold text-slate-400">{aggregatedData.absence.toFixed(1)} h</p>
                 </div>

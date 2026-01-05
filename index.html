@@ -27,32 +27,59 @@
       @keyframes spin { to { transform: rotate(360deg); } }
       #reset-btn { display: none; margin-top: 20px; background: #ef4444; color: white; padding: 14px 28px; border-radius: 12px; font-size: 14px; font-weight: bold; border: none; cursor: pointer; z-index: 10000; }
       #error-display { display: none; margin-top: 20px; background: #334155; color: #f87171; padding: 12px; border-radius: 8px; font-family: monospace; font-size: 10px; max-width: 90%; word-break: break-all; text-align: left; }
+
+      /* Tiskové styly */
+      @media print {
+        body { background-color: white !important; color: black !important; }
+        #root, .md\:hidden, #app-loader, .sidebar, .mobile-nav, .no-print { display: none !important; }
+        .print-only { display: block !important; }
+        @page { size: A4; margin: 15mm; }
+        .print-report { width: 100%; color: black !important; }
+        table { width: 100%; border-collapse: collapse; margin-top: 10px; font-size: 10px; }
+        th, td { border: 1px solid #ddd; padding: 6px; text-align: left; color: black !important; }
+        th { background-color: #f8f9fa !important; }
+        .text-right { text-align: right; }
+        .font-bold { font-weight: bold; }
+        .header { display: flex; justify-content: space-between; border-bottom: 2px solid #333; padding-bottom: 10px; margin-bottom: 20px; }
+        .signatures { display: flex; justify-content: space-between; margin-top: 50px; }
+        .sig-box { border-top: 1px solid #333; width: 40%; text-align: center; padding-top: 5px; font-size: 10px; }
+      }
+      .print-only { display: none; }
     </style>
 
-    <!-- JEDINÁ FUNKČNÍ IMPORT MAPA (v1.9.18) -->
-    <script>
-      (function() {
-        const im = {
-          "imports": {
-            "react": "https://esm.sh/react@19.0.0",
-            "react/": "https://esm.sh/react@19.0.0/",
-            "react-dom": "https://esm.sh/react-dom@19.0.0",
-            "react-dom/": "https://esm.sh/react-dom@19.0.0/",
-            "react-dom/client": "https://esm.sh/react-dom@19.0.0/client",
-            "@google/genai": "https://esm.sh/@google/genai@1.30.0",
-            "uuid": "https://esm.sh/uuid@11.0.0",
-            "recharts": "https://esm.sh/recharts@2.15.0",
-            "jspdf": "https://esm.sh/jspdf@2.5.2",
-            "jspdf-autotable": "https://esm.sh/jspdf-autotable@3.8.4",
-            "@supabase/supabase-js": "https://esm.sh/@supabase/supabase-js@2.47.10"
-          }
-        };
-        const script = document.createElement('script');
-        script.type = 'importmap-shim';
-        script.textContent = JSON.stringify(im);
-        document.currentScript.after(script);
-      })();
+    <script type="importmap-shim">
+      {
+        "imports": {
+          "react": "https://esm.sh/react@19.0.0",
+          "react/": "https://esm.sh/react@19.0.0/",
+          "react-dom": "https://esm.sh/react-dom@19.0.0",
+          "react-dom/": "https://esm.sh/react-dom@19.0.0/",
+          "react-dom/client": "https://esm.sh/react-dom@19.0.0/client",
+          "@google/genai": "https://esm.sh/@google/genai@1.30.0",
+          "uuid": "https://esm.sh/uuid@11.0.0",
+          "recharts": "https://esm.sh/recharts@2.15.0",
+          "jspdf": "https://esm.sh/jspdf@2.5.2",
+          "jspdf-autotable": "https://esm.sh/jspdf-autotable@3.8.4",
+          "@supabase/supabase-js": "https://esm.sh/@supabase/supabase-js@2.47.10"
+        }
+      }
     </script>
+  <script type="importmap">
+{
+  "imports": {
+    "react": "https://esm.sh/react@^19.2.3",
+    "react-dom/": "https://esm.sh/react-dom@^19.2.3/",
+    "react/": "https://esm.sh/react@^19.2.3/",
+    "@google/genai": "https://esm.sh/@google/genai@^1.34.0",
+    "uuid": "https://esm.sh/uuid@^13.0.0",
+    "recharts": "https://esm.sh/recharts@^3.6.0",
+    "jspdf": "https://esm.sh/jspdf@^4.0.0",
+    "jspdf-autotable": "https://esm.sh/jspdf-autotable@^5.0.7",
+    "vite": "https://esm.sh/vite@^7.3.0",
+    "@supabase/supabase-js": "https://esm.sh/@supabase/supabase-js@^2.89.0"
+  }
+}
+</script>
 <link rel="stylesheet" href="/index.css">
 </head>
   <body>
@@ -63,14 +90,17 @@
         </svg>
       </div>
       <div class="loader-spinner"></div>
-      <p id="loader-status" style="color: #94a3b8; font-size: 13px; margin-top: 20px;">Spouštění v1.9.18...</p>
+      <p id="loader-status" style="color: #94a3b8; font-size: 13px; margin-top: 20px;">Spouštění v1.9.19...</p>
       <div id="error-display"></div>
       <button id="reset-btn" onclick="emergencyReset()">OPRAVIT A RESETOVAT</button>
     </div>
 
     <div id="root"></div>
 
-    <script type="module-shim" src="./index.tsx?v=1.9.18"></script>
+    <!-- Toto bude vyplněno dynamicky v ReportingModule pro tisk -->
+    <div id="print-mount" class="print-only"></div>
+
+    <script type="module-shim" src="./index.tsx?v=1.9.19"></script>
 
     <script>
       window.APP_STARTED = false;
