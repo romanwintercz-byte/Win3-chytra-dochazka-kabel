@@ -18,7 +18,7 @@ if (!rootElement) {
 if ('serviceWorker' in navigator) {
   window.addEventListener('load', () => {
     navigator.serviceWorker.register('./sw.js', { scope: './' })
-      .then(() => console.log('SW v1.9.9 OK'))
+      .then(() => console.log('SW v1.9.10 OK'))
       .catch(err => console.warn('SW fail:', err));
   });
 }

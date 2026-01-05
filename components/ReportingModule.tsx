@@ -83,7 +83,8 @@ const ReportingModule: React.FC<ReportingModuleProps> = ({
     
     try {
         const doc = new jsPDF({ orientation: 'p', unit: 'mm', format: 'a4' });
-        
+        let currentFont = 'Helvetica';
+
         // Helper pro robustní Base64 konverzi
         const arrayBufferToBase64 = (buffer: ArrayBuffer) => {
             let binary = '';
@@ -95,20 +96,32 @@ const ReportingModule: React.FC<ReportingModuleProps> = ({
             return window.btoa(binary);
         };
 
-        // Načtení fontů pro diakritiku
-        const fontUrl = 'https://cdnjs.cloudflare.com/ajax/libs/pdfmake/0.1.66/fonts/Roboto/Roboto-Regular.ttf';
-        const fontBytes = await fetch(fontUrl).then(res => res.arrayBuffer());
-        const base64Font = arrayBufferToBase64(fontBytes);
-        doc.addFileToVFS('Roboto-Regular.ttf', base64Font);
-        doc.addFont('Roboto-Regular.ttf', 'Roboto', 'normal');
-        
-        const boldUrl = 'https://cdnjs.cloudflare.com/ajax/libs/pdfmake/0.1.66/fonts/Roboto/Roboto-Medium.ttf';
-        const boldBytes = await fetch(boldUrl).then(res => res.arrayBuffer());
-        const base64Bold = arrayBufferToBase64(boldBytes);
-        doc.addFileToVFS('Roboto-Bold.ttf', base64Bold);
-        doc.addFont('Roboto-Bold.ttf', 'Roboto', 'bold');
+        // Pokus o načtení fontů pro diakritiku
+        try {
+            const fontUrl = 'https://cdnjs.cloudflare.com/ajax/libs/pdfmake/0.1.66/fonts/Roboto/Roboto-Regular.ttf';
+            const fontBytes = await fetch(fontUrl, { cache: 'force-cache' }).then(res => {
+                if (!res.ok) throw new Error("Font fetch failed");
+                return res.arrayBuffer();
+            });
+            const base64Font = arrayBufferToBase64(fontBytes);
+            doc.addFileToVFS('Roboto-Regular.ttf', base64Font);
+            doc.addFont('Roboto-Regular.ttf', 'Roboto', 'normal');
+            
+            const boldUrl = 'https://cdnjs.cloudflare.com/ajax/libs/pdfmake/0.1.66/fonts/Roboto/Roboto-Medium.ttf';
+            const boldBytes = await fetch(boldUrl, { cache: 'force-cache' }).then(res => {
+                if (!res.ok) throw new Error("Bold font fetch failed");
+                return res.arrayBuffer();
+            });
+            const base64Bold = arrayBufferToBase64(boldBytes);
+            doc.addFileToVFS('Roboto-Bold.ttf', base64Bold);
+            doc.addFont('Roboto-Bold.ttf', 'Roboto', 'bold');
+            
+            currentFont = 'Roboto';
+        } catch (fontErr) {
+            console.warn("Nepodařilo se načíst Roboto font, používám výchozí Helvetica. Diakritika může být poškozená.", fontErr);
+        }
 
-        doc.setFont('Roboto', 'normal');
+        doc.setFont(currentFont, 'normal');
 
         const period = monthFilter === 'all' ? 'Celá historie' : monthFilter;
         const empName = employeeFilter !== 'all' ? getEmployeeName(employeeFilter) : 'Všichni zaměstnanci';
@@ -118,27 +131,27 @@ const ReportingModule: React.FC<ReportingModuleProps> = ({
         doc.rect(0, 0, 210, 20, 'F');
         doc.setTextColor(255, 255, 255);
         doc.setFontSize(14);
-        doc.setFont('Roboto', 'bold');
+        doc.setFont(currentFont, 'bold');
         doc.text("MĚSÍČNÍ VÝKAZ PRÁCE", 14, 13);
         doc.setFontSize(8);
-        doc.setFont('Roboto', 'normal');
+        doc.setFont(currentFont, 'normal');
         doc.text("Chytrá docházka by Win3 Studio", 196, 13, { align: 'right' });
 
         // INFO
         doc.setTextColor(15, 23, 42);
         doc.setFontSize(9);
         doc.text(`Zaměstnanec:`, 14, 28);
-        doc.setFont('Roboto', 'bold');
+        doc.setFont(currentFont, 'bold');
         doc.text(empName, 40, 28);
-        doc.setFont('Roboto', 'normal');
+        doc.setFont(currentFont, 'normal');
         doc.text(`Období:`, 14, 33);
-        doc.setFont('Roboto', 'bold');
+        doc.setFont(currentFont, 'bold');
         doc.text(period, 40, 33);
         doc.setFontSize(7);
         doc.setTextColor(150);
         doc.text(`Exportováno: ${new Date().toLocaleString('cs-CZ')}`, 196, 28, { align: 'right' });
 
-        // TABULKA A: SOUHRN (Vždy jedna strana - zmenšeno)
+        // TABULKA A: SOUHRN
         autoTable(doc, {
             startY: 38,
             head: [['SOUHRN MĚSÍCE', 'HODINY']],
@@ -150,7 +163,7 @@ const ReportingModule: React.FC<ReportingModuleProps> = ({
                 [{ content: 'CELKEM K VÝPLATĚ', styles: { fontStyle: 'bold' } }, { content: aggregatedData.total.toFixed(1), styles: { fontStyle: 'bold' } }]
             ],
             theme: 'grid',
-            styles: { font: 'Roboto', fontSize: 7, cellPadding: 1.5 },
+            styles: { font: currentFont, fontSize: 7, cellPadding: 1.5 },
             headStyles: { fillColor: [79, 70, 229], textColor: 255 },
             columnStyles: { 0: { cellWidth: 40 }, 1: { cellWidth: 15, halign: 'right' } },
             margin: { left: 14 }
@@ -164,14 +177,14 @@ const ReportingModule: React.FC<ReportingModuleProps> = ({
                 head: [['ROZPIS PODLE PROJEKTŮ / ZAKÁZEK', 'HODINY']],
                 body: projectRows,
                 theme: 'grid',
-                styles: { font: 'Roboto', fontSize: 7, cellPadding: 1.5 },
+                styles: { font: currentFont, fontSize: 7, cellPadding: 1.5 },
                 headStyles: { fillColor: [51, 65, 85], textColor: 255 },
                 columnStyles: { 0: { cellWidth: 80 }, 1: { cellWidth: 15, halign: 'right' } },
                 margin: { left: 14 }
             });
         }
 
-        // TABULKA C: DENNÍ VÝPIS (Jeden řádek na den)
+        // TABULKA C: DENNÍ VÝPIS
         const dailyData: Record<string, { projects: string[], hours: number, types: string[] }> = {};
         filteredEntries.forEach(e => {
             if (!dailyData[e.date]) dailyData[e.date] = { projects: [], hours: 0, types: [] };
@@ -181,10 +194,12 @@ const ReportingModule: React.FC<ReportingModuleProps> = ({
         });
 
         const logRows = Object.entries(dailyData).sort().map(([date, data]) => {
-            const dateObj = new Date(date);
-            const dayName = dateObj.toLocaleDateString('cs-CZ', { weekday: 'short' });
+            const dateParts = date.split('-');
+            const dayNum = dateParts[2].replace(/^0/, '');
+            const monthNum = dateParts[1].replace(/^0/, '');
+            
             return [
-                `${dateObj.getDate()}.${dateObj.getMonth() + 1}. (${dayName})`,
+                `${dayNum}.${monthNum}.`,
                 data.projects.join(', ').substring(0, 65) || data.types.join(', '),
                 data.hours.toFixed(1)
             ];
@@ -195,9 +210,9 @@ const ReportingModule: React.FC<ReportingModuleProps> = ({
             head: [['DATUM', 'ČINNOST / PROJEKT', 'HOD']],
             body: logRows,
             theme: 'striped',
-            styles: { font: 'Roboto', fontSize: 6.5, cellPadding: 1.2 },
+            styles: { font: currentFont, fontSize: 6.5, cellPadding: 1.2 },
             headStyles: { fillColor: [241, 245, 249], textColor: [71, 85, 105], fontStyle: 'bold' },
-            columnStyles: { 0: { cellWidth: 20 }, 1: { cellWidth: 'auto' }, 2: { cellWidth: 10, halign: 'right' } },
+            columnStyles: { 0: { cellWidth: 15 }, 1: { cellWidth: 'auto' }, 2: { cellWidth: 10, halign: 'right' } },
             margin: { left: 14, bottom: 25 },
             didDrawPage: (data) => {
                 const pageHeight = doc.internal.pageSize.height;
@@ -214,8 +229,8 @@ const ReportingModule: React.FC<ReportingModuleProps> = ({
 
         doc.save(`Vykaz_${empName.replace(/\s+/g, '_')}_${period}.pdf`);
     } catch (e) {
-        console.error("PDF Error:", e);
-        alert("Chyba při generování PDF. Pravděpodobně problém s připojením k fontům.");
+        console.error("PDF Error Detail:", e);
+        alert("Chyba při generování PDF. Zkuste prosím aplikaci restartovat nebo použít jiný prohlížeč.");
     } finally {
         setIsGeneratingPdf(false);
     }

@@ -1,4 +1,3 @@
-
 // Czech Holidays Service
 
 // Fixed holidays in format MM-DD
@@ -37,13 +36,16 @@ const getEasterSunday = (year: number): Date => {
 };
 
 export const getHolidayName = (dateStr: string): string | null => {
-  const date = new Date(dateStr);
-  const year = date.getFullYear();
-  const month = String(date.getMonth() + 1).padStart(2, '0');
-  const day = String(date.getDate()).padStart(2, '0');
-  const mmdd = `${month}-${day}`;
+  // FIX: Parsování bez rizika Timezone shiftu
+  const parts = dateStr.split('-');
+  if (parts.length !== 3) return null;
+  
+  const year = parseInt(parts[0], 10);
+  const monthStr = parts[1]; // "MM"
+  const dayStr = parts[2];   // "DD"
+  const mmdd = `${monthStr}-${dayStr}`;
 
-  // 1. Check Fixed Holidays
+  // 1. Check Fixed Holidays (státní svátky)
   if (FIXED_HOLIDAYS[mmdd]) {
     return FIXED_HOLIDAYS[mmdd];
   }
@@ -59,14 +61,14 @@ export const getHolidayName = (dateStr: string): string | null => {
   const easterMonday = new Date(easterSunday);
   easterMonday.setDate(easterSunday.getDate() + 1);
 
-  const checkDate = (d: Date) => {
-    return d.getFullYear() === year && 
-           d.getMonth() === date.getMonth() && 
-           d.getDate() === date.getDate();
+  const checkDateMatch = (d: Date, y: number, m: string, day: string) => {
+    return d.getFullYear() === y && 
+           String(d.getMonth() + 1).padStart(2, '0') === m && 
+           String(d.getDate()).padStart(2, '0') === day;
   };
 
-  if (checkDate(goodFriday)) return 'Velký pátek';
-  if (checkDate(easterMonday)) return 'Velikonoční pondělí';
+  if (checkDateMatch(goodFriday, year, monthStr, dayStr)) return 'Velký pátek';
+  if (checkDateMatch(easterMonday, year, monthStr, dayStr)) return 'Velikonoční pondělí';
 
   return null;
 };
