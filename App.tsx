@@ -43,7 +43,7 @@ const initialMonthStatus: MonthStatus = {
 };
 
 const SUPPORT_ID = 'win3-support-id';
-const VERSION = '1.9.7';
+const VERSION = '1.9.8';
 
 const App: React.FC = () => {
   const [activeTab, setActiveTab] = useState<'overview' | 'report' | 'settings'>('overview');

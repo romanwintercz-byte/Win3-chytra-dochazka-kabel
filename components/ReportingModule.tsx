@@ -1,6 +1,5 @@
 import React, { useState, useMemo, useEffect } from 'react';
 import { TimeEntry, WorkType, Employee, Job } from '../types';
-import { validateMonth } from '../services/validationService';
 import { jsPDF } from "jspdf";
 import autoTable from "jspdf-autotable";
 
@@ -9,8 +8,8 @@ interface ReportingModuleProps {
   employees: Employee[];
   currentUserRole: string;
   jobs: Job[];
-  selectedEmployeeId?: string; // Globálně vybraný zaměstnanec (z App.tsx)
-  selectedMonth?: string;      // Globálně vybraný měsíc (z App.tsx)
+  selectedEmployeeId?: string;
+  selectedMonth?: string;
 }
 
 const ReportingModule: React.FC<ReportingModuleProps> = ({ 
@@ -21,36 +20,14 @@ const ReportingModule: React.FC<ReportingModuleProps> = ({
   const [projectFilter, setProjectFilter] = useState<string>('all');
   const [employeeFilter, setEmployeeFilter] = useState<string>(selectedEmployeeId || 'all');
   const [monthFilter, setMonthFilter] = useState<string>(selectedMonth || new Date().toISOString().substring(0, 7));
-  const [isEmailModalOpen, setIsEmailModalOpen] = useState(false);
   const [isGeneratingPdf, setIsGeneratingPdf] = useState(false);
-  
-  const [selectedImage, setSelectedImage] = useState<{url: string, title: string} | null>(null);
 
-  // Synchronizace filtrů s globálním výběrem
-  useEffect(() => {
-    if (selectedEmployeeId) {
-      setEmployeeFilter(selectedEmployeeId);
-    }
-  }, [selectedEmployeeId]);
+  useEffect(() => { if (selectedEmployeeId) setEmployeeFilter(selectedEmployeeId); }, [selectedEmployeeId]);
+  useEffect(() => { if (selectedMonth) setMonthFilter(selectedMonth); }, [selectedMonth]);
 
-  useEffect(() => {
-    if (selectedMonth) {
-      setMonthFilter(selectedMonth);
-    }
-  }, [selectedMonth]);
+  const getEmployeeName = (id: string) => employees.find(e => e.id === id)?.name || 'Neznámý';
 
-  const getEmployeeName = (id: string) => {
-    const emp = employees.find(e => e.id === id);
-    return emp ? emp.name : 'Neznámý';
-  };
-
-  const isProductiveWork = (type: WorkType) => {
-    return [
-      WorkType.REGULAR, 
-      WorkType.OVERTIME, 
-      WorkType.BUSINESS_TRIP
-    ].includes(type);
-  };
+  const isProductiveWork = (type: WorkType) => [WorkType.REGULAR, WorkType.OVERTIME, WorkType.BUSINESS_TRIP].includes(type);
 
   const projectOptions = useMemo(() => {
     const fromJobs = jobs.filter(j => j.isActive).map(j => j.name);
@@ -58,9 +35,7 @@ const ReportingModule: React.FC<ReportingModuleProps> = ({
     return Array.from(new Set([...fromJobs, ...fromEntries])).sort();
   }, [entries, jobs]);
 
-  const employeeOptions = useMemo(() => {
-    return employees.filter(e => e.isActive && e.id !== 'win3-support-id').sort((a, b) => a.name.localeCompare(b.name));
-  }, [employees]);
+  const employeeOptions = useMemo(() => employees.filter(e => e.isActive && e.id !== 'win3-support-id').sort((a, b) => a.name.localeCompare(b.name)), [employees]);
 
   const availableMonths = useMemo(() => {
       const currentMonth = new Date().toISOString().substring(0, 7);
@@ -78,150 +53,217 @@ const ReportingModule: React.FC<ReportingModuleProps> = ({
         const matchesMonth = monthFilter === 'all' || entry.date.startsWith(monthFilter);
         return matchesProject && matchesEmployee && matchesMonth;
       })
-      .sort((a, b) => b.date.localeCompare(a.date));
+      .sort((a, b) => a.date.localeCompare(b.date));
   }, [entries, projectFilter, employeeFilter, monthFilter]);
 
-  const entriesWithDocs = useMemo(() => {
-      return filteredEntries.filter(e => e.attachmentUrl);
-  }, [filteredEntries]);
+  const entriesWithDocs = useMemo(() => filteredEntries.filter(e => e.attachmentUrl), [filteredEntries]);
 
   const aggregatedData = useMemo(() => {
-      const byProject: Record<string, { total: number; regular: number; overtime: number }> = {};
-      const byUser: Record<string, number> = {};
-      const byType: Record<string, number> = {};
-      
-      let totalWorked = 0;
-      let totalRegularProductive = 0;
-      let totalOvertime = 0;
-      let totalAbsence = 0;
-      let total = 0;
+      const byProject: Record<string, number> = {};
+      let regular = 0, overtime = 0, trips = 0, absence = 0, total = 0;
 
       filteredEntries.forEach(e => {
-          const productive = isProductiveWork(e.type);
-
-          if (productive) {
-            const pName = e.project || 'Ostatní / Režie';
-            if (!byProject[pName]) {
-                byProject[pName] = { total: 0, regular: 0, overtime: 0 };
-            }
-            
-            byProject[pName].total += e.hours;
-            
-            if (e.type === WorkType.OVERTIME) {
-                byProject[pName].overtime += e.hours;
-                totalOvertime += e.hours;
-            } else {
-                byProject[pName].regular += e.hours;
-                totalRegularProductive += e.hours;
-            }
-
-            totalWorked += e.hours;
+          if (isProductiveWork(e.type)) {
+              const pName = e.project || 'Ostatní';
+              byProject[pName] = (byProject[pName] || 0) + e.hours;
+              if (e.type === WorkType.OVERTIME) overtime += e.hours;
+              else if (e.type === WorkType.BUSINESS_TRIP) trips += e.hours;
+              else regular += e.hours;
           } else {
-            totalAbsence += e.hours;
+              absence += e.hours;
           }
-
-          byType[e.type] = (byType[e.type] || 0) + e.hours;
-          const empName = getEmployeeName(e.employeeId);
-          byUser[empName] = (byUser[empName] || 0) + e.hours;
           total += e.hours;
       });
 
-      return { byProject, byUser, byType, totalWorked, totalRegularProductive, totalOvertime, totalAbsence, total };
-  }, [filteredEntries, employees]);
+      return { byProject, regular, overtime, trips, absence, total };
+  }, [filteredEntries]);
 
   const generatePDF = async () => {
+    if (filteredEntries.length === 0) return alert("Nejsou k dispozici žádná data pro export.");
     setIsGeneratingPdf(true);
+    
     try {
         const doc = new jsPDF();
+        
+        // Font loading for Czech diacritics
         const fontUrl = 'https://cdnjs.cloudflare.com/ajax/libs/pdfmake/0.1.66/fonts/Roboto/Roboto-Regular.ttf';
         const fontBytes = await fetch(fontUrl).then(res => res.arrayBuffer());
         const filename = 'Roboto-Regular.ttf';
         const base64Font = btoa(new Uint8Array(fontBytes).reduce((data, byte) => data + String.fromCharCode(byte), ''));
         doc.addFileToVFS(filename, base64Font);
         doc.addFont(filename, 'Roboto', 'normal');
-        doc.setFont('Roboto');
+        
+        const boldUrl = 'https://cdnjs.cloudflare.com/ajax/libs/pdfmake/0.1.66/fonts/Roboto/Roboto-Medium.ttf';
+        const boldBytes = await fetch(boldUrl).then(res => res.arrayBuffer());
+        const boldFilename = 'Roboto-Bold.ttf';
+        const base64Bold = btoa(new Uint8Array(boldBytes).reduce((data, byte) => data + String.fromCharCode(byte), ''));
+        doc.addFileToVFS(boldFilename, base64Bold);
+        doc.addFont(boldFilename, 'Roboto', 'bold');
+
+        doc.setFont('Roboto', 'normal');
 
         const period = monthFilter === 'all' ? 'Celá historie' : monthFilter;
         const empName = employeeFilter !== 'all' ? getEmployeeName(employeeFilter) : 'Všichni zaměstnanci';
 
-        doc.setFontSize(14);
-        doc.text(`Výkaz práce: ${period}`, 14, 15);
+        // HEADER
+        doc.setFillColor(15, 23, 42); // slate-900
+        doc.rect(0, 0, 210, 25, 'F');
+        doc.setTextColor(255, 255, 255);
+        doc.setFontSize(18);
+        doc.setFont('Roboto', 'bold');
+        doc.text("MĚSÍČNÍ VÝKAZ PRÁCE", 14, 17);
         doc.setFontSize(9);
+        doc.setFont('Roboto', 'normal');
+        doc.text("Chytrá docházka by Win3 Studio", 160, 17, { align: 'right' });
+
+        // IDENTIFICATION
+        doc.setTextColor(15, 23, 42);
+        doc.setFontSize(10);
+        doc.text(`Zaměstnanec:`, 14, 35);
+        doc.setFont('Roboto', 'bold');
+        doc.text(empName, 40, 35);
+        
+        doc.setFont('Roboto', 'normal');
+        doc.text(`Období:`, 14, 42);
+        doc.setFont('Roboto', 'bold');
+        doc.text(period, 40, 42);
+
+        doc.setFont('Roboto', 'normal');
+        doc.setFontSize(8);
         doc.setTextColor(100);
-        doc.text(`Zaměstnanec: ${empName}`, 14, 20);
-        doc.setTextColor(0);
+        doc.text(`Vygenerováno: ${new Date().toLocaleString('cs-CZ')}`, 196, 35, { align: 'right' });
 
-        const summaryData = [
-            ['Běžná práce', aggregatedData.totalRegularProductive.toFixed(1)],
-            ['Přesčasy', aggregatedData.totalOvertime.toFixed(1)],
-            ['Absence', aggregatedData.totalAbsence.toFixed(1)],
-            ['CELKEM', aggregatedData.total.toFixed(1)]
-        ];
-
+        // SECTION A: SUMMARY
         autoTable(doc, {
-            startY: 28,
-            head: [['Souhrn', 'Hod']],
-            body: summaryData,
-            theme: 'plain',
-            headStyles: { fontSize: 8, fontStyle: 'bold' },
-            styles: { font: 'Roboto', fontSize: 8, cellPadding: 1 },
-            columnStyles: { 0: { cellWidth: 30 }, 1: { cellWidth: 20, fontStyle: 'bold', halign: 'right' } },
+            startY: 48,
+            head: [['SOUHRN MĚSÍCE', 'HODINY']],
+            body: [
+                ['Běžná práce', aggregatedData.regular.toFixed(1)],
+                ['Přesčasy', aggregatedData.overtime.toFixed(1)],
+                ['Služební cesty', aggregatedData.trips.toFixed(1)],
+                ['Absence (dovolená, nemoc...)', aggregatedData.absence.toFixed(1)],
+                [{ content: 'CELKEM K VÝPLATĚ', styles: { fontStyle: 'bold' } }, { content: aggregatedData.total.toFixed(1), styles: { fontStyle: 'bold' } }]
+            ],
+            theme: 'grid',
+            styles: { font: 'Roboto', fontSize: 8, cellPadding: 2 },
+            headStyles: { fillColor: [79, 70, 229], textColor: 255 }, // indigo-600
+            columnStyles: { 0: { cellWidth: 50 }, 1: { cellWidth: 20, halign: 'right' } },
             margin: { left: 14 }
         });
 
-        doc.save(`vykaz_prace_${empName}_${period}.pdf`);
+        // SECTION B: PROJECTS
+        // Fix: Explicitly cast 'hours' to number to avoid TypeScript 'unknown' inference error from Object.entries
+        const projectRows = Object.entries(aggregatedData.byProject).map(([name, hours]) => [name.substring(0, 40), (hours as number).toFixed(1)]);
+        if (projectRows.length > 0) {
+            autoTable(doc, {
+                startY: (doc as any).lastAutoTable.cursor.y + 10,
+                head: [['ROZPIS PODLE PROJEKTŮ / ZAKÁZEK', 'HODINY']],
+                body: projectRows,
+                theme: 'grid',
+                styles: { font: 'Roboto', fontSize: 8, cellPadding: 2 },
+                headStyles: { fillColor: [51, 65, 85], textColor: 255 }, // slate-700
+                columnStyles: { 0: { cellWidth: 100 }, 1: { cellWidth: 20, halign: 'right' } },
+                margin: { left: 14 }
+            });
+        }
+
+        // SECTION C: DETAILED LOG (Grouped by date, single line per day)
+        const dailyData: Record<string, { projects: string[], hours: number, types: string[] }> = {};
+        filteredEntries.forEach(e => {
+            if (!dailyData[e.date]) dailyData[e.date] = { projects: [], hours: 0, types: [] };
+            if (e.project && !dailyData[e.date].projects.includes(e.project)) dailyData[e.date].projects.push(e.project);
+            dailyData[e.date].hours += e.hours;
+            if (!dailyData[e.date].types.includes(e.type)) dailyData[e.date].types.push(e.type);
+        });
+
+        const logRows = Object.entries(dailyData).sort().map(([date, data]) => {
+            const dateObj = new Date(date);
+            const dayName = dateObj.toLocaleDateString('cs-CZ', { weekday: 'short' });
+            return [
+                `${dateObj.getDate()}.${dateObj.getMonth() + 1}. (${dayName})`,
+                data.projects.join(', ').substring(0, 50) || data.types.join(', '),
+                data.hours.toFixed(1)
+            ];
+        });
+
+        autoTable(doc, {
+            startY: (doc as any).lastAutoTable.cursor.y + 10,
+            head: [['DATUM', 'ČINNOST / PROJEKT', 'HOD']],
+            body: logRows,
+            theme: 'striped',
+            styles: { font: 'Roboto', fontSize: 7, cellPadding: 1.5 },
+            headStyles: { fillColor: [241, 245, 249], textColor: [71, 85, 105], fontStyle: 'bold' },
+            columnStyles: { 0: { cellWidth: 25 }, 1: { cellWidth: 'auto' }, 2: { cellWidth: 15, halign: 'right' } },
+            margin: { left: 14, bottom: 40 },
+            didDrawPage: (data) => {
+                // FOOTER WITH SIGNATURES - only on last page
+                const pageSize = doc.internal.pageSize;
+                const pageHeight = pageSize.height ? pageSize.height : pageSize.getHeight();
+                
+                doc.setDrawColor(200);
+                doc.line(14, pageHeight - 30, 80, pageHeight - 30);
+                doc.line(130, pageHeight - 30, 196, pageHeight - 30);
+                
+                doc.setFontSize(7);
+                doc.setTextColor(150);
+                doc.text("Podpis zaměstnance", 14, pageHeight - 25);
+                doc.text("Podpis nadřízeného", 130, pageHeight - 25);
+                
+                doc.text(`Aplikace Chytrá docházka - win3.cz - Strana ${data.pageNumber}`, 105, pageHeight - 10, { align: 'center' });
+            }
+        });
+
+        doc.save(`Vykaz_prace_${empName.replace(/\s+/g, '_')}_${period}.pdf`);
     } catch (e) {
-        alert("Chyba při generování PDF.");
+        console.error(e);
+        alert("Chyba při generování PDF. Zkuste to prosím znovu.");
     } finally {
         setIsGeneratingPdf(false);
     }
   };
 
-  const handlePreSend = async () => {
-      await generatePDF();
-      setIsEmailModalOpen(true);
-  };
-
   return (
-    <div className="space-y-6">
+    <div className="space-y-6 animate-fade-in">
         <div className="bg-white p-6 rounded-xl shadow-sm border border-gray-100">
-            <h3 className="text-lg font-semibold text-slate-900 mb-4">Filtry Reportu</h3>
-            <div className="grid grid-cols-1 md:grid-cols-4 gap-4 items-end">
+            <div className="flex justify-between items-center mb-4">
+                <h3 className="text-lg font-semibold text-slate-900">Filtry a export</h3>
+                <button 
+                  onClick={generatePDF} 
+                  disabled={isGeneratingPdf}
+                  className="flex items-center gap-2 px-4 py-2 bg-indigo-600 text-white rounded-lg font-bold hover:bg-indigo-700 transition-all shadow-md active:scale-95 disabled:opacity-50"
+                >
+                    {isGeneratingPdf ? (
+                        <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin"></div>
+                    ) : (
+                        <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+                        </svg>
+                    )}
+                    Exportovat do PDF
+                </button>
+            </div>
+            
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                 <div>
-                    <label className="block text-sm font-medium text-slate-700 mb-1">Období</label>
-                    <select 
-                      value={monthFilter} 
-                      onChange={(e) => setMonthFilter(e.target.value)} 
-                      className="w-full p-2 border border-gray-300 rounded-lg focus:ring-indigo-500 text-slate-900 bg-white"
-                    >
-                        <option value="all" className="text-slate-900">Celá historie</option>
-                        {availableMonths.map(m => <option key={m} value={m} className="text-slate-900">{m}</option>)}
+                    <label className="block text-xs font-bold text-slate-500 uppercase mb-1">Období</label>
+                    <select value={monthFilter} onChange={(e) => setMonthFilter(e.target.value)} className="w-full p-2 border border-gray-300 rounded-lg text-slate-900 bg-white">
+                        <option value="all">Celá historie</option>
+                        {availableMonths.map(m => <option key={m} value={m}>{m}</option>)}
                     </select>
                 </div>
                 <div>
-                    <label className="block text-sm font-medium text-slate-700 mb-1">Projekt</label>
-                    <select 
-                      value={projectFilter} 
-                      onChange={(e) => setProjectFilter(e.target.value)} 
-                      className="w-full p-2 border border-gray-300 rounded-lg focus:ring-indigo-500 text-slate-900 bg-white"
-                    >
-                        <option value="all" className="text-slate-900">Všechny projekty</option>
-                        {projectOptions.map(p => <option key={p} value={p} className="text-slate-900">{p}</option>)}
+                    <label className="block text-xs font-bold text-slate-500 uppercase mb-1">Projekt</label>
+                    <select value={projectFilter} onChange={(e) => setProjectFilter(e.target.value)} className="w-full p-2 border border-gray-300 rounded-lg text-slate-900 bg-white">
+                        <option value="all">Všechny projekty</option>
+                        {projectOptions.map(p => <option key={p} value={p}>{p}</option>)}
                     </select>
                 </div>
                 <div>
-                    <label className="block text-sm font-medium text-slate-700 mb-1">Zaměstnanec</label>
-                    <select 
-                      value={employeeFilter} 
-                      onChange={(e) => setEmployeeFilter(e.target.value)} 
-                      className="w-full p-2 border border-gray-300 rounded-lg focus:ring-indigo-500 text-slate-900 bg-white"
-                    >
-                        <option value="all" className="text-slate-900">Všichni zaměstnanci</option>
-                        {employeeOptions.map(emp => <option key={emp.id} value={emp.id} className="text-slate-900">{emp.name}</option>)}
+                    <label className="block text-xs font-bold text-slate-500 uppercase mb-1">Zaměstnanec</label>
+                    <select value={employeeFilter} onChange={(e) => setEmployeeFilter(e.target.value)} className="w-full p-2 border border-gray-300 rounded-lg text-slate-900 bg-white">
+                        <option value="all">Všichni zaměstnanci</option>
+                        {employeeOptions.map(emp => <option key={emp.id} value={emp.id}>{emp.name}</option>)}
                     </select>
-                </div>
-                <div>
-                    <button onClick={() => { setProjectFilter('all'); setEmployeeFilter('all'); setMonthFilter('all'); }} className="w-full px-4 py-2 bg-slate-100 text-slate-600 rounded-lg hover:bg-slate-200 transition-colors font-bold">Vymazat</button>
                 </div>
             </div>
         </div>
@@ -232,19 +274,23 @@ const ReportingModule: React.FC<ReportingModuleProps> = ({
         </div>
 
         {activeView === 'stats' && (
-        <>
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+        <div className="space-y-6">
+            <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
                 <div className="bg-white p-4 rounded-xl shadow-sm border border-gray-100">
-                    <p className="text-sm text-gray-500 mb-1">Běžně odpracováno</p>
-                    <p className="text-2xl font-bold text-indigo-600">{aggregatedData.totalRegularProductive.toFixed(1)} h</p>
+                    <p className="text-xs text-slate-500 uppercase font-bold mb-1">Práce</p>
+                    <p className="text-2xl font-bold text-indigo-600">{aggregatedData.regular.toFixed(1)} h</p>
                 </div>
                 <div className="bg-white p-4 rounded-xl shadow-sm border border-gray-100">
-                    <p className="text-sm text-gray-500 mb-1">Přesčasy</p>
-                    <p className={`text-2xl font-bold ${aggregatedData.totalOvertime > 0 ? 'text-orange-600' : 'text-slate-900'}`}>{aggregatedData.totalOvertime.toFixed(1)} h</p>
+                    <p className="text-xs text-slate-500 uppercase font-bold mb-1">Přesčas</p>
+                    <p className={`text-2xl font-bold ${aggregatedData.overtime > 0 ? 'text-orange-600' : 'text-slate-900'}`}>{aggregatedData.overtime.toFixed(1)} h</p>
                 </div>
                 <div className="bg-white p-4 rounded-xl shadow-sm border border-gray-100">
-                    <p className="text-sm text-gray-500 mb-1">Celkem (fond)</p>
-                    <p className="text-2xl font-bold text-slate-900">{aggregatedData.total.toFixed(1)} h</p>
+                    <p className="text-xs text-slate-500 uppercase font-bold mb-1">Absence</p>
+                    <p className="text-2xl font-bold text-slate-400">{aggregatedData.absence.toFixed(1)} h</p>
+                </div>
+                <div className="bg-indigo-600 p-4 rounded-xl shadow-lg border border-indigo-700 text-white">
+                    <p className="text-xs text-indigo-100 uppercase font-bold mb-1">Celkem fond</p>
+                    <p className="text-2xl font-bold">{aggregatedData.total.toFixed(1)} h</p>
                 </div>
             </div>
 
@@ -252,27 +298,52 @@ const ReportingModule: React.FC<ReportingModuleProps> = ({
                 <table className="min-w-full divide-y divide-gray-200 text-sm">
                     <thead className="bg-gray-50">
                         <tr>
-                            <th className="px-4 py-2 text-left text-gray-500">Datum</th>
-                            <th className="px-4 py-2 text-left text-gray-500">Projekt</th>
-                            <th className="px-4 py-2 text-left text-gray-500">Typ</th>
-                            <th className="px-4 py-2 text-right text-gray-500">Hodiny</th>
+                            <th className="px-4 py-2 text-left text-gray-500 font-bold uppercase tracking-wider text-[10px]">Datum</th>
+                            <th className="px-4 py-2 text-left text-gray-500 font-bold uppercase tracking-wider text-[10px]">Projekt / Činnost</th>
+                            <th className="px-4 py-2 text-right text-gray-500 font-bold uppercase tracking-wider text-[10px]">Hodiny</th>
                         </tr>
                     </thead>
                     <tbody className="divide-y divide-gray-200">
                         {filteredEntries.length === 0 ? (
-                            <tr><td colSpan={4} className="px-4 py-8 text-center text-gray-400">Žádné záznamy pro tento filtr.</td></tr>
+                            <tr><td colSpan={3} className="px-4 py-8 text-center text-gray-400 italic">Žádné záznamy pro tento filtr.</td></tr>
                         ) : filteredEntries.map(e => (
-                            <tr key={e.id}>
-                                <td className="px-4 py-2 text-slate-900">{e.date}</td>
-                                <td className="px-4 py-2 font-medium text-slate-800">{e.project || '-'}</td>
-                                <td className="px-4 py-2"><span className={`px-2 py-0.5 rounded-full text-xs font-medium ${e.type === WorkType.OVERTIME ? 'text-orange-800 bg-orange-200' : 'text-gray-700 bg-gray-100'}`}>{e.type}</span></td>
+                            <tr key={e.id} className="hover:bg-slate-50 transition-colors">
+                                <td className="px-4 py-2 text-slate-500 whitespace-nowrap">{new Date(e.date).toLocaleDateString('cs-CZ')}</td>
+                                <td className="px-4 py-2 font-medium text-slate-900">
+                                    <div className="flex items-center gap-2">
+                                        <span className={`w-2 h-2 rounded-full ${isProductiveWork(e.type) ? 'bg-indigo-500' : 'bg-slate-300'}`}></span>
+                                        {e.project || e.type}
+                                    </div>
+                                </td>
                                 <td className="px-4 py-2 text-right font-mono font-bold text-slate-900">{Number(e.hours).toFixed(1)}</td>
                             </tr>
                         ))}
                     </tbody>
                 </table>
             </div>
-        </>
+        </div>
+        )}
+
+        {activeView === 'documents' && (
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+                {entriesWithDocs.length === 0 ? (
+                    <div className="col-span-full py-20 text-center bg-white rounded-xl border-2 border-dashed border-slate-200 text-slate-400">
+                        Nenalezeny žádné přílohy.
+                    </div>
+                ) : entriesWithDocs.map(e => (
+                    <a key={e.id} href={e.attachmentUrl} target="_blank" rel="noopener noreferrer" className="bg-white p-4 rounded-xl border border-gray-200 shadow-sm hover:shadow-md transition-shadow group">
+                        <div className="aspect-[3/4] bg-slate-100 rounded-lg mb-3 overflow-hidden border border-slate-200 relative">
+                             <img src={e.attachmentUrl} className="w-full h-full object-cover group-hover:scale-105 transition-transform" alt="Doklad" />
+                             <div className="absolute inset-0 bg-slate-900/40 opacity-0 group-hover:opacity-100 flex items-center justify-center transition-opacity">
+                                 <span className="bg-white text-slate-900 px-3 py-1.5 rounded-full font-bold text-xs">Zobrazit detail</span>
+                             </div>
+                        </div>
+                        <div className="text-xs text-slate-500 font-bold uppercase">{new Date(e.date).toLocaleDateString('cs-CZ')}</div>
+                        <div className="text-sm font-bold text-slate-900 mt-1">{e.type}</div>
+                        <div className="text-xs text-slate-400 mt-1 truncate">{e.description || 'Bez popisu'}</div>
+                    </a>
+                ))}
+            </div>
         )}
     </div>
   );
