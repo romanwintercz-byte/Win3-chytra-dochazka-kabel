@@ -57,9 +57,10 @@ const ReportingModule: React.FC<ReportingModuleProps> = ({
 
   const entriesWithDocs = useMemo(() => filteredEntries.filter(e => e.attachmentUrl), [filteredEntries]);
 
+  // Fix: Added vacation and holiday to aggregatedData calculation and returned object to avoid missing property errors.
   const aggregatedData = useMemo(() => {
       const byProject: Record<string, number> = {};
-      let regular = 0, overtime = 0, trips = 0, absence = 0, total = 0;
+      let regular = 0, overtime = 0, trips = 0, vacation = 0, holiday = 0, absence = 0, total = 0;
 
       filteredEntries.forEach(e => {
           const h = Number(e.hours) || 0;
@@ -69,22 +70,154 @@ const ReportingModule: React.FC<ReportingModuleProps> = ({
               if (e.type === WorkType.OVERTIME) overtime += h;
               else if (e.type === WorkType.BUSINESS_TRIP) trips += h;
               else regular += h;
+          } else if (e.type === WorkType.VACATION) {
+              vacation += h;
+          } else if (e.type === WorkType.HOLIDAY) {
+              holiday += h;
           } else {
               absence += h;
           }
           total += h;
       });
 
-      return { byProject, regular, overtime, trips, absence, total };
+      return { byProject, regular, overtime, trips, vacation, holiday, absence, total };
   }, [filteredEntries]);
 
-  // --- EXCEL (CSV) EXPORT ---
+  // --- TISK (A4) ---
+  const handlePrint = () => {
+    const printMount = document.getElementById('print-mount');
+    if (!printMount) return;
+
+    const empName = employeeFilter !== 'all' ? getEmployeeName(employeeFilter) : 'Všichni zaměstnanci';
+    const period = monthFilter === 'all' ? 'Všechna období' : monthFilter;
+
+    // Seskupení záznamů podle data pro vícesloupcový denní rozpis (1 řádek = 1 den)
+    const dailyAggregation = filteredEntries.reduce((acc, e) => {
+        if (!acc[e.date]) {
+          acc[e.date] = { work: 0, vacation: 0, holiday: 0, other: 0, total: 0, text: [] };
+        }
+        const h = Number(e.hours);
+        acc[e.date].total += h;
+        
+        if (e.type === WorkType.VACATION) acc[e.date].vacation += h;
+        else if (e.type === WorkType.HOLIDAY) acc[e.date].holiday += h;
+        else if (isProductiveWork(e.type)) acc[e.date].work += h;
+        else acc[e.date].other += h;
+
+        const activity = `${e.project || e.type}${e.description ? ': ' + e.description : ''}`;
+        if (!acc[e.date].text.includes(activity)) acc[e.date].text.push(activity);
+        
+        return acc;
+    }, {} as Record<string, { work: number, vacation: number, holiday: number, other: number, total: number, text: string[] }>);
+
+    const sortedDates = Object.keys(dailyAggregation).sort();
+
+    // Seskupení podle projektů pro účetní
+    const projectSummary = filteredEntries.reduce((acc, e) => {
+        if (isProductiveWork(e.type)) {
+          const pName = e.project || 'Ostatní / Režie';
+          acc[pName] = (acc[pName] || 0) + Number(e.hours);
+        }
+        return acc;
+    }, {} as Record<string, number>);
+
+    // Generování HTML pro tisk
+    printMount.innerHTML = `
+      <div class="print-report">
+        <div class="header">
+          <div>
+            <h1 style="margin:0; font-size:16pt; color:black">MĚSÍČNÍ VÝKAZ PRÁCE</h1>
+            <p style="margin:1px 0; font-size:9pt; color:gray">Chytrá docházka Win3</p>
+          </div>
+          <div style="text-align:right; color:black; font-size:10pt">
+            <p style="margin:0"><b>Období:</b> ${period}</p>
+            <p style="margin:0"><b>Zaměstnanec:</b> ${empName}</p>
+          </div>
+        </div>
+
+        <div style="display: flex; gap: 15px; margin-bottom: 5px;">
+          <div style="flex: 2;">
+            <h2>Podklady pro účetní (Rozpis na zakázky)</h2>
+            <table>
+              <thead>
+                <tr><th>Název zakázky / Kód</th><th class="text-right" style="width:80px">Hodin celkem</th></tr>
+              </thead>
+              <tbody>
+                ${Object.entries(projectSummary).length === 0 ? '<tr><td colspan="2" class="text-center italic">Žádná práce na zakázkách</td></tr>' : 
+                  Object.entries(projectSummary).map(([name, hours]) => `
+                  <tr>
+                    <td>${name}</td>
+                    <td class="text-right font-bold">${hours.toFixed(1)}</td>
+                  </tr>
+                `).join('')}
+                <tr style="background:#f0f0f0">
+                  <td class="font-bold">ODPRACAVÁNO CELKEM (Výkon)</td>
+                  <td class="text-right font-bold">${(aggregatedData.regular + aggregatedData.overtime + aggregatedData.trips).toFixed(1)}</td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+          <div style="flex: 1;">
+            <h2>Souhrnná statistika</h2>
+            <table>
+              <tbody>
+                <tr><td>Běžná práce</td><td class="text-right">${aggregatedData.regular.toFixed(1)} h</td></tr>
+                <tr><td>Přesčasy</td><td class="text-right">${aggregatedData.overtime.toFixed(1)} h</td></tr>
+                <tr><td>Služební cesty</td><td class="text-right">${aggregatedData.trips.toFixed(1)} h</td></tr>
+                <tr><td>Dovolená</td><td class="text-right">${aggregatedData.vacation?.toFixed(1) || '0.0'} h</td></tr>
+                <tr><td>Svátek</td><td class="text-right">${aggregatedData.holiday?.toFixed(1) || '0.0'} h</td></tr>
+                <tr><td>Ostatní (Nemoc...)</td><td class="text-right">${aggregatedData.absence.toFixed(1)} h</td></tr>
+                <tr class="font-bold" style="background:#eee"><td>FOND CELKEM</td><td class="text-right">${aggregatedData.total.toFixed(1)} h</td></tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+
+        <h2>Denní rozpis docházky</h2>
+        <table>
+          <thead>
+            <tr>
+              <th style="width: 70px">Datum</th>
+              <th>Projekty a popis činnosti</th>
+              <th class="col-hours">Práce</th>
+              <th class="col-hours">Dov.</th>
+              <th class="col-hours">Svátek</th>
+              <th class="col-hours">Ost.</th>
+              <th class="col-hours" style="background:#e5e7eb">Celkem</th>
+            </tr>
+          </thead>
+          <tbody>
+            ${sortedDates.map(date => {
+              const d = dailyAggregation[date];
+              return `
+              <tr>
+                <td class="font-bold">${new Date(date).toLocaleDateString('cs-CZ', {day:'2-digit', month:'2-digit', weekday:'short'})}</td>
+                <td style="color: #333; font-size: 7pt">${d.text.join('; ')}</td>
+                <td class="text-right">${d.work > 0 ? d.work.toFixed(1) : '-'}</td>
+                <td class="text-right">${d.vacation > 0 ? d.vacation.toFixed(1) : '-'}</td>
+                <td class="text-right">${d.holiday > 0 ? d.holiday.toFixed(1) : '-'}</td>
+                <td class="text-right">${d.other > 0 ? d.other.toFixed(1) : '-'}</td>
+                <td class="text-right font-bold" style="background:#f3f4f6">${d.total.toFixed(1)}</td>
+              </tr>
+            `}).join('')}
+          </tbody>
+        </table>
+
+        <div class="signatures">
+          <div class="sig-box">Podpis zaměstnance (stvrzuji správnost dat)</div>
+          <div class="sig-box">Schválil (za firmu / nadřízený)</div>
+        </div>
+        <div style="text-align:center; font-size:6pt; color:gray; margin-top:5px;">Vygenerováno systémem Chytrá docházka v1.9.21</div>
+      </div>
+    `;
+
+    window.print();
+  };
+
   const exportToCSV = () => {
     if (filteredEntries.length === 0) return alert("Nejsou data k exportu.");
-    
     const empName = employeeFilter !== 'all' ? getEmployeeName(employeeFilter) : 'Všichni';
     const period = monthFilter === 'all' ? 'Historie' : monthFilter;
-
     const BOM = "\uFEFF";
     const headers = ["Datum", "Zaměstnanec", "Projekt", "Činnost", "Hodiny", "Typ"].join(";");
     const rows = filteredEntries.map(e => [
@@ -95,7 +228,6 @@ const ReportingModule: React.FC<ReportingModuleProps> = ({
         e.hours.toString().replace('.', ','),
         e.type
     ].join(";"));
-
     const csvContent = BOM + headers + "\n" + rows.join("\n");
     const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
     const url = URL.createObjectURL(blob);
@@ -107,180 +239,25 @@ const ReportingModule: React.FC<ReportingModuleProps> = ({
     document.body.removeChild(link);
   };
 
-  // --- TISK (A4) ---
-  const handlePrint = () => {
-    const printMount = document.getElementById('print-mount');
-    if (!printMount) return;
-
-    const empName = employeeFilter !== 'all' ? getEmployeeName(employeeFilter) : 'Všichni zaměstnanci';
-    const period = monthFilter === 'all' ? 'Všechna období' : monthFilter;
-
-    // Seskupení záznamů podle data pro denní rozpis (1 řádek = 1 den)
-    const dailyAggregation = filteredEntries.reduce((acc, e) => {
-        if (!acc[e.date]) acc[e.date] = { hours: 0, text: [] };
-        acc[e.date].hours += Number(e.hours);
-        const activity = `${e.project || e.type}${e.description ? ': ' + e.description : ''}`;
-        acc[e.date].text.push(activity);
-        return acc;
-    }, {} as Record<string, { hours: number, text: string[] }>);
-
-    const sortedDates = Object.keys(dailyAggregation).sort();
-
-    // Seskupení podle projektů pro účetní
-    const projectSummary = filteredEntries.reduce((acc, e) => {
-        const pName = e.project || e.type || 'Ostatní';
-        acc[pName] = (acc[pName] || 0) + Number(e.hours);
-        return acc;
-    }, {} as Record<string, number>);
-
-    // Generování HTML pro tisk
-    printMount.innerHTML = `
-      <div class="print-report">
-        <div class="header">
-          <div>
-            <h1 style="margin:0; font-size:18px; color:black">MĚSÍČNÍ VÝKAZ PRÁCE</h1>
-            <p style="margin:2px 0; font-size:10px; color:black">Chytrá docházka Win3</p>
-          </div>
-          <div style="text-align:right; color:black; font-size:10px">
-            <p style="margin:0"><b>Období:</b> ${period}</p>
-            <p style="margin:0"><b>Zaměstnanec:</b> ${empName}</p>
-          </div>
-        </div>
-
-        <div style="display: flex; gap: 20px;">
-          <div style="flex: 1;">
-            <h2>Podklady pro účetní (Zakázky)</h2>
-            <table>
-              <thead>
-                <tr><th>Název zakázky / Typ</th><th class="text-right">Celkem hodin</th></tr>
-              </thead>
-              <tbody>
-                ${Object.entries(projectSummary).map(([name, hours]) => `
-                  <tr>
-                    <td>${name}</td>
-                    <td class="text-right font-bold">${hours.toFixed(1)}</td>
-                  </tr>
-                `).join('')}
-                <tr style="background:#f0f0f0">
-                  <td class="font-bold">CELKEM K VÝPLATĚ</td>
-                  <td class="text-right font-bold">${aggregatedData.total.toFixed(1)}</td>
-                </tr>
-              </tbody>
-            </table>
-          </div>
-          <div style="flex: 1;">
-            <h2>Statistika docházky</h2>
-            <table>
-              <tbody>
-                <tr><td>Běžná práce</td><td class="text-right">${aggregatedData.regular.toFixed(1)} h</td></tr>
-                <tr><td>Přesčasy</td><td class="text-right">${aggregatedData.overtime.toFixed(1)} h</td></tr>
-                <tr><td>Služební cesty</td><td class="text-right">${aggregatedData.trips.toFixed(1)} h</td></tr>
-                <tr><td>Absence (Dov, Nem...)</td><td class="text-right">${aggregatedData.absence.toFixed(1)} h</td></tr>
-              </tbody>
-            </table>
-          </div>
-        </div>
-
-        <h2>Denní rozpis činností</h2>
-        <table style="font-size: 8px;">
-          <thead>
-            <tr>
-              <th style="width: 60px">Datum</th>
-              <th>Projekty a popis činnosti</th>
-              <th style="width: 50px" class="text-right">Suma</th>
-            </tr>
-          </thead>
-          <tbody>
-            ${sortedDates.map(date => `
-              <tr>
-                <td class="font-bold">${new Date(date).toLocaleDateString('cs-CZ', {day:'2-digit', month:'2-digit', weekday:'short'})}</td>
-                <td style="color: #444">${dailyAggregation[date].text.join('; ')}</td>
-                <td class="text-right font-bold">${dailyAggregation[date].hours.toFixed(1)}</td>
-              </tr>
-            `).join('')}
-          </tbody>
-        </table>
-
-        <div class="signatures">
-          <div class="sig-box">Podpis zaměstnance (potvrzuji správnost dat)</div>
-          <div class="sig-box">Podpis nadřízeného (schvaluji k proplacení)</div>
-        </div>
-      </div>
-    `;
-
-    window.print();
-  };
-
-  const generatePDF = async () => {
-    if (filteredEntries.length === 0) return alert("Nejsou k dispozici žádná data pro export.");
-    setIsGeneratingPdf(true);
-    
-    try {
-        const doc = new jsPDF({ orientation: 'p', unit: 'mm', format: 'a4' });
-        doc.setFont('helvetica', 'normal');
-        const period = monthFilter === 'all' ? 'Celá historie' : monthFilter;
-        const empName = employeeFilter !== 'all' ? getEmployeeName(employeeFilter) : 'Všichni zaměstnanci';
-
-        doc.setFontSize(14);
-        doc.text("MĚSÍČNÍ VÝKAZ PRÁCE", 14, 15);
-        doc.setFontSize(9);
-        doc.text(`Zaměstnanec: ${empName}`, 14, 25);
-        doc.text(`Období: ${period}`, 14, 30);
-
-        autoTable(doc, {
-            startY: 35,
-            head: [['Typ práce', 'Hodiny']],
-            body: [
-                ['Běžná práce', aggregatedData.regular.toFixed(1)],
-                ['Přesčasy', aggregatedData.overtime.toFixed(1)],
-                ['Služební cesty', aggregatedData.trips.toFixed(1)],
-                ['Absence', aggregatedData.absence.toFixed(1)],
-                ['CELKEM', aggregatedData.total.toFixed(1)]
-            ],
-            theme: 'grid'
-        });
-
-        autoTable(doc, {
-            startY: (doc as any).lastAutoTable.cursor.y + 10,
-            head: [['Datum', 'Projekt', 'Hodin']],
-            body: filteredEntries.map(e => [new Date(e.date).toLocaleDateString('cs-CZ'), e.project || e.type, e.hours.toFixed(1)]),
-            theme: 'striped'
-        });
-
-        doc.save(`Vykaz_${empName.replace(/\s+/g, '_')}_${period}.pdf`);
-    } catch (e) {
-        alert("Generování PDF selhalo. Použijte tlačítko TISK nebo EXCEL.");
-    } finally {
-        setIsGeneratingPdf(false);
-    }
-  };
-
   return (
     <div className="space-y-6 animate-fade-in no-print">
         <div className="bg-white p-6 rounded-xl shadow-sm border border-gray-100">
             <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 mb-6">
-                <h3 className="text-lg font-semibold text-slate-900">Filtry a exporty</h3>
+                <h3 className="text-lg font-semibold text-slate-900">Export a tisk reportu</h3>
                 <div className="flex flex-wrap gap-2 w-full sm:w-auto">
                     <button 
                       onClick={handlePrint}
-                      className="flex-1 sm:flex-none flex items-center justify-center gap-2 px-4 py-2 bg-slate-800 text-white rounded-lg font-bold hover:bg-slate-900 transition-all shadow-md active:scale-95"
+                      className="flex-1 sm:flex-none flex items-center justify-center gap-2 px-5 py-2.5 bg-slate-900 text-white rounded-lg font-bold hover:bg-black transition-all shadow-lg active:scale-95"
                     >
-                        <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 17h2a2 2 0 002-2v-4a2 2 0 00-2-2H5a2 2 0 00-2 2v4a2 2 0 002 2h2m2 4h6a2 2 0 002-2v-4a2 2 0 00-2-2H9a2 2 0 00-2 2v4a2 2 0 002 2zm8-12V5a2 2 0 00-2-2H9a2 2 0 00-2 2v4h10z" /></svg>
-                        Tisk Reportu (A4)
+                        <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 17h2a2 2 0 002-2v-4a2 2 0 00-2-2H5a2 2 0 00-2 2v4a2 2 0 002 2h2m2 4h6a2 2 0 002-2v-4a2 2 0 00-2-2H9a2 2 0 00-2 2v4a2 2 0 002 2zm8-12V5a2 2 0 00-2-2H9a2 2 0 00-2 2v4h10z" /></svg>
+                        Tisk na A4
                     </button>
                     <button 
                       onClick={exportToCSV}
-                      className="flex-1 sm:flex-none flex items-center justify-center gap-2 px-4 py-2 bg-green-600 text-white rounded-lg font-bold hover:bg-green-700 transition-all shadow-md active:scale-95"
+                      className="flex-1 sm:flex-none flex items-center justify-center gap-2 px-5 py-2.5 bg-green-600 text-white rounded-lg font-bold hover:bg-green-700 transition-all shadow-lg active:scale-95"
                     >
-                        <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" /></svg>
-                        Excel (CSV)
-                    </button>
-                    <button 
-                      onClick={generatePDF} 
-                      disabled={isGeneratingPdf}
-                      className="flex-1 sm:flex-none flex items-center justify-center gap-2 px-4 py-2 bg-indigo-600 text-white rounded-lg font-bold hover:bg-indigo-700 transition-all shadow-md active:scale-95 disabled:opacity-50"
-                    >
-                        {isGeneratingPdf ? <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin"></div> : "Staré PDF"}
+                        <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" /></svg>
+                        CSV / Excel
                     </button>
                 </div>
             </div>
@@ -288,21 +265,21 @@ const ReportingModule: React.FC<ReportingModuleProps> = ({
             <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                 <div>
                     <label className="block text-xs font-bold text-slate-500 uppercase mb-1">Období</label>
-                    <select value={monthFilter} onChange={(e) => setMonthFilter(e.target.value)} className="w-full p-2 border border-gray-300 rounded-lg text-slate-900 bg-white">
+                    <select value={monthFilter} onChange={(e) => setMonthFilter(e.target.value)} className="w-full p-2.5 border border-gray-300 rounded-lg text-slate-900 bg-white">
                         <option value="all">Celá historie</option>
                         {availableMonths.map(m => <option key={m} value={m}>{m}</option>)}
                     </select>
                 </div>
                 <div>
                     <label className="block text-xs font-bold text-slate-500 uppercase mb-1">Projekt</label>
-                    <select value={projectFilter} onChange={(e) => setProjectFilter(e.target.value)} className="w-full p-2 border border-gray-300 rounded-lg text-slate-900 bg-white">
+                    <select value={projectFilter} onChange={(e) => setProjectFilter(e.target.value)} className="w-full p-2.5 border border-gray-300 rounded-lg text-slate-900 bg-white">
                         <option value="all">Všechny projekty</option>
                         {projectOptions.map(p => <option key={p} value={p}>{p}</option>)}
                     </select>
                 </div>
                 <div>
                     <label className="block text-xs font-bold text-slate-500 uppercase mb-1">Zaměstnanec</label>
-                    <select value={employeeFilter} onChange={(e) => setEmployeeFilter(e.target.value)} className="w-full p-2 border border-gray-300 rounded-lg text-slate-900 bg-white">
+                    <select value={employeeFilter} onChange={(e) => setEmployeeFilter(e.target.value)} className="w-full p-2.5 border border-gray-300 rounded-lg text-slate-900 bg-white">
                         <option value="all">Všichni zaměstnanci</option>
                         {employeeOptions.map(emp => <option key={emp.id} value={emp.id}>{emp.name}</option>)}
                     </select>
@@ -320,7 +297,7 @@ const ReportingModule: React.FC<ReportingModuleProps> = ({
             <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
                 <div className="bg-white p-4 rounded-xl shadow-sm border border-gray-100 text-slate-900">
                     <p className="text-xs text-slate-500 uppercase font-bold mb-1">Práce</p>
-                    <p className="text-2xl font-bold text-indigo-600">{aggregatedData.regular.toFixed(1)} h</p>
+                    <p className="text-2xl font-bold text-indigo-600">{(aggregatedData.regular + aggregatedData.overtime).toFixed(1)} h</p>
                 </div>
                 <div className="bg-white p-4 rounded-xl shadow-sm border border-gray-100 text-slate-900">
                     <p className="text-xs text-slate-500 uppercase font-bold mb-1">Přesčas</p>
@@ -331,7 +308,7 @@ const ReportingModule: React.FC<ReportingModuleProps> = ({
                     <p className="text-2xl font-bold text-slate-400">{aggregatedData.absence.toFixed(1)} h</p>
                 </div>
                 <div className="bg-indigo-600 p-4 rounded-xl shadow-lg border border-indigo-700 text-white">
-                    <p className="text-xs text-indigo-100 uppercase font-bold mb-1">Celkem fond</p>
+                    <p className="text-xs text-indigo-100 uppercase font-bold mb-1">Fond celkem</p>
                     <p className="text-2xl font-bold">{aggregatedData.total.toFixed(1)} h</p>
                 </div>
             </div>

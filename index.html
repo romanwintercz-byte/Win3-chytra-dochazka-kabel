@@ -31,19 +31,22 @@
       /* Tiskové styly pro A4 */
       @media print {
         body { background-color: white !important; color: black !important; }
-        #root, .md\:hidden, #app-loader, .sidebar, .mobile-nav, .no-print { display: none !important; }
+        #root, .md\:hidden, #app-loader, .sidebar, .mobile-nav, .no-print, #help-button { display: none !important; }
         .print-only { display: block !important; }
-        @page { size: A4; margin: 10mm; }
-        .print-report { width: 100%; color: black !important; font-size: 9px; line-height: 1.2; }
-        table { width: 100%; border-collapse: collapse; margin-top: 5px; margin-bottom: 10px; }
-        th, td { border: 1px solid #999; padding: 4px; text-align: left; color: black !important; }
-        th { background-color: #f0f0f0 !important; font-weight: bold; }
+        @page { size: A4 portrait; margin: 8mm; }
+        .print-report { width: 100%; color: black !important; font-size: 8pt; line-height: 1.1; }
+        table { width: 100%; border-collapse: collapse; margin-top: 4px; margin-bottom: 8px; }
+        th, td { border: 1px solid #333; padding: 3px 5px; text-align: left; color: black !important; vertical-align: middle; }
+        th { background-color: #f0f0f0 !important; font-weight: bold; font-size: 7pt; text-transform: uppercase; }
         .text-right { text-align: right; }
+        .text-center { text-align: center; }
         .font-bold { font-weight: bold; }
-        .header { display: flex; justify-content: space-between; border-bottom: 2px solid #333; padding-bottom: 5px; margin-bottom: 10px; }
-        .signatures { display: flex; justify-content: space-between; margin-top: 20px; }
-        .sig-box { border-top: 1px solid #333; width: 45%; text-align: center; padding-top: 3px; font-size: 8px; }
-        h2 { font-size: 12px; margin: 5px 0; border-bottom: 1px solid #ccc; }
+        .header { display: flex; justify-content: space-between; border-bottom: 2px solid #000; padding-bottom: 4px; margin-bottom: 8px; }
+        .signatures { display: flex; justify-content: space-between; margin-top: 15px; }
+        .sig-box { border-top: 1px solid #000; width: 45%; text-align: center; padding-top: 2px; font-size: 7pt; }
+        h2 { font-size: 10pt; margin: 4px 0; border-bottom: 1px solid #666; padding-bottom: 2px; }
+        .bg-gray { background-color: #f9f9f9 !important; }
+        .col-hours { width: 35px; text-align: right; }
       }
       .print-only { display: none; }
     </style>
@@ -91,21 +94,18 @@
         </svg>
       </div>
       <div class="loader-spinner"></div>
-      <p id="loader-status" style="color: #94a3b8; font-size: 13px; margin-top: 20px;">Spouštění v1.9.20...</p>
+      <p id="loader-status" style="color: #94a3b8; font-size: 13px; margin-top: 20px;">Spouštění v1.9.21...</p>
       <div id="error-display"></div>
       <button id="reset-btn" onclick="emergencyReset()">OPRAVIT A RESETOVAT</button>
     </div>
 
     <div id="root"></div>
-
-    <!-- Toto bude vyplněno dynamicky v ReportingModule pro tisk -->
     <div id="print-mount" class="print-only"></div>
 
-    <script type="module-shim" src="./index.tsx?v=1.9.20"></script>
+    <script type="module-shim" src="./index.tsx?v=1.9.21"></script>
 
     <script>
       window.APP_STARTED = false;
-      
       window.onerror = function(msg, url, line, col, error) {
         var errDiv = document.getElementById('error-display');
         var btn = document.getElementById('reset-btn');
@@ -116,7 +116,6 @@
         if (btn) btn.style.display = 'block';
         return false;
       };
-
       window.emergencyReset = function() {
         if (confirm("Opravit aplikaci? Smažou se dočasná data a mezipaměť.")) {
           localStorage.clear();
@@ -126,16 +125,10 @@
               for (var name of names) caches.delete(name);
             });
           }
-          if ('serviceWorker' in navigator) {
-            navigator.serviceWorker.getRegistrations().then(function(regs) {
-              for(var r of regs) r.unregister();
-            });
-          }
           alert("Vyčištěno. Restartuji...");
           setTimeout(function() { window.location.href = 'index.html?r=' + Date.now(); }, 500);
         }
       };
-
       setTimeout(function() {
         if (!window.APP_STARTED) {
           document.getElementById('loader-status').innerText = "Problém se spuštěním. Zkuste opravu.";
