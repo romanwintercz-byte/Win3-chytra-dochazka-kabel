@@ -1,4 +1,4 @@
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useEffect } from 'react';
 import { TimeEntry, WorkType, Employee, Job } from '../types';
 import { validateMonth } from '../services/validationService';
 import { jsPDF } from "jspdf";
@@ -9,17 +9,35 @@ interface ReportingModuleProps {
   employees: Employee[];
   currentUserRole: string;
   jobs: Job[];
+  selectedEmployeeId?: string; // Globálně vybraný zaměstnanec (z App.tsx)
+  selectedMonth?: string;      // Globálně vybraný měsíc (z App.tsx)
 }
 
-const ReportingModule: React.FC<ReportingModuleProps> = ({ entries, employees, currentUserRole, jobs }) => {
+const ReportingModule: React.FC<ReportingModuleProps> = ({ 
+  entries, employees, currentUserRole, jobs, 
+  selectedEmployeeId, selectedMonth 
+}) => {
   const [activeView, setActiveView] = useState<'stats' | 'documents'>('stats');
   const [projectFilter, setProjectFilter] = useState<string>('all');
-  const [employeeFilter, setEmployeeFilter] = useState<string>('all');
-  const [monthFilter, setMonthFilter] = useState<string>(new Date().toISOString().substring(0, 7));
+  const [employeeFilter, setEmployeeFilter] = useState<string>(selectedEmployeeId || 'all');
+  const [monthFilter, setMonthFilter] = useState<string>(selectedMonth || new Date().toISOString().substring(0, 7));
   const [isEmailModalOpen, setIsEmailModalOpen] = useState(false);
   const [isGeneratingPdf, setIsGeneratingPdf] = useState(false);
   
   const [selectedImage, setSelectedImage] = useState<{url: string, title: string} | null>(null);
+
+  // Synchronizace filtrů s globálním výběrem
+  useEffect(() => {
+    if (selectedEmployeeId) {
+      setEmployeeFilter(selectedEmployeeId);
+    }
+  }, [selectedEmployeeId]);
+
+  useEffect(() => {
+    if (selectedMonth) {
+      setMonthFilter(selectedMonth);
+    }
+  }, [selectedMonth]);
 
   const getEmployeeName = (id: string) => {
     const emp = employees.find(e => e.id === id);
@@ -48,8 +66,9 @@ const ReportingModule: React.FC<ReportingModuleProps> = ({ entries, employees, c
       const currentMonth = new Date().toISOString().substring(0, 7);
       const months = new Set(entries.map(e => e.date.substring(0, 7)));
       months.add(currentMonth);
+      if (selectedMonth) months.add(selectedMonth);
       return Array.from(months).sort().reverse();
-  }, [entries]);
+  }, [entries, selectedMonth]);
 
   const filteredEntries = useMemo(() => {
     return entries

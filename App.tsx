@@ -43,7 +43,7 @@ const initialMonthStatus: MonthStatus = {
 };
 
 const SUPPORT_ID = 'win3-support-id';
-const VERSION = '1.9.6';
+const VERSION = '1.9.7';
 
 const App: React.FC = () => {
   const [activeTab, setActiveTab] = useState<'overview' | 'report' | 'settings'>('overview');
@@ -351,7 +351,16 @@ const App: React.FC = () => {
           )}
 
           {activeTab === 'report' && (
-             <div className="p-4 md:p-8 pt-6 space-y-8"><ReportingModule entries={isManagerMode ? entries : allUserEntries} employees={employees} currentUserRole={currentUser.role} jobs={jobs} /></div>
+             <div className="p-4 md:p-8 pt-6 space-y-8">
+               <ReportingModule 
+                  entries={isManagerMode ? entries : allUserEntries} 
+                  employees={employees} 
+                  currentUserRole={currentUser.role} 
+                  jobs={jobs} 
+                  selectedEmployeeId={targetUserId}
+                  selectedMonth={selectedMonth}
+               />
+             </div>
           )}
 
           {activeTab === 'settings' && isManagerMode && (
