@@ -29,7 +29,7 @@
       #error-display { display: none; margin-top: 20px; background: #334155; color: #f87171; padding: 12px; border-radius: 8px; font-family: monospace; font-size: 10px; max-width: 90%; word-break: break-all; text-align: left; }
     </style>
 
-    <!-- JEDINÝ DEFINOVANÝ IMPORT MAP BLOK (v1.9.13) -->
+    <!-- OPRAVENÝ JEDINÝ IMPORT MAP BLOK (v1.9.14) -->
     <script>
       (function() {
         const im = {
@@ -80,14 +80,14 @@
         </svg>
       </div>
       <div class="loader-spinner"></div>
-      <p id="loader-status" style="color: #94a3b8; font-size: 13px; margin-top: 20px;">Spouštění v1.9.13...</p>
+      <p id="loader-status" style="color: #94a3b8; font-size: 13px; margin-top: 20px;">Spouštění v1.9.14...</p>
       <div id="error-display"></div>
       <button id="reset-btn" onclick="emergencyReset()">OPRAVIT A RESETOVAT</button>
     </div>
 
     <div id="root"></div>
 
-    <script type="module-shim" src="./index.tsx?v=1.9.13"></script>
+    <script type="module-shim" src="./index.tsx?v=1.9.14"></script>
 
     <script>
       window.APP_STARTED = false;
