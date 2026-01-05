@@ -85,7 +85,6 @@ const ReportingModule: React.FC<ReportingModuleProps> = ({
     const empName = employeeFilter !== 'all' ? getEmployeeName(employeeFilter) : 'Všichni';
     const period = monthFilter === 'all' ? 'Historie' : monthFilter;
 
-    // BOM pro správné zobrazení v českém Excelu
     const BOM = "\uFEFF";
     const headers = ["Datum", "Zaměstnanec", "Projekt", "Činnost", "Hodiny", "Typ"].join(";");
     const rows = filteredEntries.map(e => [
@@ -116,53 +115,95 @@ const ReportingModule: React.FC<ReportingModuleProps> = ({
     const empName = employeeFilter !== 'all' ? getEmployeeName(employeeFilter) : 'Všichni zaměstnanci';
     const period = monthFilter === 'all' ? 'Všechna období' : monthFilter;
 
+    // Seskupení záznamů podle data pro denní rozpis (1 řádek = 1 den)
+    const dailyAggregation = filteredEntries.reduce((acc, e) => {
+        if (!acc[e.date]) acc[e.date] = { hours: 0, text: [] };
+        acc[e.date].hours += Number(e.hours);
+        const activity = `${e.project || e.type}${e.description ? ': ' + e.description : ''}`;
+        acc[e.date].text.push(activity);
+        return acc;
+    }, {} as Record<string, { hours: number, text: string[] }>);
+
+    const sortedDates = Object.keys(dailyAggregation).sort();
+
+    // Seskupení podle projektů pro účetní
+    const projectSummary = filteredEntries.reduce((acc, e) => {
+        const pName = e.project || e.type || 'Ostatní';
+        acc[pName] = (acc[pName] || 0) + Number(e.hours);
+        return acc;
+    }, {} as Record<string, number>);
+
     // Generování HTML pro tisk
     printMount.innerHTML = `
       <div class="print-report">
         <div class="header">
           <div>
-            <h1 style="margin:0; font-size:24px; color:black">MĚSÍČNÍ VÝKAZ PRÁCE</h1>
-            <p style="margin:5px 0; color:black">Chytrá docházka Win3</p>
+            <h1 style="margin:0; font-size:18px; color:black">MĚSÍČNÍ VÝKAZ PRÁCE</h1>
+            <p style="margin:2px 0; font-size:10px; color:black">Chytrá docházka Win3</p>
           </div>
-          <div style="text-align:right; color:black">
+          <div style="text-align:right; color:black; font-size:10px">
             <p style="margin:0"><b>Období:</b> ${period}</p>
             <p style="margin:0"><b>Zaměstnanec:</b> ${empName}</p>
           </div>
         </div>
 
-        <h2 style="font-size:16px; margin-bottom:10px; color:black">Souhrn hodin</h2>
-        <table>
-          <thead>
-            <tr><th>Typ práce</th><th class="text-right">Hodin</th></tr>
-          </thead>
-          <tbody>
-            <tr><td>Běžná práce</td><td class="text-right">${aggregatedData.regular.toFixed(1)}</td></tr>
-            <tr><td>Přesčasy</td><td class="text-right">${aggregatedData.overtime.toFixed(1)}</td></tr>
-            <tr><td>Služební cesty</td><td class="text-right">${aggregatedData.trips.toFixed(1)}</td></tr>
-            <tr><td>Absence (dovolená, nemoc...)</td><td class="text-right">${aggregatedData.absence.toFixed(1)}</td></tr>
-            <tr class="font-bold"><td>CELKEM K VÝPLATĚ</td><td class="text-right">${aggregatedData.total.toFixed(1)}</td></tr>
-          </tbody>
-        </table>
+        <div style="display: flex; gap: 20px;">
+          <div style="flex: 1;">
+            <h2>Podklady pro účetní (Zakázky)</h2>
+            <table>
+              <thead>
+                <tr><th>Název zakázky / Typ</th><th class="text-right">Celkem hodin</th></tr>
+              </thead>
+              <tbody>
+                ${Object.entries(projectSummary).map(([name, hours]) => `
+                  <tr>
+                    <td>${name}</td>
+                    <td class="text-right font-bold">${hours.toFixed(1)}</td>
+                  </tr>
+                `).join('')}
+                <tr style="background:#f0f0f0">
+                  <td class="font-bold">CELKEM K VÝPLATĚ</td>
+                  <td class="text-right font-bold">${aggregatedData.total.toFixed(1)}</td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+          <div style="flex: 1;">
+            <h2>Statistika docházky</h2>
+            <table>
+              <tbody>
+                <tr><td>Běžná práce</td><td class="text-right">${aggregatedData.regular.toFixed(1)} h</td></tr>
+                <tr><td>Přesčasy</td><td class="text-right">${aggregatedData.overtime.toFixed(1)} h</td></tr>
+                <tr><td>Služební cesty</td><td class="text-right">${aggregatedData.trips.toFixed(1)} h</td></tr>
+                <tr><td>Absence (Dov, Nem...)</td><td class="text-right">${aggregatedData.absence.toFixed(1)} h</td></tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
 
-        <h2 style="font-size:16px; margin:20px 0 10px 0; color:black">Denní rozpis</h2>
-        <table>
+        <h2>Denní rozpis činností</h2>
+        <table style="font-size: 8px;">
           <thead>
-            <tr><th>Datum</th><th>Projekt / Činnost</th><th class="text-right">Hodin</th></tr>
+            <tr>
+              <th style="width: 60px">Datum</th>
+              <th>Projekty a popis činnosti</th>
+              <th style="width: 50px" class="text-right">Suma</th>
+            </tr>
           </thead>
           <tbody>
-            ${filteredEntries.map(e => `
+            ${sortedDates.map(date => `
               <tr>
-                <td>${new Date(e.date).toLocaleDateString('cs-CZ')}</td>
-                <td>${e.project || e.type} ${e.description ? '- ' + e.description : ''}</td>
-                <td class="text-right">${Number(e.hours).toFixed(1)}</td>
+                <td class="font-bold">${new Date(date).toLocaleDateString('cs-CZ', {day:'2-digit', month:'2-digit', weekday:'short'})}</td>
+                <td style="color: #444">${dailyAggregation[date].text.join('; ')}</td>
+                <td class="text-right font-bold">${dailyAggregation[date].hours.toFixed(1)}</td>
               </tr>
             `).join('')}
           </tbody>
         </table>
 
         <div class="signatures">
-          <div class="sig-box">Podpis zaměstnance</div>
-          <div class="sig-box">Podpis nadřízeného</div>
+          <div class="sig-box">Podpis zaměstnance (potvrzuji správnost dat)</div>
+          <div class="sig-box">Podpis nadřízeného (schvaluji k proplacení)</div>
         </div>
       </div>
     `;
@@ -225,7 +266,7 @@ const ReportingModule: React.FC<ReportingModuleProps> = ({
                       className="flex-1 sm:flex-none flex items-center justify-center gap-2 px-4 py-2 bg-slate-800 text-white rounded-lg font-bold hover:bg-slate-900 transition-all shadow-md active:scale-95"
                     >
                         <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 17h2a2 2 0 002-2v-4a2 2 0 00-2-2H5a2 2 0 00-2 2v4a2 2 0 002 2h2m2 4h6a2 2 0 002-2v-4a2 2 0 00-2-2H9a2 2 0 00-2 2v4a2 2 0 002 2zm8-12V5a2 2 0 00-2-2H9a2 2 0 00-2 2v4h10z" /></svg>
-                        Tisk (A4)
+                        Tisk Reportu (A4)
                     </button>
                     <button 
                       onClick={exportToCSV}
@@ -239,7 +280,7 @@ const ReportingModule: React.FC<ReportingModuleProps> = ({
                       disabled={isGeneratingPdf}
                       className="flex-1 sm:flex-none flex items-center justify-center gap-2 px-4 py-2 bg-indigo-600 text-white rounded-lg font-bold hover:bg-indigo-700 transition-all shadow-md active:scale-95 disabled:opacity-50"
                     >
-                        {isGeneratingPdf ? <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin"></div> : "PDF"}
+                        {isGeneratingPdf ? <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin"></div> : "Staré PDF"}
                     </button>
                 </div>
             </div>
