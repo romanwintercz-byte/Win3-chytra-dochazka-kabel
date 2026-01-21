@@ -1,3 +1,4 @@
+
 import React, { useState, useMemo, useEffect } from 'react';
 import { TimeEntry, WorkType, Employee, Job } from '../types';
 import { jsPDF } from "jspdf";
@@ -10,6 +11,18 @@ interface ReportingModuleProps {
   jobs: Job[];
   selectedEmployeeId?: string;
   selectedMonth?: string;
+}
+
+// Interface for aggregated stats to resolve TypeScript inference issues
+interface AggregatedStats {
+  byProject: Record<string, number>;
+  regular: number;
+  overtime: number;
+  trips: number;
+  vacation: number;
+  holiday: number;
+  absence: number;
+  total: number;
 }
 
 const ReportingModule: React.FC<ReportingModuleProps> = ({ 
@@ -57,8 +70,8 @@ const ReportingModule: React.FC<ReportingModuleProps> = ({
 
   const entriesWithDocs = useMemo(() => filteredEntries.filter(e => e.attachmentUrl), [filteredEntries]);
 
-  // Fix: Added vacation and holiday to aggregatedData calculation and returned object to avoid missing property errors.
-  const aggregatedData = useMemo(() => {
+  // Use explicit AggregatedStats type for the useMemo result to prevent TypeScript 'unknown' errors
+  const aggregatedData = useMemo<AggregatedStats>(() => {
       const byProject: Record<string, number> = {};
       let regular = 0, overtime = 0, trips = 0, vacation = 0, holiday = 0, absence = 0, total = 0;
 
@@ -164,8 +177,8 @@ const ReportingModule: React.FC<ReportingModuleProps> = ({
                 <tr><td>Běžná práce</td><td class="text-right">${aggregatedData.regular.toFixed(1)} h</td></tr>
                 <tr><td>Přesčasy</td><td class="text-right">${aggregatedData.overtime.toFixed(1)} h</td></tr>
                 <tr><td>Služební cesty</td><td class="text-right">${aggregatedData.trips.toFixed(1)} h</td></tr>
-                <tr><td>Dovolená</td><td class="text-right">${aggregatedData.vacation?.toFixed(1) || '0.0'} h</td></tr>
-                <tr><td>Svátek</td><td class="text-right">${aggregatedData.holiday?.toFixed(1) || '0.0'} h</td></tr>
+                <tr><td>Dovolená</td><td class="text-right">${aggregatedData.vacation.toFixed(1)} h</td></tr>
+                <tr><td>Svátek</td><td class="text-right">${aggregatedData.holiday.toFixed(1)} h</td></tr>
                 <tr><td>Ostatní (Nemoc...)</td><td class="text-right">${aggregatedData.absence.toFixed(1)} h</td></tr>
                 <tr class="font-bold" style="background:#eee"><td>FOND CELKEM</td><td class="text-right">${aggregatedData.total.toFixed(1)} h</td></tr>
               </tbody>
