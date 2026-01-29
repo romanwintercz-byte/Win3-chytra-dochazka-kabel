@@ -28,10 +28,10 @@
       @keyframes spin { to { transform: rotate(360deg); } }
       
       @keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
-      @keyframes scaleIn { from { opacity: 0; transform: scale(0.95); } to { opacity: 1; transform: scale(1); } }
+      @keyframes scaleIn { from { opacity: 0; transform: translateY(10px) scale(0.98); } to { opacity: 1; transform: translateY(0) scale(1); } }
       
       .animate-fade-in { animation: fadeIn 0.2s ease-out forwards; }
-      .animate-scale-in { animation: scaleIn 0.25s cubic-bezier(0.16, 1, 0.3, 1) forwards; }
+      .animate-scale-in { animation: scaleIn 0.2s cubic-bezier(0.16, 1, 0.3, 1) forwards; }
 
       #reset-btn { display: none; margin-top: 20px; background: #ef4444; color: white; padding: 14px 28px; border-radius: 12px; font-size: 14px; font-weight: bold; border: none; cursor: pointer; z-index: 10000; }
       #error-display { display: none; margin-top: 20px; background: #334155; color: #f87171; padding: 12px; border-radius: 8px; font-family: monospace; font-size: 10px; max-width: 90%; word-break: break-all; text-align: left; }
@@ -60,8 +60,8 @@
     "jspdf": "https://esm.sh/jspdf@2.5.2",
     "jspdf-autotable": "https://esm.sh/jspdf-autotable@3.8.4",
     "@supabase/supabase-js": "https://esm.sh/@supabase/supabase-js@2.47.10",
-    "vite": "https://esm.sh/vite@^7.3.1",
-    "react-dom/": "https://esm.sh/react-dom@^19.2.4/"
+    "react-dom/": "https://esm.sh/react-dom@^19.2.4/",
+    "vite": "https://esm.sh/vite@^7.3.1"
   }
 }
 </script>
