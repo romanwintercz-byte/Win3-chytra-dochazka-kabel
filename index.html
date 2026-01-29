@@ -14,12 +14,10 @@
     <title>Chytrá docházka</title>
     <link rel="apple-touch-icon" href="https://cdn-icons-png.flaticon.com/512/9512/9512839.png">
     
-    <!-- Polyfill pro process.env - MUSÍ BÝT PŘED IMPORTY -->
     <script>
       window.process = { env: { API_KEY: "" } };
     </script>
 
-    <!-- Es-module-shims pro podporu importmap v prohlížeči -->
     <script async src="https://ga.jspm.io/npm:es-module-shims@1.10.1/dist/es-module-shims.js"></script>
 
     <script src="https://cdn.tailwindcss.com"></script>
@@ -46,17 +44,17 @@
     "jspdf": "https://esm.sh/jspdf@2.5.2",
     "jspdf-autotable": "https://esm.sh/jspdf-autotable@3.8.4",
     "@supabase/supabase-js": "https://esm.sh/@supabase/supabase-js@2.47.10",
-    "react-dom/": "https://esm.sh/react-dom@^19.2.4/",
-    "vite": "https://esm.sh/vite@^7.3.1"
+    "react-dom/": "https://esm.sh/react-dom@^19.2.4/"
   }
 }
 </script>
-  </head>
+  <link rel="stylesheet" href="/index.css">
+</head>
   <body>
     <div id="app-loader">
       <div class="loader-spinner"></div>
-      <p id="loader-status" style="color: #94a3b8; font-size: 14px; margin-top: 16px;">Spouštění docházky...</p>
-      <button id="reset-btn" onclick="emergencyReset()">VYČISTIT A RESTARTOVAT</button>
+      <p id="loader-status" style="color: #94a3b8; font-size: 14px; margin-top: 16px;">Načítání aplikace...</p>
+      <button id="reset-btn" onclick="emergencyReset()">VYČISTIT MEZIPAMĚŤ</button>
     </div>
 
     <div id="root"></div>
@@ -66,7 +64,7 @@
     <script>
       window.APP_STARTED = false;
       window.emergencyReset = function() {
-        if(confirm("Opravdu chcete vyčistit mezipaměť?")) {
+        if(confirm("Opravdu chcete smazat dočasná data?")) {
           localStorage.clear();
           sessionStorage.clear();
           window.location.reload();
@@ -75,12 +73,11 @@
       
       setTimeout(function() {
         if (!window.APP_STARTED) {
-          var status = document.getElementById('loader-status');
-          if (status) status.innerText = "Chyba při startu aplikace.";
           var btn = document.getElementById('reset-btn');
           if (btn) btn.style.display = "block";
         }
-      }, 8000);
+      }, 6000);
     </script>
-  </body>
+  <script type="module" src="/index.tsx"></script>
+</body>
 </html>
