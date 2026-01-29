@@ -14,8 +14,13 @@
     <title>Chytrá docházka</title>
     <link rel="apple-touch-icon" href="https://cdn-icons-png.flaticon.com/512/9512/9512839.png">
     
-    <!-- Es-module-shims bez async pro maximální spolehlivost při startu -->
-    <script src="https://ga.jspm.io/npm:es-module-shims@1.10.1/dist/es-module-shims.js"></script>
+    <!-- Polyfill pro process.env - MUSÍ BÝT PŘED IMPORTY -->
+    <script>
+      window.process = { env: { API_KEY: "" } };
+    </script>
+
+    <!-- Es-module-shims pro podporu importmap v prohlížeči -->
+    <script async src="https://ga.jspm.io/npm:es-module-shims@1.10.1/dist/es-module-shims.js"></script>
 
     <script src="https://cdn.tailwindcss.com"></script>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
@@ -46,8 +51,7 @@
   }
 }
 </script>
-  <link rel="stylesheet" href="/index.css">
-</head>
+  </head>
   <body>
     <div id="app-loader">
       <div class="loader-spinner"></div>
@@ -57,7 +61,6 @@
 
     <div id="root"></div>
 
-    <!-- Načtení index.tsx jako module-shim pro es-module-shims -->
     <script type="module-shim" src="./index.tsx"></script>
 
     <script>
@@ -69,16 +72,15 @@
           window.location.reload();
         }
       };
-      // Kontrolní mechanismus pro případ, že aplikace nenaběhne do 6 sekund
+      
       setTimeout(function() {
         if (!window.APP_STARTED) {
           var status = document.getElementById('loader-status');
-          if (status) status.innerText = "Načítání trvá déle než obvykle...";
+          if (status) status.innerText = "Chyba při startu aplikace.";
           var btn = document.getElementById('reset-btn');
           if (btn) btn.style.display = "block";
         }
-      }, 6000);
+      }, 8000);
     </script>
-  <script type="module" src="/index.tsx"></script>
-</body>
+  </body>
 </html>
