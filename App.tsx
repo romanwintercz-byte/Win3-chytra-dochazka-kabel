@@ -17,7 +17,6 @@ import PresentationMode, { PresentationType } from './components/PresentationMod
 import NotificationBell from './components/NotificationBell';
 import PinPadModal from './components/PinPadModal'; 
 import UpdatePrompt from './components/UpdatePrompt';
-import MessageModal from './components/MessageModal'; 
 import MonthNavigator from './components/MonthNavigator';
 import { TimeEntry, MonthStatus, TimesheetStatus, Employee, Job, Notification } from './types';
 import { validateMonth } from './services/validationService';
@@ -44,7 +43,7 @@ const initialMonthStatus: MonthStatus = {
 };
 
 const SUPPORT_ID = 'win3-support-id';
-const VERSION = '1.9.21';
+const VERSION = '1.9.22';
 
 const App: React.FC = () => {
   const [activeTab, setActiveTab] = useState<'overview' | 'report' | 'settings'>('overview');
@@ -64,9 +63,6 @@ const App: React.FC = () => {
   const [presentationMode, setPresentationMode] = useState<PresentationType | null>(null);
   const [isPinModalOpen, setIsPinModalOpen] = useState(false);
   const [pendingUserId, setPendingUserId] = useState<string | null>(null);
-  const [isMessageModalOpen, setIsMessageModalOpen] = useState(false);
-  const [messageRecipientId, setMessageRecipientId] = useState<string>('');
-  const [messageRecipientName, setMessageRecipientName] = useState<string>('');
 
   const currentUser = employees.find(e => e.id === currentUserId) || employees[0] || {
       id: 'temp', name: 'Načítání...', role: 'Zaměstnanec', email: '', avatar: '', isActive: true
@@ -94,7 +90,6 @@ const App: React.FC = () => {
   }, [isStatusLocked, isManagerMode, isGlobalLocked]);
 
   const activeEmployees = useMemo(() => {
-      // Zobrazení všech aktivních zaměstnanců včetně podpory
       return employees.filter(e => e.isActive);
   }, [employees]);
 
@@ -107,7 +102,6 @@ const App: React.FC = () => {
       const configured = isSupabaseConfigured();
       
       if (forceDemo || !configured) {
-          console.warn("Načítám DEMO data.");
           setEmployees(MOCK_EMPLOYEES);
           setJobs(MOCK_JOBS);
           setEntries(MOCK_ENTRIES);
@@ -264,8 +258,10 @@ const App: React.FC = () => {
 
   const handleMarkRead = async (id: string) => { if (!useDemoData) await markNotificationAsRead(id); setNotifications(prev => prev.map(n => n.id === id ? { ...n, isRead: true } : n)); };
   const handleMarkAllRead = async () => { if (!useDemoData) await markAllNotificationsAsRead(currentUserId); setNotifications(prev => prev.map(n => ({ ...n, isRead: true }))); };
-  const handleOpenMessage = (recipientId: string, recipientName: string) => { setMessageRecipientId(recipientId); setMessageRecipientName(recipientName); setIsMessageModalOpen(true); };
-  const handleSendMessage = async (text: string) => { try { if (!useDemoData) await createNotification(messageRecipientId, text, 'info', currentUser.id); else alert('Zasláno.'); } catch (e) { alert('Chyba.'); } };
+  
+  const handleSendMessagePlaceholder = () => {
+    alert("Funkce zasílání zpráv je dočasně mimo provoz kvůli údržbě stability.");
+  };
 
   const handleAddEmployee = async (emp: Employee) => { if (useDemoData) setEmployees(prev => [...prev, emp]); else { await addEmployee(emp); loadData(); } };
   const handleUpdateEmployee = async (emp: Employee) => { if (useDemoData) setEmployees(prev => prev.map(e => e.id === emp.id ? emp : e)); else { await updateEmployee(emp); loadData(); } };
@@ -274,24 +270,10 @@ const App: React.FC = () => {
   const handleAddJob = async (job: Job) => { if (useDemoData) setJobs(prev => [...prev, job]); else { await addJob(job); loadData(); } };
   const handleToggleJobStatus = async (id: string, isActive: boolean) => { if (useDemoData) setJobs(prev => prev.map(j => j.id === id ? { ...j, isActive } : j)); else { await updateJobStatus(id, isActive); loadData(); } };
 
-  const handleServiceLogin = async () => {
-    // Nově místo tech. nastavení otevřeme rovnou zprávu pro vývojáře
-    const dev = employees.find(e => e.id === SUPPORT_ID);
-    handleOpenMessage(SUPPORT_ID, dev ? dev.name : 'Vývojář');
-    setIsAboutOpen(false);
-  };
-
   if (presentationMode) return <PresentationMode type={presentationMode} onClose={() => setPresentationMode(null)} />;
 
   if (isLoading && employees.length === 0) {
-      return (
-          <div className="flex items-center justify-center min-h-screen bg-[#0f172a] text-white">
-              <div className="flex flex-col items-center gap-4">
-                  <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-indigo-500"></div>
-                  <p className="text-sm font-medium">Načítání v{VERSION}...</p>
-              </div>
-          </div>
-      );
+      return null; // Zobrazí se loader z index.html
   }
 
   return (
@@ -299,7 +281,7 @@ const App: React.FC = () => {
       <Sidebar 
         activeTab={activeTab} setActiveTab={setActiveTab} installPrompt={installPrompt} onInstall={handleInstallClick}
         currentUser={currentUser} employees={activeEmployees} onRequestSwitchUser={handleRequestSwitchUser} 
-        onShowAbout={() => setIsAboutOpen(true)} onContactManager={() => handleOpenMessage('mgr', 'Manažer')} onlineUserIds={onlineUserIds} 
+        onShowAbout={() => setIsAboutOpen(true)} onContactManager={handleSendMessagePlaceholder} onlineUserIds={onlineUserIds} 
         version={VERSION}
         notifications={notifications}
         onMarkAsRead={handleMarkRead}
@@ -350,7 +332,7 @@ const App: React.FC = () => {
 
               <ApprovalWorkflow status={monthStatus} onUpdateStatus={handleStatusUpdate} isManagerMode={isManagerMode} validationIssues={validationIssues} />
               
-              {isManagerMode && !reviewingUserId && <TeamOverview employees={activeEmployees} allEntries={entries} selectedMonth={selectedMonth} onInspect={setReviewingUserId} currentUserRole={currentUser.role} reports={monthlyReports} onMessage={handleOpenMessage} onlineUserIds={onlineUserIds} />}
+              {isManagerMode && !reviewingUserId && <TeamOverview employees={activeEmployees} allEntries={entries} selectedMonth={selectedMonth} onInspect={setReviewingUserId} currentUserRole={currentUser.role} reports={monthlyReports} onMessage={handleSendMessagePlaceholder} onlineUserIds={onlineUserIds} />}
               
               {canEdit && <SmartInput onEntriesAdded={handleAddEntries} currentUserId={targetUserId} onManualEntry={() => setIsEntryModalOpen(true)} onCopyLastDay={handleCopyLastDay} lastActiveDay={lastActiveDay} selectedMonth={selectedMonth} existingEntries={monthlyUserEntries} />}
               
@@ -382,11 +364,10 @@ const App: React.FC = () => {
       </main>
       
       <HelpSystem />
-      <AboutModal isOpen={isAboutOpen} onClose={() => setIsAboutOpen(false)} onContactDeveloper={() => handleOpenMessage(SUPPORT_ID, 'Vývojář')} onServiceLogin={handleServiceLogin} version={VERSION} />
+      <AboutModal isOpen={isAboutOpen} onClose={() => setIsAboutOpen(false)} onContactDeveloper={handleSendMessagePlaceholder} onServiceLogin={handleSendMessagePlaceholder} version={VERSION} />
       <UpdatePrompt /> 
       <MobileNavigation activeTab={activeTab} setActiveTab={setActiveTab} currentUserRole={currentUser.role} />
       <EntryFormModal isOpen={isEntryModalOpen} onClose={() => setIsEntryModalOpen(false)} onSubmit={handleModalSubmit} initialDate={editingDate || undefined} existingEntries={entriesForEditingDate} currentUserId={targetUserId} jobs={activeJobs} allMonthEntries={monthlyUserEntries} />
-      <MessageModal isOpen={isMessageModalOpen} onClose={() => setIsMessageModalOpen(false)} onSend={handleSendMessage} recipientName={messageRecipientName} isRecipientOnline={onlineUserIds.has(messageRecipientId)} />
       {pendingUserId && (
           <PinPadModal isOpen={isPinModalOpen} onClose={() => { setIsPinModalOpen(false); setPendingUserId(null); }} onSuccess={handlePinSuccess} targetPin={employees.find(e => e.id === pendingUserId)?.pinCode || ''} targetUserName={employees.find(e => e.id === pendingUserId)?.name || 'Uživatel'} />
       )}
