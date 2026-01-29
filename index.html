@@ -7,14 +7,13 @@
     <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate" />
     
     <meta name="theme-color" content="#0f172a" />
-    <meta name="apple-mobile-web-app-capable" content="no">
-    <meta name="apple-mobile-web-app-status-bar-style" content="default">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
     <meta name="apple-mobile-web-app-title" content="Docházka">
     
     <title>Chytrá docházka</title>
     <link rel="apple-touch-icon" href="https://cdn-icons-png.flaticon.com/512/9512/9512839.png">
     
-    <!-- Polyfill pro es-moduly -->
     <script async src="https://ga.jspm.io/npm:es-module-shims@1.10.1/dist/es-module-shims.js"></script>
 
     <script src="https://cdn.tailwindcss.com"></script>
@@ -28,77 +27,45 @@
       
       @keyframes spin { to { transform: rotate(360deg); } }
       
-      /* Oprava animací pro modální okna */
-      @keyframes fadeIn {
-        from { opacity: 0; }
-        to { opacity: 1; }
-      }
-      @keyframes scaleIn {
-        from { opacity: 0; transform: scale(0.95); }
-        to { opacity: 1; transform: scale(1); }
-      }
+      @keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
+      @keyframes scaleIn { from { opacity: 0; transform: scale(0.95); } to { opacity: 1; transform: scale(1); } }
+      
       .animate-fade-in { animation: fadeIn 0.2s ease-out forwards; }
-      .animate-scale-in { animation: scaleIn 0.2s cubic-bezier(0.16, 1, 0.3, 1) forwards; }
+      .animate-scale-in { animation: scaleIn 0.25s cubic-bezier(0.16, 1, 0.3, 1) forwards; }
 
       #reset-btn { display: none; margin-top: 20px; background: #ef4444; color: white; padding: 14px 28px; border-radius: 12px; font-size: 14px; font-weight: bold; border: none; cursor: pointer; z-index: 10000; }
       #error-display { display: none; margin-top: 20px; background: #334155; color: #f87171; padding: 12px; border-radius: 8px; font-family: monospace; font-size: 10px; max-width: 90%; word-break: break-all; text-align: left; }
 
-      /* Tiskové styly pro A4 */
       @media print {
         body { background-color: white !important; color: black !important; }
         #root, .md\:hidden, #app-loader, .sidebar, .mobile-nav, .no-print, #help-button { display: none !important; }
         .print-only { display: block !important; }
         @page { size: A4 portrait; margin: 8mm; }
-        .print-report { width: 100%; color: black !important; font-size: 8pt; line-height: 1.1; }
-        table { width: 100%; border-collapse: collapse; margin-top: 4px; margin-bottom: 8px; }
-        th, td { border: 1px solid #333; padding: 3px 5px; text-align: left; color: black !important; vertical-align: middle; }
-        th { background-color: #f0f0f0 !important; font-weight: bold; font-size: 7pt; text-transform: uppercase; }
-        .text-right { text-align: right; }
-        .text-center { text-align: center; }
-        .font-bold { font-weight: bold; }
-        .header { display: flex; justify-content: space-between; border-bottom: 2px solid #000; padding-bottom: 4px; margin-bottom: 8px; }
-        .signatures { display: flex; justify-content: space-between; margin-top: 15px; }
-        .sig-box { border-top: 1px solid #000; width: 45%; text-align: center; padding-top: 2px; font-size: 7pt; }
-        h2 { font-size: 10pt; margin: 4px 0; border-bottom: 1px solid #666; padding-bottom: 2px; }
-        .bg-gray { background-color: #f9f9f9 !important; }
-        .col-hours { width: 35px; text-align: right; }
+        table { width: 100%; border-collapse: collapse; }
+        th, td { border: 1px solid #333; padding: 3px 5px; text-align: left; color: black !important; }
       }
       .print-only { display: none; }
     </style>
 
-    <script type="importmap-shim">
-      {
-        "imports": {
-          "react": "https://esm.sh/react@19.0.0",
-          "react/": "https://esm.sh/react@19.0.0/",
-          "react-dom": "https://esm.sh/react-dom@19.0.0",
-          "react-dom/client": "https://esm.sh/react-dom@19.0.0/client",
-          "@google/genai": "https://esm.sh/@google/genai@1.30.0",
-          "uuid": "https://esm.sh/uuid@11.0.0",
-          "recharts": "https://esm.sh/recharts@2.15.0",
-          "jspdf": "https://esm.sh/jspdf@2.5.2",
-          "jspdf-autotable": "https://esm.sh/jspdf-autotable@3.8.4",
-          "@supabase/supabase-js": "https://esm.sh/@supabase/supabase-js@2.47.10"
-        }
-      }
-    </script>
-  <script type="importmap">
+    <script type="importmap">
 {
   "imports": {
-    "react": "https://esm.sh/react@^19.2.3",
-    "react-dom/": "https://esm.sh/react-dom@^19.2.3/",
-    "react/": "https://esm.sh/react@^19.2.3/",
-    "@google/genai": "https://esm.sh/@google/genai@^1.34.0",
-    "uuid": "https://esm.sh/uuid@^13.0.0",
-    "recharts": "https://esm.sh/recharts@^3.6.0",
-    "jspdf": "https://esm.sh/jspdf@^4.0.0",
-    "jspdf-autotable": "https://esm.sh/jspdf-autotable@^5.0.7",
-    "vite": "https://esm.sh/vite@^7.3.0",
-    "@supabase/supabase-js": "https://esm.sh/@supabase/supabase-js@^2.89.0"
+    "react": "https://esm.sh/react@19.0.0",
+    "react/": "https://esm.sh/react@19.0.0/",
+    "react-dom": "https://esm.sh/react-dom@19.0.0",
+    "react-dom/client": "https://esm.sh/react-dom@19.0.0/client",
+    "@google/genai": "https://esm.sh/@google/genai@1.30.0",
+    "uuid": "https://esm.sh/uuid@11.0.0",
+    "recharts": "https://esm.sh/recharts@2.15.0",
+    "jspdf": "https://esm.sh/jspdf@2.5.2",
+    "jspdf-autotable": "https://esm.sh/jspdf-autotable@3.8.4",
+    "@supabase/supabase-js": "https://esm.sh/@supabase/supabase-js@2.47.10",
+    "vite": "https://esm.sh/vite@^7.3.1",
+    "react-dom/": "https://esm.sh/react-dom@^19.2.4/"
   }
 }
 </script>
-</head>
+  </head>
   <body>
     <div id="app-loader">
       <div class="loader-logo">
@@ -107,7 +74,7 @@
         </svg>
       </div>
       <div class="loader-spinner"></div>
-      <p id="loader-status" style="color: #94a3b8; font-size: 13px; margin-top: 20px;">Spouštění v1.9.21...</p>
+      <p id="loader-status" style="color: #94a3b8; font-size: 13px; margin-top: 20px;">Spouštění systému...</p>
       <div id="error-display"></div>
       <button id="reset-btn" onclick="emergencyReset()">OPRAVIT A RESETOVAT</button>
     </div>
@@ -115,7 +82,7 @@
     <div id="root"></div>
     <div id="print-mount" class="print-only"></div>
 
-    <script type="module-shim" src="./index.tsx?v=1.9.21"></script>
+    <script type="module-shim" src="./index.tsx"></script>
 
     <script>
       window.APP_STARTED = false;
@@ -130,24 +97,12 @@
         return false;
       };
       window.emergencyReset = function() {
-        if (confirm("Opravit aplikaci? Smažou se dočasná data a mezipaměť.")) {
+        if (confirm("Opravit aplikaci? Smažou se dočasná data.")) {
           localStorage.clear();
           sessionStorage.clear();
-          if ('caches' in window) {
-            caches.keys().then(function(names) {
-              for (var name of names) caches.delete(name);
-            });
-          }
-          alert("Vyčištěno. Restartuji...");
-          setTimeout(function() { window.location.href = 'index.html?r=' + Date.now(); }, 500);
+          window.location.reload();
         }
       };
-      setTimeout(function() {
-        if (!window.APP_STARTED) {
-          document.getElementById('loader-status').innerText = "Problém se spuštěním. Zkuste opravu.";
-          document.getElementById('reset-btn').style.display = "block";
-        }
-      }, 7000);
     </script>
   </body>
 </html>
