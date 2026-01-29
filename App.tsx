@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect, useMemo } from 'react';
 import Sidebar from './components/Sidebar';
 import SmartInput from './components/SmartInput';
@@ -93,7 +94,8 @@ const App: React.FC = () => {
   }, [isStatusLocked, isManagerMode, isGlobalLocked]);
 
   const activeEmployees = useMemo(() => {
-      return employees.filter(e => e.isActive && e.id !== SUPPORT_ID);
+      // Zobrazení všech aktivních zaměstnanců včetně podpory
+      return employees.filter(e => e.isActive);
   }, [employees]);
 
   const activeJobs = useMemo(() => jobs.filter(j => j.isActive), [jobs]);
@@ -273,11 +275,10 @@ const App: React.FC = () => {
   const handleToggleJobStatus = async (id: string, isActive: boolean) => { if (useDemoData) setJobs(prev => prev.map(j => j.id === id ? { ...j, isActive } : j)); else { await updateJobStatus(id, isActive); loadData(); } };
 
   const handleServiceLogin = async () => {
-    if ((window as any).aistudio && (window as any).aistudio.openSelectKey) {
-      await (window as any).aistudio.openSelectKey();
-    } else {
-      alert("Servisní nastavení klíče není v tomto prostředí k dispozici.");
-    }
+    // Nově místo tech. nastavení otevřeme rovnou zprávu pro vývojáře
+    const dev = employees.find(e => e.id === SUPPORT_ID);
+    handleOpenMessage(SUPPORT_ID, dev ? dev.name : 'Vývojář');
+    setIsAboutOpen(false);
   };
 
   if (presentationMode) return <PresentationMode type={presentationMode} onClose={() => setPresentationMode(null)} />;
@@ -378,7 +379,7 @@ const App: React.FC = () => {
       </main>
       
       <HelpSystem />
-      <AboutModal isOpen={isAboutOpen} onClose={() => setIsAboutOpen(false)} onContactDeveloper={() => handleOpenMessage('dev', 'Vývojář')} onServiceLogin={handleServiceLogin} version={VERSION} />
+      <AboutModal isOpen={isAboutOpen} onClose={() => setIsAboutOpen(false)} onContactDeveloper={() => handleOpenMessage(SUPPORT_ID, 'Vývojář')} onServiceLogin={handleServiceLogin} version={VERSION} />
       <UpdatePrompt /> 
       <MobileNavigation activeTab={activeTab} setActiveTab={setActiveTab} currentUserRole={currentUser.role} />
       <EntryFormModal isOpen={isEntryModalOpen} onClose={() => setIsEntryModalOpen(false)} onSubmit={handleModalSubmit} initialDate={editingDate || undefined} existingEntries={entriesForEditingDate} currentUserId={targetUserId} jobs={activeJobs} allMonthEntries={monthlyUserEntries} />
