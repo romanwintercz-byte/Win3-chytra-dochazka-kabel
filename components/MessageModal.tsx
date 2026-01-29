@@ -29,7 +29,7 @@ const MessageModal: React.FC<MessageModalProps> = ({ isOpen, onClose, onSend, re
             <h3 className="text-lg font-bold text-gray-900 flex items-center gap-2">
                 <span className="text-xl">✉️</span> Nová zpráva
             </h3>
-            <button onClick={onClose} className="text-gray-400 hover:text-gray-600">
+            <button onClick={onClose} className="text-gray-400 hover:text-gray-600 transition-colors">
                 <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
                 </svg>
@@ -38,7 +38,7 @@ const MessageModal: React.FC<MessageModalProps> = ({ isOpen, onClose, onSend, re
 
         <div className="mb-4">
             <label className="block text-sm font-medium text-gray-700 mb-1">Příjemce</label>
-            <div className="bg-gray-100 p-2 rounded-lg text-gray-800 font-medium flex justify-between items-center">
+            <div className="bg-gray-100 p-2 rounded-lg text-gray-800 font-medium flex justify-between items-center border border-gray-200">
                 <span>{recipientName}</span>
                 {isRecipientOnline && (
                     <span className="text-xs bg-green-100 text-green-700 px-2 py-0.5 rounded-full border border-green-200 flex items-center gap-1">
@@ -52,7 +52,7 @@ const MessageModal: React.FC<MessageModalProps> = ({ isOpen, onClose, onSend, re
         <div className="mb-6">
             <label className="block text-sm font-medium text-gray-700 mb-1">Zpráva</label>
             <textarea 
-                className="w-full p-3 border border-gray-300 rounded-lg h-32 focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
+                className="w-full p-3 border border-gray-300 rounded-lg h-32 focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 bg-white text-slate-900 placeholder-gray-400"
                 placeholder="Napište zprávu..."
                 value={message}
                 onChange={(e) => setMessage(e.target.value)}

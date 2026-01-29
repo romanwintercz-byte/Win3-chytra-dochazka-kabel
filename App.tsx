@@ -301,6 +301,9 @@ const App: React.FC = () => {
         currentUser={currentUser} employees={activeEmployees} onRequestSwitchUser={handleRequestSwitchUser} 
         onShowAbout={() => setIsAboutOpen(true)} onContactManager={() => handleOpenMessage('mgr', 'Manažer')} onlineUserIds={onlineUserIds} 
         version={VERSION}
+        notifications={notifications}
+        onMarkAsRead={handleMarkRead}
+        onMarkAllAsRead={handleMarkAllRead}
       />
 
       <div className="md:hidden bg-slate-900 text-white p-4 pt-[env(safe-area-inset-top,20px)] flex justify-between items-center sticky top-0 z-30 shadow-md">
