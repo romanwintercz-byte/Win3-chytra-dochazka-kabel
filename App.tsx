@@ -16,6 +16,7 @@ import PresentationMode, { PresentationType } from './components/PresentationMod
 import NotificationBell from './components/NotificationBell';
 import PinPadModal from './components/PinPadModal'; 
 import UpdatePrompt from './components/UpdatePrompt';
+import MessageModal from './components/MessageModal'; 
 import MonthNavigator from './components/MonthNavigator';
 import { TimeEntry, MonthStatus, TimesheetStatus, Employee, Job, Notification } from './types';
 import { validateMonth } from './services/validationService';
@@ -32,24 +33,21 @@ import {
     subscribeToPresence, subscribeToNotifications
 } from './services/supabase';
 
-// Pomocná funkce pro získání lokálního YYYY-MM bez UTC posunu
-const getLocalMonthStr = (date: Date = new Date()) => {
-  const y = date.getFullYear();
-  const m = String(date.getMonth() + 1).padStart(2, '0');
-  return `${y}-${m}`;
+const getCurrentMonth = () => {
+  return new Date().toISOString().slice(0, 7);
 };
 
 const initialMonthStatus: MonthStatus = {
-  month: getLocalMonthStr(),
+  month: getCurrentMonth(),
   status: TimesheetStatus.DRAFT,
 };
 
-const VERSION = '1.9.23';
+const SUPPORT_ID = 'win3-support-id';
+const VERSION = '1.9.21';
 
 const App: React.FC = () => {
   const [activeTab, setActiveTab] = useState<'overview' | 'report' | 'settings'>('overview');
   const [useDemoData, setUseDemoData] = useState(false);
-  const [isCloudSyncing, setIsCloudSyncing] = useState(false);
   
   const [employees, setEmployees] = useState<Employee[]>([]);
   const [jobs, setJobs] = useState<Job[]>([]);
@@ -65,6 +63,9 @@ const App: React.FC = () => {
   const [presentationMode, setPresentationMode] = useState<PresentationType | null>(null);
   const [isPinModalOpen, setIsPinModalOpen] = useState(false);
   const [pendingUserId, setPendingUserId] = useState<string | null>(null);
+  const [isMessageModalOpen, setIsMessageModalOpen] = useState(false);
+  const [messageRecipientId, setMessageRecipientId] = useState<string>('');
+  const [messageRecipientName, setMessageRecipientName] = useState<string>('');
 
   const currentUser = employees.find(e => e.id === currentUserId) || employees[0] || {
       id: 'temp', name: 'Načítání...', role: 'Zaměstnanec', email: '', avatar: '', isActive: true
@@ -73,7 +74,7 @@ const App: React.FC = () => {
   const targetUserId = reviewingUserId || currentUserId;
   const targetUser = employees.find(e => e.id === targetUserId) || currentUser;
 
-  const [selectedMonth, setSelectedMonth] = useState<string>(getLocalMonthStr());
+  const [selectedMonth, setSelectedMonth] = useState<string>(getCurrentMonth());
   const [isGlobalLocked, setIsGlobalLocked] = useState(false);
   const [monthStatus, setMonthStatus] = useState<MonthStatus>(initialMonthStatus);
   const [installPrompt, setInstallPrompt] = useState<any>(null);
@@ -92,20 +93,19 @@ const App: React.FC = () => {
   }, [isStatusLocked, isManagerMode, isGlobalLocked]);
 
   const activeEmployees = useMemo(() => {
-      return employees.filter(e => e.isActive);
+      return employees.filter(e => e.isActive && e.id !== SUPPORT_ID);
   }, [employees]);
 
   const activeJobs = useMemo(() => jobs.filter(j => j.isActive), [jobs]);
 
   const loadData = async (forceDemo: boolean = false) => {
       setIsLoading(true);
-      setIsCloudSyncing(true);
       setError(null);
 
       const configured = isSupabaseConfigured();
       
       if (forceDemo || !configured) {
-          console.warn("Aplikace běží v DEMO režimu (chybí Supabase klíče nebo vynuceno)");
+          console.warn("Načítám DEMO data.");
           setEmployees(MOCK_EMPLOYEES);
           setJobs(MOCK_JOBS);
           setEntries(MOCK_ENTRIES);
@@ -114,37 +114,25 @@ const App: React.FC = () => {
           if (savedId && MOCK_EMPLOYEES.some(e => e.id === savedId)) setCurrentUserId(savedId);
           else setCurrentUserId(MOCK_EMPLOYEES[1].id);
           setIsLoading(false);
-          setIsCloudSyncing(false);
           return;
       }
 
       try {
-          // Načtení dat ze Supabase
-          const [emps, jbs, entrs] = await Promise.all([
+          let [emps, jbs, entrs] = await Promise.all([
               fetchEmployees(),
               fetchJobs(),
               fetchTimeEntries()
           ]);
-          
           setEmployees(emps);
           setJobs(jbs);
           setEntries(entrs);
-          setUseDemoData(false);
-
           const savedId = localStorage.getItem('smartwork_current_user_id');
-          if (savedId && emps?.some(e => e.id === savedId && e.isActive !== false)) {
-              setCurrentUserId(savedId);
-          } else if (emps?.[0]) {
-              setCurrentUserId(emps[0].id);
-          }
+          if (savedId && emps?.some(e => e.id === savedId && e.isActive !== false)) setCurrentUserId(savedId);
+          else if (emps?.[0]) setCurrentUserId(emps[0].id);
       } catch (err: any) {
-          console.error("Kritická chyba při načítání ze Supabase:", err);
-          setError(`Chyba připojení k databázi: ${err.message}`);
-          // Fallback na demo při chybě sítě
-          if (employees.length === 0) setUseDemoData(true);
+          setError(`Chyba: ${err.message}`);
       } finally {
           setIsLoading(false);
-          setIsCloudSyncing(false);
       }
   };
 
@@ -157,10 +145,8 @@ const App: React.FC = () => {
           const presenceChannel = subscribeToPresence(currentUserId, (ids) => setOnlineUserIds(new Set(ids)));
           const notificationChannel = subscribeToNotifications(currentUserId, (newNote) => setNotifications(prev => [newNote, ...prev]));
           const loadNotifications = async () => {
-              try {
-                  const notifs = await fetchNotifications(currentUserId);
-                  setNotifications(notifs);
-              } catch (e) {}
+              const notifs = await fetchNotifications(currentUserId);
+              setNotifications(notifs);
           };
           loadNotifications();
           return () => {
@@ -193,14 +179,9 @@ const App: React.FC = () => {
     if (currentUserId) localStorage.setItem('smartwork_current_user_id', currentUserId);
   }, [currentUserId]);
 
-  // FILTROVÁNÍ: Zde docházelo k chybě, pokud datum nebylo ve formátu YYYY-MM-DD
   const allUserEntries = useMemo(() => entries.filter(e => e.employeeId === targetUserId), [entries, targetUserId]);
-  const monthlyUserEntries = useMemo(() => {
-      return allUserEntries.filter(e => e.date && e.date.startsWith(selectedMonth));
-  }, [allUserEntries, selectedMonth]);
-  
+  const monthlyUserEntries = useMemo(() => allUserEntries.filter(e => e.date.startsWith(selectedMonth)), [allUserEntries, selectedMonth]);
   const entriesForEditingDate = useMemo(() => editingDate ? allUserEntries.filter(e => e.date === editingDate) : [], [allUserEntries, editingDate]);
-  
   const lastActiveDay = useMemo(() => {
     if (allUserEntries.length === 0) return undefined;
     const sorted = [...allUserEntries].sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
@@ -234,79 +215,40 @@ const App: React.FC = () => {
   const handleInstallClick = () => { if (installPrompt) { installPrompt.prompt(); setInstallPrompt(null); } };
 
   const handleAddEntries = async (newEntries: TimeEntry[]) => {
-    if (!canEdit) return alert("Měsíc je uzamčen. Nelze přidávat záznamy.");
-    if (useDemoData) { 
-        setEntries(prev => [...prev, ...newEntries]); 
-        return; 
-    }
-    try { 
-        setIsCloudSyncing(true);
-        await addTimeEntriesBulk(newEntries); 
-        await loadData(); 
-    } catch (e: any) { 
-        console.error("Chyba při ukládání:", e);
-        alert(`Nepodařilo se uložit data: ${e.message}`); 
-    } finally {
-        setIsCloudSyncing(false);
-    }
+    if (!canEdit) return alert("Zamčeno.");
+    if (useDemoData) { setEntries(prev => [...prev, ...newEntries]); return; }
+    try { await addTimeEntriesBulk(newEntries); loadData(); } catch (e: any) { alert("Chyba."); }
   };
 
-  const handleCopyLastDay = async () => {
+  const handleCopyLastDay = async ( ) => {
     if (!canEdit || !lastActiveDay) return;
     const entriesToCopy = allUserEntries.filter(e => e.date === lastActiveDay);
     if (entriesToCopy.length === 0) return;
-    
-    // Použití lokálního data místo ISO
-    const now = new Date();
-    const todayStr = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`;
-    
+    const today = new Date().toISOString().split('T')[0];
     const newEntries = entriesToCopy.map(e => ({
-        id: uuidv4(), 
-        employeeId: targetUserId, 
-        date: todayStr, 
-        project: e.project, 
-        description: e.description, 
-        hours: e.hours, 
-        type: e.type
+        id: uuidv4(), employeeId: targetUserId, date: today, project: e.project, description: e.description, hours: e.hours, type: e.type
     }));
     await handleAddEntries(newEntries);
   };
 
   const handleModalSubmit = async (date: string, submittedEntries: TimeEntry[]) => {
-    if (!canEdit) return alert("Měsíc je uzamčen.");
+    if (!canEdit) return alert("Zamčeno.");
     if (useDemoData) {
         if (date === 'BULK_RANGE') setEntries(prev => [...prev, ...submittedEntries]);
         else setEntries(prev => [...prev.filter(e => !(e.employeeId === targetUserId && e.date === date)), ...submittedEntries]);
         return;
     }
     try {
-        setIsCloudSyncing(true);
-        if (date === 'BULK_RANGE') {
-            await addTimeEntriesBulk(submittedEntries);
-        } else { 
-            await deleteTimeEntriesForDate(targetUserId, date); 
-            if (submittedEntries.length > 0) await addTimeEntriesBulk(submittedEntries); 
-        }
-        await loadData();
-    } catch (e: any) { 
-        alert(`Chyba při ukládání: ${e.message}`); 
-    } finally {
-        setIsCloudSyncing(false);
-    }
+        if (date === 'BULK_RANGE') await addTimeEntriesBulk(submittedEntries);
+        else { await deleteTimeEntriesForDate(targetUserId, date); if (submittedEntries.length > 0) await addTimeEntriesBulk(submittedEntries); }
+        loadData();
+    } catch (e: any) { alert("Chyba."); }
   };
 
   const handleDeleteEntry = async (id: string) => {
-    if (!canEdit) return alert("Měsíc je uzamčen.");
+    if (!canEdit) return alert("Zamčeno.");
     if (useDemoData) { setEntries(prev => prev.filter(e => e.id !== id)); return; }
-    try { 
-        setIsCloudSyncing(true);
-        await deleteTimeEntry(id); 
-        setEntries(prev => prev.filter(e => e.id !== id)); 
-    } catch (e: any) { 
-        alert("Chyba při mazání."); 
-    } finally {
-        setIsCloudSyncing(false);
-    }
+    try { await deleteTimeEntry(id); setEntries(prev => prev.filter(e => e.id !== id)); } catch (e: any) { alert("Chyba."); }
   };
 
   const handleStatusUpdate = async (newStatus: TimesheetStatus, comment?: string) => {
@@ -315,23 +257,13 @@ const App: React.FC = () => {
         setMonthlyReports(prev => [...prev.filter(r => !(r.employeeId === targetUserId && r.month === selectedMonth)), updatedReport]);
         return;
     }
-    try { 
-        setIsCloudSyncing(true);
-        await upsertMonthlyReport(updatedReport); 
-        await loadData(); 
-    } catch (e: any) { 
-        alert("Chyba při změně stavu."); 
-    } finally {
-        setIsCloudSyncing(false);
-    }
+    try { await upsertMonthlyReport(updatedReport); loadData(); } catch (e: any) { alert("Chyba."); }
   };
 
   const handleMarkRead = async (id: string) => { if (!useDemoData) await markNotificationAsRead(id); setNotifications(prev => prev.map(n => n.id === id ? { ...n, isRead: true } : n)); };
   const handleMarkAllRead = async () => { if (!useDemoData) await markAllNotificationsAsRead(currentUserId); setNotifications(prev => prev.map(n => ({ ...n, isRead: true }))); };
-  
-  const handleSendMessagePlaceholder = () => {
-    alert("Funkce zasílání zpráv je dočasně mimo provoz kvůli údržbě stability.");
-  };
+  const handleOpenMessage = (recipientId: string, recipientName: string) => { setMessageRecipientId(recipientId); setMessageRecipientName(recipientName); setIsMessageModalOpen(true); };
+  const handleSendMessage = async (text: string) => { try { if (!useDemoData) await createNotification(messageRecipientId, text, 'info', currentUser.id); else alert('Zasláno.'); } catch (e) { alert('Chyba.'); } };
 
   const handleAddEmployee = async (emp: Employee) => { if (useDemoData) setEmployees(prev => [...prev, emp]); else { await addEmployee(emp); loadData(); } };
   const handleUpdateEmployee = async (emp: Employee) => { if (useDemoData) setEmployees(prev => prev.map(e => e.id === emp.id ? emp : e)); else { await updateEmployee(emp); loadData(); } };
@@ -340,25 +272,34 @@ const App: React.FC = () => {
   const handleAddJob = async (job: Job) => { if (useDemoData) setJobs(prev => [...prev, job]); else { await addJob(job); loadData(); } };
   const handleToggleJobStatus = async (id: string, isActive: boolean) => { if (useDemoData) setJobs(prev => prev.map(j => j.id === id ? { ...j, isActive } : j)); else { await updateJobStatus(id, isActive); loadData(); } };
 
+  const handleServiceLogin = async () => {
+    if ((window as any).aistudio && (window as any).aistudio.openSelectKey) {
+      await (window as any).aistudio.openSelectKey();
+    } else {
+      alert("Servisní nastavení klíče není v tomto prostředí k dispozici.");
+    }
+  };
+
   if (presentationMode) return <PresentationMode type={presentationMode} onClose={() => setPresentationMode(null)} />;
 
-  if (isLoading && employees.length === 0) return null;
+  if (isLoading && employees.length === 0) {
+      return (
+          <div className="flex items-center justify-center min-h-screen bg-[#0f172a] text-white">
+              <div className="flex flex-col items-center gap-4">
+                  <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-indigo-500"></div>
+                  <p className="text-sm font-medium">Načítání v{VERSION}...</p>
+              </div>
+          </div>
+      );
+  }
 
   return (
     <div className="flex flex-col md:flex-row min-h-screen bg-[#f3f4f6]">
-      {/* Cloud Sync Status Bar */}
-      {isCloudSyncing && !useDemoData && (
-          <div className="fixed top-0 left-0 right-0 z-[100] h-1 bg-indigo-600 animate-pulse"></div>
-      )}
-
       <Sidebar 
         activeTab={activeTab} setActiveTab={setActiveTab} installPrompt={installPrompt} onInstall={handleInstallClick}
         currentUser={currentUser} employees={activeEmployees} onRequestSwitchUser={handleRequestSwitchUser} 
-        onShowAbout={() => setIsAboutOpen(true)} onContactManager={handleSendMessagePlaceholder} onlineUserIds={onlineUserIds} 
+        onShowAbout={() => setIsAboutOpen(true)} onContactManager={() => handleOpenMessage('mgr', 'Manažer')} onlineUserIds={onlineUserIds} 
         version={VERSION}
-        notifications={notifications}
-        onMarkAsRead={handleMarkRead}
-        onMarkAllAsRead={handleMarkAllRead}
       />
 
       <div className="md:hidden bg-slate-900 text-white p-4 pt-[env(safe-area-inset-top,20px)] flex justify-between items-center sticky top-0 z-30 shadow-md">
@@ -368,7 +309,7 @@ const App: React.FC = () => {
                 <path d="M20 30 L40 75 L60 30 L80 75 L100 30" stroke="white" strokeWidth="12" strokeLinecap="round" strokeLinejoin="round"/>
              </svg>
            </div>
-           <div className="flex flex-col text-left">
+           <div className="flex flex-col">
              <div className="flex items-baseline gap-1">
                 <h1 className="font-bold text-lg leading-none">Chytrá</h1>
                 <span className="text-[9px] text-slate-400">v{VERSION}</span>
@@ -388,18 +329,7 @@ const App: React.FC = () => {
       </div>
 
       <main className="flex-1 p-0 overflow-y-auto flex flex-col h-screen md:h-auto no-print">
-        {useDemoData && (
-          <div className="bg-amber-100 text-amber-800 px-4 py-2 text-[11px] font-black uppercase tracking-widest text-center sticky top-0 md:relative z-[60] border-b border-amber-200">
-            ⚠️ DEMO REŽIM - DATA SE NEUKLÁDAJÍ DO CLOUDU
-          </div>
-        )}
-        
-        {error && (
-            <div className="bg-red-50 text-red-600 p-3 text-center text-sm font-bold border-b border-red-100 animate-shake">
-                {error}
-            </div>
-        )}
-
+        {useDemoData && <div className="bg-amber-100 text-amber-800 px-4 py-1 text-[10px] font-bold uppercase tracking-widest text-center">DEMO REŽIM</div>}
         {reviewingUserId && (
           <div className="bg-indigo-600 text-white px-6 py-3 sticky top-0 md:top-0 z-40 flex justify-between items-center shadow-md animate-fade-in">
              <div className="font-bold text-sm">Kontrola: {targetUser.name}</div>
@@ -416,7 +346,7 @@ const App: React.FC = () => {
 
               <ApprovalWorkflow status={monthStatus} onUpdateStatus={handleStatusUpdate} isManagerMode={isManagerMode} validationIssues={validationIssues} />
               
-              {isManagerMode && !reviewingUserId && <TeamOverview employees={activeEmployees} allEntries={entries} selectedMonth={selectedMonth} onInspect={setReviewingUserId} currentUserRole={currentUser.role} reports={monthlyReports} onMessage={handleSendMessagePlaceholder} onlineUserIds={onlineUserIds} />}
+              {isManagerMode && !reviewingUserId && <TeamOverview employees={activeEmployees} allEntries={entries} selectedMonth={selectedMonth} onInspect={setReviewingUserId} currentUserRole={currentUser.role} reports={monthlyReports} onMessage={handleOpenMessage} onlineUserIds={onlineUserIds} />}
               
               {canEdit && <SmartInput onEntriesAdded={handleAddEntries} currentUserId={targetUserId} onManualEntry={() => setIsEntryModalOpen(true)} onCopyLastDay={handleCopyLastDay} lastActiveDay={lastActiveDay} selectedMonth={selectedMonth} existingEntries={monthlyUserEntries} />}
               
@@ -424,10 +354,7 @@ const App: React.FC = () => {
               
               <ValidationStatus issues={validationIssues} />
               
-              <div className="flex justify-between items-center mb-4">
-                  <h3 className="text-lg font-semibold text-slate-900">Záznamy ({selectedMonth}) - {targetUser.name}</h3>
-                  {isCloudSyncing && <span className="text-xs text-indigo-600 animate-pulse">Synchronizace...</span>}
-              </div>
+              <h3 className="text-lg font-semibold text-slate-900 mb-4">Záznamy ({selectedMonth}) - {targetUser.name}</h3>
               <TimesheetTable entries={monthlyUserEntries} onDelete={handleDeleteEntry} onEdit={(d) => { setEditingDate(d); setIsEntryModalOpen(true); }} isLocked={isStatusLocked} canEdit={canEdit} />
             </div>
           )}
@@ -451,10 +378,11 @@ const App: React.FC = () => {
       </main>
       
       <HelpSystem />
-      <AboutModal isOpen={isAboutOpen} onClose={() => setIsAboutOpen(false)} onContactDeveloper={handleSendMessagePlaceholder} onServiceLogin={handleSendMessagePlaceholder} version={VERSION} />
+      <AboutModal isOpen={isAboutOpen} onClose={() => setIsAboutOpen(false)} onContactDeveloper={() => handleOpenMessage('dev', 'Vývojář')} onServiceLogin={handleServiceLogin} version={VERSION} />
       <UpdatePrompt /> 
       <MobileNavigation activeTab={activeTab} setActiveTab={setActiveTab} currentUserRole={currentUser.role} />
       <EntryFormModal isOpen={isEntryModalOpen} onClose={() => setIsEntryModalOpen(false)} onSubmit={handleModalSubmit} initialDate={editingDate || undefined} existingEntries={entriesForEditingDate} currentUserId={targetUserId} jobs={activeJobs} allMonthEntries={monthlyUserEntries} />
+      <MessageModal isOpen={isMessageModalOpen} onClose={() => setIsMessageModalOpen(false)} onSend={handleSendMessage} recipientName={messageRecipientName} isRecipientOnline={onlineUserIds.has(messageRecipientId)} />
       {pendingUserId && (
           <PinPadModal isOpen={isPinModalOpen} onClose={() => { setIsPinModalOpen(false); setPendingUserId(null); }} onSuccess={handlePinSuccess} targetPin={employees.find(e => e.id === pendingUserId)?.pinCode || ''} targetUserName={employees.find(e => e.id === pendingUserId)?.name || 'Uživatel'} />
       )}

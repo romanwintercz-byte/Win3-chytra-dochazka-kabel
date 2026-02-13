@@ -85,20 +85,6 @@ const SmartInput: React.FC<SmartInputProps> = ({
       </div>
       
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-        {/* Otevřít Editor - nyní na začátku */}
-        <button
-          onClick={onManualEntry}
-          className="flex flex-col items-center justify-center p-4 rounded-xl border border-gray-200 bg-white hover:border-indigo-300 hover:shadow-md transition-all text-gray-700 hover:text-indigo-600 group"
-        >
-            <div className="p-2 rounded-full bg-gray-100 text-gray-600 mb-2 group-hover:bg-indigo-50 group-hover:text-indigo-600 transition-colors">
-                <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
-                </svg>
-            </div>
-            <span className="font-bold text-sm">Otevřít Editor</span>
-            <span className="text-xs mt-1 text-gray-400">Ruční zadání dne</span>
-        </button>
-
         <button
           onClick={onCopyLastDay}
           disabled={!lastActiveDay}
@@ -143,6 +129,19 @@ const SmartInput: React.FC<SmartInputProps> = ({
             </div>
             <span className="font-bold text-sm">Dovolená (8h)</span>
             <span className="text-xs mt-1 opacity-70">Jeden klik</span>
+        </button>
+
+        <button
+          onClick={onManualEntry}
+          className="flex flex-col items-center justify-center p-4 rounded-xl border border-gray-200 bg-white hover:border-indigo-300 hover:shadow-md transition-all text-gray-700 hover:text-indigo-600 group"
+        >
+            <div className="p-2 rounded-full bg-gray-100 text-gray-600 mb-2 group-hover:bg-indigo-50 group-hover:text-indigo-600 transition-colors">
+                <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
+                </svg>
+            </div>
+            <span className="font-bold text-sm">Otevřít Editor</span>
+            <span className="text-xs mt-1 text-gray-400">Ruční zadání dne</span>
         </button>
       </div>
     </div>
