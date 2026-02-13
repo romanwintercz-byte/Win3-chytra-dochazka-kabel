@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect, useMemo } from 'react';
 import Sidebar from './components/Sidebar';
 import SmartInput from './components/SmartInput';
@@ -14,11 +13,10 @@ import TeamOverview from './components/TeamOverview';
 import HelpSystem from './components/HelpSystem';
 import AboutModal from './components/AboutModal';
 import PresentationMode, { PresentationType } from './components/PresentationMode';
+import NotificationBell from './components/NotificationBell';
 import PinPadModal from './components/PinPadModal'; 
 import UpdatePrompt from './components/UpdatePrompt';
 import MonthNavigator from './components/MonthNavigator';
-// Import missing NotificationBell component
-import NotificationBell from './components/NotificationBell';
 import { TimeEntry, MonthStatus, TimesheetStatus, Employee, Job, Notification } from './types';
 import { validateMonth } from './services/validationService';
 import { v4 as uuidv4 } from 'uuid';
@@ -34,6 +32,7 @@ import {
     subscribeToPresence, subscribeToNotifications
 } from './services/supabase';
 
+// Pomocná funkce pro bezpečné datum bez UTC posunu
 const getLocalMonthStr = (date: Date = new Date()) => {
   const y = date.getFullYear();
   const m = String(date.getMonth() + 1).padStart(2, '0');
@@ -45,7 +44,7 @@ const initialMonthStatus: MonthStatus = {
   status: TimesheetStatus.DRAFT,
 };
 
-const VERSION = '1.9.26';
+const VERSION = '1.9.27';
 
 const App: React.FC = () => {
   const [activeTab, setActiveTab] = useState<'overview' | 'report' | 'settings'>('overview');
@@ -56,7 +55,6 @@ const App: React.FC = () => {
   const [jobs, setJobs] = useState<Job[]>([]);
   const [entries, setEntries] = useState<TimeEntry[]>([]);
   const [isLoading, setIsLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
   const [dbStatus, setDbStatus] = useState<{ok: boolean, msg?: string}>({ ok: true });
   
   const [monthlyReports, setMonthlyReports] = useState<MonthStatus[]>([]);
@@ -98,7 +96,7 @@ const App: React.FC = () => {
   }, [isStatusLocked, isManagerMode, isGlobalLocked]);
 
   const activeEmployees = useMemo(() => {
-      return employees.filter(e => e.isActive);
+      return employees.filter(e => e.isActive && e.id !== 'win3-support-id');
   }, [employees]);
 
   const activeJobs = useMemo(() => jobs.filter(j => j.isActive), [jobs]);
@@ -106,7 +104,6 @@ const App: React.FC = () => {
   const loadData = async (forceDemo: boolean = false) => {
       setIsLoading(true);
       setIsCloudSyncing(true);
-      setError(null);
 
       const configured = isSupabaseConfigured();
       
@@ -118,9 +115,9 @@ const App: React.FC = () => {
           const savedId = localStorage.getItem('smartwork_current_user_id');
           if (savedId && MOCK_EMPLOYEES.some(e => e.id === savedId)) setCurrentUserId(savedId);
           else setCurrentUserId(MOCK_EMPLOYEES[1].id);
-          setDbStatus({ ok: true, msg: 'DEMO' });
           setIsLoading(false);
           setIsCloudSyncing(false);
+          setDbStatus({ ok: true, msg: 'DEMO' });
           return;
       }
 
@@ -144,11 +141,13 @@ const App: React.FC = () => {
               setCurrentUserId(emps[0].id);
           }
       } catch (err: any) {
-          console.error("Chyba při načítání:", err);
-          setDbStatus({ ok: false, msg: err.message });
+          console.error("DB Error:", err);
+          setDbStatus({ ok: false, msg: err.message || 'Chyba připojení' });
+          
+          // Pokud selže DB (např. 406), spadneme do demo dat aby se dalo v aplikaci aspoň pohybovat
           if (employees.length === 0) {
-              setEmployees(MOCK_EMPLOYEES);
-              setUseDemoData(true);
+            setEmployees(MOCK_EMPLOYEES);
+            setUseDemoData(true);
           }
       } finally {
           setIsLoading(false);
@@ -235,7 +234,7 @@ const App: React.FC = () => {
         await addTimeEntriesBulk(newEntries); 
         await loadData(); 
     } catch (e: any) { 
-        alert(`Chyba: ${e.message}`); 
+        alert(`Chyba při zápisu: ${e.message}`); 
     } finally { setIsCloudSyncing(false); }
   };
 
@@ -338,23 +337,46 @@ const App: React.FC = () => {
             </div>
         ) : (
             <div className="p-4 md:p-8 pt-6">
-                {activeTab === 'overview' && (
-                    <div className="animate-fade-in">
-                        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-2">
-                            <h2 className="text-xl font-bold text-slate-900">Přehled docházky</h2>
-                            <MonthNavigator selectedMonth={selectedMonth} onMonthChange={setSelectedMonth} />
-                        </div>
-                        <ApprovalWorkflow status={monthStatus} onUpdateStatus={handleStatusUpdate} isManagerMode={isManagerMode} validationIssues={validationIssues} />
-                        {isManagerMode && !reviewingUserId && <TeamOverview employees={activeEmployees} allEntries={entries} selectedMonth={selectedMonth} onInspect={setReviewingUserId} currentUserRole={currentUser.role} reports={monthlyReports} onMessage={() => {}} onlineUserIds={onlineUserIds} />}
-                        {canEdit && <SmartInput onEntriesAdded={handleAddEntries} currentUserId={targetUserId} onManualEntry={() => setIsEntryModalOpen(true)} onCopyLastDay={handleCopyLastDay} lastActiveDay={lastActiveDay} selectedMonth={selectedMonth} existingEntries={monthlyUserEntries} />}
-                        <div className="mb-8"><Dashboard entries={monthlyUserEntries} selectedMonth={selectedMonth} /></div>
-                        <ValidationStatus issues={validationIssues} />
-                        <h3 className="text-lg font-semibold text-slate-900 mb-4">Záznamy - {targetUser.name}</h3>
-                        <TimesheetTable entries={monthlyUserEntries} onDelete={handleDeleteEntry} onEdit={(d) => { setEditingDate(d); setIsEntryModalOpen(true); }} isLocked={isStatusLocked} canEdit={canEdit} />
-                    </div>
-                )}
-                {activeTab === 'report' && <ReportingModule entries={isManagerMode ? entries : entries.filter(e => e.employeeId === currentUserId)} employees={employees} currentUserRole={currentUser.role} jobs={jobs} selectedEmployeeId={targetUserId} selectedMonth={selectedMonth} />}
-                {activeTab === 'settings' && isManagerMode && <AdminPanel employees={employees} onAddEmployee={() => {}} onUpdateEmployee={() => {}} onToggleEmployeeStatus={() => {}} jobs={jobs} onAddJob={() => {}} onToggleJobStatus={() => {}} currentUser={currentUser} onStartPresentation={setPresentationMode} />}
+                <div className="animate-fade-in">
+                    {activeTab === 'overview' && (
+                        <>
+                            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-2">
+                                <h2 className="text-xl font-bold text-slate-900">Přehled docházky</h2>
+                                <MonthNavigator selectedMonth={selectedMonth} onMonthChange={setSelectedMonth} />
+                            </div>
+                            <ApprovalWorkflow status={monthStatus} onUpdateStatus={handleStatusUpdate} isManagerMode={isManagerMode} validationIssues={validationIssues} />
+                            {isManagerMode && !reviewingUserId && <TeamOverview employees={activeEmployees} allEntries={entries} selectedMonth={selectedMonth} onInspect={setReviewingUserId} currentUserRole={currentUser.role} reports={monthlyReports} onMessage={() => {}} onlineUserIds={onlineUserIds} />}
+                            {canEdit && <SmartInput onEntriesAdded={handleAddEntries} currentUserId={targetUserId} onManualEntry={() => setIsEntryModalOpen(true)} onCopyLastDay={handleCopyLastDay} lastActiveDay={lastActiveDay} selectedMonth={selectedMonth} existingEntries={monthlyUserEntries} />}
+                            <div className="mb-8"><Dashboard entries={monthlyUserEntries} selectedMonth={selectedMonth} /></div>
+                            <ValidationStatus issues={validationIssues} />
+                            <h3 className="text-lg font-semibold text-slate-900 mb-4">Záznamy - {targetUser.name}</h3>
+                            <TimesheetTable entries={monthlyUserEntries} onDelete={handleDeleteEntry} onEdit={(d) => { setEditingDate(d); setIsEntryModalOpen(true); }} isLocked={isStatusLocked} canEdit={canEdit} />
+                        </>
+                    )}
+                    {activeTab === 'report' && (
+                        <ReportingModule 
+                            entries={isManagerMode ? entries : entries.filter(e => e.employeeId === currentUserId)} 
+                            employees={employees} 
+                            currentUserRole={currentUser.role} 
+                            jobs={jobs} 
+                            selectedEmployeeId={targetUserId} 
+                            selectedMonth={selectedMonth} 
+                        />
+                    )}
+                    {activeTab === 'settings' && isManagerMode && (
+                        <AdminPanel 
+                            employees={employees} 
+                            onAddEmployee={() => {}} 
+                            onUpdateEmployee={() => {}} 
+                            onToggleEmployeeStatus={() => {}} 
+                            jobs={jobs} 
+                            onAddJob={() => {}} 
+                            onToggleJobStatus={() => {}} 
+                            currentUser={currentUser} 
+                            onStartPresentation={setPresentationMode} 
+                        />
+                    )}
+                </div>
             </div>
         )}
       </main>

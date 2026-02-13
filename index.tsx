@@ -18,19 +18,22 @@ if (rootElement) {
       </React.StrictMode>
     );
     
-    // Signalizace úspěšného startu
+    // Signalizace úspěšného startu pro index.html
     (window as any).APP_STARTED = true;
     
-    // Okamžité skrytí loaderu po renderu
-    const loader = document.getElementById('app-loader');
-    if (loader) {
-      loader.style.opacity = '0';
-      loader.style.pointerEvents = 'none';
-      setTimeout(() => loader.remove(), 600);
-    }
+    // Skrytí loaderu s malým zpožděním pro hladký přechod
+    setTimeout(() => {
+      const loader = document.getElementById('app-loader');
+      if (loader) {
+        loader.style.opacity = '0';
+        loader.style.pointerEvents = 'none';
+        setTimeout(() => loader.remove(), 600);
+      }
+    }, 200);
+    
   } catch (err) {
-    console.error('Kritická chyba startu:', err);
+    console.error('Kritická chyba startu Reactu:', err);
     const status = document.getElementById('loader-status');
-    if (status) status.innerText = "Chyba při spouštění komponent.";
+    if (status) status.innerText = "Chyba při renderování komponent.";
   }
 }

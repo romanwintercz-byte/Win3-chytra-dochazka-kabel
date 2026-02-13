@@ -1,7 +1,7 @@
 {
   "name": "chytra-dochazka",
   "private": true,
-  "version": "1.9.25",
+  "version": "1.9.27",
   "type": "module",
   "dependencies": {
     "react": "19.0.0",

@@ -55,6 +55,7 @@
 
     <div id="root"></div>
 
+    <!-- Používáme pouze module-shim pro konzistenci -->
     <script type="module-shim" src="./index.tsx"></script>
 
     <script>
@@ -63,14 +64,18 @@
         if(confirm("Opravdu chcete vyčistit mezipaměť? Smažou se neuložená data.")) {
           localStorage.clear();
           sessionStorage.clear();
+          if ('caches' in window) {
+            caches.keys().then(function(names) {
+              for (var name of names) caches.delete(name);
+            });
+          }
           window.location.reload(true);
         }
       };
       
-      // Pokud se aplikace nenačte do 7 sekund, zobrazíme nouzové tlačítko
       setTimeout(function() {
         if (!window.APP_STARTED) {
-          document.getElementById('loader-status').innerText = "Aplikaci se nedaří spustit.";
+          document.getElementById('loader-status').innerText = "Aplikaci se nedaří spustit. Zkuste vyčistit mezipaměť.";
           document.getElementById('reset-btn').style.display = "block";
         }
       }, 7000);
