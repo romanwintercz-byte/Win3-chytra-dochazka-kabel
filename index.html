@@ -19,11 +19,12 @@
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
     
     <style>
-      body { font-family: 'Inter', sans-serif; background-color: #0f172a; margin: 0; padding: 0; color: white; -webkit-tap-highlight-color: transparent; }
-      #app-loader { position: fixed; inset: 0; display: flex; flex-direction: column; align-items: center; justify-content: center; background-color: #0f172a; z-index: 9999; }
+      body { font-family: 'Inter', sans-serif; background-color: #0f172a; margin: 0; padding: 0; color: white; -webkit-tap-highlight-color: transparent; overflow: hidden; }
+      #app-loader { position: fixed; inset: 0; display: flex; flex-direction: column; align-items: center; justify-content: center; background-color: #0f172a; z-index: 9999; transition: opacity 0.5s ease; }
       .loader-spinner { width: 40px; height: 40px; border: 4px solid rgba(255,255,255,0.1); border-top-color: #4f46e5; border-radius: 50%; animation: spin 1s linear infinite; }
       @keyframes spin { to { transform: rotate(360deg); } }
-      #reset-btn { display: none; margin-top: 20px; background: #ef4444; color: white; padding: 12px 24px; border-radius: 8px; font-weight: bold; border: none; cursor: pointer; }
+      #reset-btn { display: none; margin-top: 20px; background: #ef4444; color: white; padding: 12px 24px; border-radius: 12px; font-weight: bold; border: none; cursor: pointer; font-size: 14px; box-shadow: 0 10px 15px -3px rgba(239, 68, 68, 0.3); }
+      #root { height: 100vh; overflow: hidden; }
     </style>
 
     <script type="importmap">
@@ -43,12 +44,13 @@
   }
 }
 </script>
-  </head>
+  <link rel="stylesheet" href="/index.css">
+</head>
   <body>
     <div id="app-loader">
       <div class="loader-spinner"></div>
-      <p id="loader-status" style="color: #94a3b8; font-size: 14px; margin-top: 16px;">Načítání aplikace...</p>
-      <button id="reset-btn" onclick="emergencyReset()">VYČISTIT MEZIPAMĚŤ</button>
+      <p id="loader-status" style="color: #94a3b8; font-size: 14px; margin-top: 16px; font-weight: 500;">Načítání systému...</p>
+      <button id="reset-btn" onclick="emergencyReset()">VYČISTIT A RESTARTOVAT</button>
     </div>
 
     <div id="root"></div>
@@ -58,19 +60,21 @@
     <script>
       window.APP_STARTED = false;
       window.emergencyReset = function() {
-        if(confirm("Opravdu chcete smazat dočasná data?")) {
+        if(confirm("Opravdu chcete vyčistit mezipaměť? Smažou se neuložená data.")) {
           localStorage.clear();
           sessionStorage.clear();
-          window.location.reload();
+          window.location.reload(true);
         }
       };
       
+      // Pokud se aplikace nenačte do 7 sekund, zobrazíme nouzové tlačítko
       setTimeout(function() {
         if (!window.APP_STARTED) {
-          var btn = document.getElementById('reset-btn');
-          if (btn) btn.style.display = "block";
+          document.getElementById('loader-status').innerText = "Aplikaci se nedaří spustit.";
+          document.getElementById('reset-btn').style.display = "block";
         }
-      }, 6000);
+      }, 7000);
     </script>
-  </body>
+  <script type="module" src="/index.tsx"></script>
+</body>
 </html>

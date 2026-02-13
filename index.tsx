@@ -2,8 +2,10 @@ import React from 'react';
 import ReactDOM from 'react-dom/client';
 import App from './App';
 
-// Signalizace pro index.html, že React byl načten
-(window as any).APP_STARTED = true;
+// Polyfill pro process.env aby Gemini SDK nespadlo
+if (!(window as any).process) {
+  (window as any).process = { env: {} };
+}
 
 const rootElement = document.getElementById('root');
 
@@ -16,15 +18,19 @@ if (rootElement) {
       </React.StrictMode>
     );
     
-    // Odstranění loaderu
-    setTimeout(() => {
-      const loader = document.getElementById('app-loader');
-      if (loader) {
-        loader.style.opacity = '0';
-        setTimeout(() => loader.remove(), 500);
-      }
-    }, 200);
+    // Signalizace úspěšného startu
+    (window as any).APP_STARTED = true;
+    
+    // Okamžité skrytí loaderu po renderu
+    const loader = document.getElementById('app-loader');
+    if (loader) {
+      loader.style.opacity = '0';
+      loader.style.pointerEvents = 'none';
+      setTimeout(() => loader.remove(), 600);
+    }
   } catch (err) {
-    console.error('Chyba při renderování:', err);
+    console.error('Kritická chyba startu:', err);
+    const status = document.getElementById('loader-status');
+    if (status) status.innerText = "Chyba při spouštění komponent.";
   }
 }
