@@ -160,7 +160,8 @@ const ReportingModule: React.FC<ReportingModuleProps> = ({
                   Object.entries(projectSummary).map(([name, hours]) => `
                   <tr>
                     <td>${name}</td>
-                    <td class="text-right font-bold">${hours.toFixed(1)}</td>
+                    <!-- Fix: Cast hours to Number to avoid TypeScript inference issues from Object.entries -->
+                    <td class="text-right font-bold">${Number(hours).toFixed(1)}</td>
                   </tr>
                 `).join('')}
                 <tr style="background:#f0f0f0">

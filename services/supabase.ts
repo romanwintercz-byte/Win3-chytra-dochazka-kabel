@@ -59,7 +59,7 @@ export const fetchEmployees = async (): Promise<Employee[]> => {
     if (!supabase) return [];
     const { data, error } = await supabase.from('employees').select('*').order('name');
     if (error) {
-        console.error("Supabase error (employees):", error.message, error.details);
+        console.error("Supabase error (employees):", error);
         throw error;
     }
     return (data || []).map(mapEmployee);
@@ -125,7 +125,10 @@ export const updateJobStatus = async (id: string, isActive: boolean) => {
 export const fetchTimeEntries = async (): Promise<TimeEntry[]> => {
     if (!supabase) return [];
     const { data, error } = await supabase.from('time_entries').select('*');
-    if (error) throw error;
+    if (error) {
+        console.error("Supabase error (entries):", error);
+        throw error;
+    }
     return (data || []).map(mapTimeEntry);
 };
 
@@ -180,9 +183,11 @@ export const upsertMonthlyReport = async (report: MonthStatus) => {
 
 export const fetchGlobalLock = async (month: string): Promise<boolean> => {
     if (!supabase) return false;
-    const { data, error } = await supabase.from('global_locks').select('is_locked').eq('month', month).single();
-    if (error && error.code !== 'PGRST116') return false;
-    return data?.is_locked || data?.isLocked || false;
+    try {
+        const { data, error } = await supabase.from('global_locks').select('is_locked').eq('month', month).single();
+        if (error && error.code !== 'PGRST116') return false;
+        return data?.is_locked || data?.isLocked || false;
+    } catch (e) { return false; }
 };
 
 export const toggleGlobalLock = async (month: string, isLocked: boolean, managerId: string) => {
@@ -224,7 +229,6 @@ export const createNotification = async (userId: string, message: string, type: 
     if (error) throw error;
 };
 
-// FIX: Added createGlobalNotification to support bulk insertion of notifications for multiple users.
 export const createGlobalNotification = async (userIds: string[], message: string, type: string = 'info', senderId?: string) => {
     if (!supabase || userIds.length === 0) return;
     const rows = userIds.map(userId => ({
