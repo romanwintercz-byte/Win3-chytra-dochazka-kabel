@@ -41,6 +41,7 @@ const App: React.FC = () => {
   const [pendingUserId, setPendingUserId] = useState<string | null>(null);
   const [reviewingUserId, setReviewingUserId] = useState<string | null>(null);
   const [isConnected, setIsConnected] = useState(false);
+  const [editingEntry, setEditingEntry] = useState<TimeEntry | undefined>(undefined);
 
   useEffect(() => {
     if (!isSupabaseConfigured()) {
@@ -136,8 +137,10 @@ const App: React.FC = () => {
   const handleModalSubmit = async (date: string, submittedEntries: TimeEntry[]) => {
       if (!useDemoData) {
         try {
-          if (date !== 'BULK_RANGE') {
-            await db.deleteTimeEntriesForDate(targetUserId, date);
+          if (editingEntry) {
+              await db.deleteTimeEntry(editingEntry.id);
+          } else if (date !== 'BULK_RANGE') {
+              await db.deleteTimeEntriesForDate(targetUserId, date);
           }
           await db.addTimeEntriesBulk(submittedEntries);
         } catch (e: any) {
@@ -150,10 +153,11 @@ const App: React.FC = () => {
           setEntries(prev => [...prev, ...submittedEntries]);
       } else {
           setEntries(prev => [
-              ...prev.filter(e => !(e.employeeId === targetUserId && e.date === date)),
+              ...prev.filter(e => !(e.employeeId === targetUserId && (editingEntry ? e.id === editingEntry.id : e.date === date))),
               ...submittedEntries
           ]);
       }
+      setEditingEntry(undefined);
   };
 
   const handleDeleteEntry = async (id: string) => {
@@ -166,6 +170,16 @@ const App: React.FC = () => {
       }
     }
     setEntries(prev => prev.filter(e => e.id !== id));
+  };
+
+  const handleEditEntry = (entry: TimeEntry) => {
+    setEditingEntry(entry);
+    setIsEntryModalOpen(true);
+  };
+
+  const handleOpenManualEntry = () => {
+    setEditingEntry(undefined);
+    setIsEntryModalOpen(true);
   };
 
   return (
@@ -186,7 +200,6 @@ const App: React.FC = () => {
             <NotificationBell notifications={[]} onMarkAsRead={()=>{}} onMarkAllAsRead={()=>{}} />
             <div className="relative group active:scale-95 transition-transform">
                 <img src={currentUser.avatar} className="w-9 h-9 rounded-full border-2 border-indigo-500 shadow-lg" alt="User" />
-                {/* Neviditelný select pro mobilní přepínání uživatelů */}
                 <select 
                   value={currentUser.id} 
                   onChange={(e) => handleRequestSwitchUser(e.target.value)}
@@ -244,7 +257,7 @@ const App: React.FC = () => {
                 <TeamOverview employees={employees} allEntries={entries} selectedMonth={selectedMonth} onInspect={setReviewingUserId} currentUserRole={currentUser.role} reports={[]} onMessage={()=>{}} />
             )}
 
-            <SmartInput onEntriesAdded={handleAddEntries} currentUserId={targetUserId} onManualEntry={() => setIsEntryModalOpen(true)} selectedMonth={selectedMonth} existingEntries={monthlyUserEntries} />
+            <SmartInput onEntriesAdded={handleAddEntries} currentUserId={targetUserId} onManualEntry={handleOpenManualEntry} selectedMonth={selectedMonth} existingEntries={monthlyUserEntries} />
             
             <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 mb-8">
                 <div className="lg:col-span-2"><Dashboard entries={monthlyUserEntries} selectedMonth={selectedMonth} /></div>
@@ -252,7 +265,7 @@ const App: React.FC = () => {
             </div>
 
             <h3 className="text-lg font-semibold text-slate-900 mb-4">Výkaz: {targetUser.name}</h3>
-            <TimesheetTable entries={monthlyUserEntries} onDelete={handleDeleteEntry} onEdit={() => setIsEntryModalOpen(true)} />
+            <TimesheetTable entries={monthlyUserEntries} onDelete={handleDeleteEntry} onEdit={handleEditEntry} />
           </div>
         )}
 
@@ -269,7 +282,7 @@ const App: React.FC = () => {
 
       <AboutModal isOpen={isAboutOpen} onClose={() => setIsAboutOpen(false)} version="1.9.26" />
       <MobileNavigation activeTab={activeTab} setActiveTab={setActiveTab} currentUserRole={currentUser.role} />
-      <EntryFormModal isOpen={isEntryModalOpen} onClose={() => setIsEntryModalOpen(false)} onSubmit={handleModalSubmit} currentUserId={targetUserId} jobs={jobs} />
+      <EntryFormModal isOpen={isEntryModalOpen} onClose={() => {setIsEntryModalOpen(false); setEditingEntry(undefined);}} onSubmit={handleModalSubmit} currentUserId={targetUserId} jobs={jobs} initialEntry={editingEntry} />
       <HelpSystem />
       {isPinModalOpen && pendingUserId && (
           <PinPadModal isOpen={isPinModalOpen} onClose={() => setIsPinModalOpen(false)} onSuccess={() => {setCurrentUserId(pendingUserId); setIsPinModalOpen(false);}} targetPin={(employees.find(e=>e.id===pendingUserId) || MOCK_EMPLOYEES.find(e=>e.id===pendingUserId))?.pinCode || ""} targetUserName={(employees.find(e=>e.id===pendingUserId) || MOCK_EMPLOYEES.find(e=>e.id===pendingUserId))?.name || ""} />

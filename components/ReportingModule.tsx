@@ -78,7 +78,6 @@ const ReportingModule: React.FC<ReportingModuleProps> = ({ entries, employees, s
 
   return (
     <div className="space-y-6 max-w-5xl mx-auto pb-20">
-      {/* Ovládací panel (skrytý při tisku) */}
       <div className="bg-white p-6 rounded-xl border border-gray-200 shadow-sm flex justify-between items-center no-print">
         <div>
           <h2 className="text-xl font-bold text-slate-900">Mzdový report</h2>
@@ -94,10 +93,8 @@ const ReportingModule: React.FC<ReportingModuleProps> = ({ entries, employees, s
         </div>
       </div>
 
-      {/* Samotný report pro tisk */}
       <div className="bg-white p-6 md:p-8 rounded-none md:rounded-xl shadow-none md:shadow-sm border-0 md:border border-gray-100 print:p-0 print:m-0">
         
-        {/* Hlavička reportu */}
         <div className="flex justify-between items-start border-b-2 border-slate-900 pb-4 mb-6">
           <div>
             <h1 className="text-2xl font-black text-slate-900 uppercase">Výkaz práce</h1>
@@ -110,7 +107,6 @@ const ReportingModule: React.FC<ReportingModuleProps> = ({ entries, employees, s
           </div>
         </div>
 
-        {/* Hlavní statistiky */}
         <div className="grid grid-cols-4 gap-4 mb-8">
           <div className="border-l-4 border-indigo-600 pl-3">
             <p className="text-[10px] font-black text-slate-400 uppercase tracking-tighter">Celkem hodin</p>
@@ -133,7 +129,6 @@ const ReportingModule: React.FC<ReportingModuleProps> = ({ entries, employees, s
         </div>
 
         <div className="grid grid-cols-1 md:grid-cols-2 gap-8 mb-8">
-          {/* Mzdové ukazatele */}
           <div>
             <h3 className="text-xs font-black text-slate-900 uppercase mb-3 bg-slate-100 p-2 border-l-2 border-slate-900">Mzdové ukazatele</h3>
             <div className="grid grid-cols-2 gap-x-6 gap-y-1">
@@ -146,7 +141,6 @@ const ReportingModule: React.FC<ReportingModuleProps> = ({ entries, employees, s
             </div>
           </div>
 
-          {/* Rekapitulace zakázek */}
           <div>
             <h3 className="text-xs font-black text-slate-900 uppercase mb-3 bg-slate-100 p-2 border-l-2 border-slate-900">Přehled zakázek</h3>
             <table className="w-full text-left">
@@ -170,7 +164,6 @@ const ReportingModule: React.FC<ReportingModuleProps> = ({ entries, employees, s
           </div>
         </div>
 
-        {/* Denní rozpis */}
         <div>
           <h3 className="text-xs font-black text-slate-900 uppercase mb-3 bg-slate-100 p-2 border-l-2 border-slate-900">Denní detail docházky</h3>
           <table className="w-full border-collapse">
@@ -223,16 +216,10 @@ const ReportingModule: React.FC<ReportingModuleProps> = ({ entries, employees, s
                 );
               })}
             </tbody>
-            <tfoot>
-              <tr className="bg-slate-100">
-                <td colSpan={3} className="text-[10px] p-2 font-black text-right uppercase">Součet za měsíc:</td>
-                <td className="text-xs p-2 font-black text-right">{monthStats.totalHours.toFixed(1)}h</td>
-              </tr>
-            </tfoot>
+            {/* Odsraněna patička s duplicitním součtem hodin pro úsporu místa a přehlednost */}
           </table>
         </div>
 
-        {/* Podpisy */}
         <div className="mt-12 flex justify-between gap-12 print:mt-12">
           <div className="flex-1 border-t border-slate-300 pt-2">
             <p className="text-[9px] font-bold text-slate-400 uppercase mb-8">Podpis zaměstnance</p>

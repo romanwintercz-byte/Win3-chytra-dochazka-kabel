@@ -5,7 +5,7 @@ import { TimeEntry, WorkType } from '../types';
 interface TimesheetTableProps {
   entries: TimeEntry[];
   onDelete: (id: string) => void;
-  onEdit: (date: string) => void;
+  onEdit: (entry: TimeEntry) => void;
 }
 
 const TimesheetTable: React.FC<TimesheetTableProps> = ({ entries, onDelete, onEdit }) => {
@@ -30,8 +30,21 @@ const TimesheetTable: React.FC<TimesheetTableProps> = ({ entries, onDelete, onEd
               <td className="p-4 text-slate-700">{e.project}</td>
               <td className="p-4 text-slate-500 italic">{e.description}</td>
               <td className="p-4 text-right font-bold text-slate-900">{e.hours.toFixed(1)}h</td>
-              <td className="p-4 text-right">
-                <button onClick={() => onDelete(e.id)} className="text-red-400 hover:text-red-600">Smazat</button>
+              <td className="p-4 text-right whitespace-nowrap">
+                <div className="flex justify-end gap-3">
+                  <button 
+                    onClick={() => onEdit(e)} 
+                    className="text-indigo-600 hover:text-indigo-800 font-bold text-xs uppercase"
+                  >
+                    Upravit
+                  </button>
+                  <button 
+                    onClick={() => onDelete(e.id)} 
+                    className="text-red-400 hover:text-red-600 font-bold text-xs uppercase"
+                  >
+                    Smazat
+                  </button>
+                </div>
               </td>
             </tr>
           ))}

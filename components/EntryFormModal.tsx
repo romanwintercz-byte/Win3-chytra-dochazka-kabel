@@ -1,5 +1,5 @@
 
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { TimeEntry, Job, WorkType } from '../types';
 import { v4 as uuidv4 } from 'uuid';
 
@@ -9,12 +9,12 @@ interface EntryFormModalProps {
   onSubmit: (date: string, entries: TimeEntry[]) => void;
   currentUserId: string;
   jobs: Job[];
-  existingEntries?: TimeEntry[];
+  initialEntry?: TimeEntry;
 }
 
 type EntryMode = 'single' | 'range';
 
-const EntryFormModal: React.FC<EntryFormModalProps> = ({ isOpen, onClose, onSubmit, currentUserId, jobs }) => {
+const EntryFormModal: React.FC<EntryFormModalProps> = ({ isOpen, onClose, onSubmit, currentUserId, jobs, initialEntry }) => {
   const [mode, setMode] = useState<EntryMode>('single');
   const [date, setDate] = useState(new Date().toISOString().split('T')[0]);
   const [dateTo, setDateTo] = useState(new Date().toISOString().split('T')[0]);
@@ -24,11 +24,28 @@ const EntryFormModal: React.FC<EntryFormModalProps> = ({ isOpen, onClose, onSubm
   const [hours, setHours] = useState('8');
   const [type, setType] = useState(WorkType.REGULAR);
 
+  // Reagovat na změnu initialEntry (při otevření pro editaci)
+  useEffect(() => {
+    if (initialEntry) {
+      setMode('single');
+      setDate(initialEntry.date);
+      setProject(initialEntry.project);
+      setHours(String(initialEntry.hours));
+      setType(initialEntry.type);
+    } else {
+      // Reset na výchozí při novém záznamu
+      setDate(new Date().toISOString().split('T')[0]);
+      setProject(jobs[0]?.name || '');
+      setHours('8');
+      setType(WorkType.REGULAR);
+    }
+  }, [initialEntry, jobs, isOpen]);
+
   if (!isOpen) return null;
 
   const isWeekend = (dateObj: Date) => {
     const day = dateObj.getDay();
-    return day === 0 || day === 6; // 0 = Neděle, 6 = Sobota
+    return day === 0 || day === 6; 
   };
 
   const handleSubmit = (e: React.FormEvent) => {
@@ -36,7 +53,7 @@ const EntryFormModal: React.FC<EntryFormModalProps> = ({ isOpen, onClose, onSubm
     
     if (mode === 'single') {
       onSubmit(date, [{
-        id: uuidv4(),
+        id: initialEntry ? initialEntry.id : uuidv4(),
         employeeId: currentUserId,
         date,
         project,
@@ -45,7 +62,6 @@ const EntryFormModal: React.FC<EntryFormModalProps> = ({ isOpen, onClose, onSubm
         type
       }]);
     } else {
-      // Logika pro rozmezí
       const start = new Date(date);
       const end = new Date(dateTo);
       const newEntries: TimeEntry[] = [];
@@ -80,25 +96,29 @@ const EntryFormModal: React.FC<EntryFormModalProps> = ({ isOpen, onClose, onSubm
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4 backdrop-blur-sm">
       <div className="bg-white w-full max-w-md rounded-2xl shadow-2xl p-6 overflow-hidden">
-        <h3 className="text-xl font-bold mb-6 text-slate-900">Zápis hodin</h3>
+        <h3 className="text-xl font-bold mb-6 text-slate-900">
+          {initialEntry ? 'Upravit záznam' : 'Zápis hodin'}
+        </h3>
         
-        {/* Přepínač režimů */}
-        <div className="flex bg-slate-100 p-1 rounded-xl mb-6">
-          <button 
-            type="button"
-            onClick={() => setMode('single')}
-            className={`flex-1 py-2 text-xs font-bold rounded-lg transition-all ${mode === 'single' ? 'bg-white text-indigo-600 shadow-sm' : 'text-slate-500 hover:text-slate-700'}`}
-          >
-            Jeden den
-          </button>
-          <button 
-            type="button"
-            onClick={() => setMode('range')}
-            className={`flex-1 py-2 text-xs font-bold rounded-lg transition-all ${mode === 'range' ? 'bg-white text-indigo-600 shadow-sm' : 'text-slate-500 hover:text-slate-700'}`}
-          >
-            Rozmezí
-          </button>
-        </div>
+        {/* Přepínač režimů (skrytý při editaci) */}
+        {!initialEntry && (
+          <div className="flex bg-slate-100 p-1 rounded-xl mb-6">
+            <button 
+              type="button"
+              onClick={() => setMode('single')}
+              className={`flex-1 py-2 text-xs font-bold rounded-lg transition-all ${mode === 'single' ? 'bg-white text-indigo-600 shadow-sm' : 'text-slate-500 hover:text-slate-700'}`}
+            >
+              Jeden den
+            </button>
+            <button 
+              type="button"
+              onClick={() => setMode('range')}
+              className={`flex-1 py-2 text-xs font-bold rounded-lg transition-all ${mode === 'range' ? 'bg-white text-indigo-600 shadow-sm' : 'text-slate-500 hover:text-slate-700'}`}
+            >
+              Rozmezí
+            </button>
+          </div>
+        )}
 
         <form onSubmit={handleSubmit} className="space-y-4">
           <div className={`grid gap-4 ${mode === 'range' ? 'grid-cols-2' : 'grid-cols-1'}`}>
@@ -190,7 +210,7 @@ const EntryFormModal: React.FC<EntryFormModalProps> = ({ isOpen, onClose, onSubm
               type="submit" 
               className="flex-1 py-3 bg-indigo-600 hover:bg-indigo-700 text-white font-bold rounded-xl shadow-lg shadow-indigo-200 transition-all active:scale-95"
             >
-              Uložit {mode === 'range' ? 'hromadně' : ''}
+              {initialEntry ? 'Uložit změny' : `Uložit ${mode === 'range' ? 'hromadně' : ''}`}
             </button>
           </div>
         </form>
