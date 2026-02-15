@@ -1,6 +1,6 @@
 {
-  "name": "Chytrá docházka",
-  "description": "Profesionální aplikace pro evidenci pracovní doby a projektů.",
+  "name": "Chytrá docházka Win3",
+  "description": "Profesionální aplikace pro evidenci pracovní doby, projektů a schvalovací procesy s AI podporou.",
   "requestFramePermissions": [
     "camera",
     "microphone"

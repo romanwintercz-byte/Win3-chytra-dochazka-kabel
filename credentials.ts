@@ -1,8 +1,7 @@
 
 export const CREDENTIALS = {
-    // Vite vyžaduje prefix VITE_, ale Vercel někdy předává proměnné i přímo přes process.env
-    SUPABASE_URL: (import.meta as any).env?.VITE_SUPABASE_URL || (window as any).process?.env?.VITE_SUPABASE_URL || '',
-    SUPABASE_KEY: (import.meta as any).env?.VITE_SUPABASE_KEY || (window as any).process?.env?.VITE_SUPABASE_KEY || ''
+    SUPABASE_URL: (window as any).process?.env?.VITE_SUPABASE_URL || '',
+    SUPABASE_KEY: (window as any).process?.env?.VITE_SUPABASE_KEY || ''
 };
 
 export const isSupabaseConfigured = () => {

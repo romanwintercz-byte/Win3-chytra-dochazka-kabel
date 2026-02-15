@@ -28,7 +28,7 @@ export interface Employee {
   email: string;
   avatar: string;
   isActive: boolean;
-  pinCode?: string; // Optional security PIN
+  pinCode?: string;
 }
 
 export interface Job {
@@ -40,33 +40,18 @@ export interface Job {
 
 export interface TimeEntry {
   id: string;
-  employeeId: string; // Link to Employee
-  date: string; // ISO string YYYY-MM-DD
-  project: string; // Should match a Job name or code
+  employeeId: string;
+  date: string;
+  project: string;
   description: string;
   hours: number;
   type: WorkType;
-  attachmentUrl?: string; // URL to the uploaded document (Supabase Storage)
-}
-
-export interface MonthlyStats {
-  totalHours: number;
-  billableHours: number;
-  overtimeHours: number;
-  projectDistribution: { name: string; value: number }[];
-}
-
-export interface CalendarEvent {
-  id: string;
-  title: string;
-  start: string; // ISO date string
-  end: string; // ISO date string
-  isImported: boolean;
+  attachmentUrl?: string;
 }
 
 export interface MonthStatus {
-  employeeId?: string; // Link to owner
-  month: string; // YYYY-MM
+  employeeId?: string;
+  month: string;
   status: TimesheetStatus;
   managerComment?: string;
   submittedAt?: string;
@@ -76,7 +61,7 @@ export interface MonthStatus {
 export interface Notification {
   id: string;
   userId: string;
-  senderId?: string; // ID of the sender
+  senderId?: string;
   type: 'info' | 'success' | 'warning' | 'error';
   message: string;
   isRead: boolean;
