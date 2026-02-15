@@ -5,8 +5,8 @@
  * můžete URL a KEY vložit přímo do uvozovek níže.
  */
 
-const DIRECT_URL = ""; 
-const DIRECT_KEY = "";
+const DIRECT_URL = "https://afjsymtiupvcfccsrodi.supabase.co"; 
+const DIRECT_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImFmanN5bXRpdXB2Y2ZjY3Nyb2RpIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjQ2NjQwMjQsImV4cCI6MjA4MDI0MDAyNH0.fPlthT47PPBEdTgNRzg-Rw5H6RoV9qgC9RKjDx_WnUM";
 
 export const CREDENTIALS = {
     SUPABASE_URL: DIRECT_URL || 
