@@ -2,39 +2,38 @@ import React from 'react';
 import ReactDOM from 'react-dom/client';
 import App from './App';
 
-// Safari Polyfill pro process.env
-if (typeof (window as any).process === 'undefined') {
+// Polyfill pro process.env aby Gemini SDK nespadlo
+if (!(window as any).process) {
   (window as any).process = { env: {} };
 }
 
-// Signalizace pro index.html
-(window as any).APP_STARTED = true;
-
 const rootElement = document.getElementById('root');
-if (!rootElement) {
-  throw new Error("Root element nebyl nalezen.");
-}
 
-if ('serviceWorker' in navigator) {
-  window.addEventListener('load', () => {
-    navigator.serviceWorker.register('./sw.js', { scope: './' })
-      .then(() => console.log('SW v1.9.20 OK'))
-      .catch(err => console.warn('SW fail:', err));
-  });
-}
-
-const root = ReactDOM.createRoot(rootElement);
-root.render(
-  <React.StrictMode>
-    <App />
-  </React.StrictMode>
-);
-
-// Odstranění loaderu
-setTimeout(() => {
-  const loader = document.getElementById('app-loader');
-  if (loader) {
-    loader.style.opacity = '0';
-    setTimeout(() => loader.remove(), 400);
+if (rootElement) {
+  try {
+    const root = ReactDOM.createRoot(rootElement);
+    root.render(
+      <React.StrictMode>
+        <App />
+      </React.StrictMode>
+    );
+    
+    // Signalizace úspěšného startu pro index.html
+    (window as any).APP_STARTED = true;
+    
+    // Skrytí loaderu s malým zpožděním pro hladký přechod
+    setTimeout(() => {
+      const loader = document.getElementById('app-loader');
+      if (loader) {
+        loader.style.opacity = '0';
+        loader.style.pointerEvents = 'none';
+        setTimeout(() => loader.remove(), 600);
+      }
+    }, 200);
+    
+  } catch (err) {
+    console.error('Kritická chyba startu Reactu:', err);
+    const status = document.getElementById('loader-status');
+    if (status) status.innerText = "Chyba při renderování komponent.";
   }
-}, 500);
+}
