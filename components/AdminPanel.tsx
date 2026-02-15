@@ -2,7 +2,21 @@
 import React from 'react';
 import { Employee, Job } from '../types';
 
-const AdminPanel: React.FC<{employees: Employee[], onAddEmployee: any, onUpdateEmployee: any, onToggleEmployeeStatus: any, jobs: Job[], onAddJob: any, onToggleJobStatus: any, currentUser: Employee, onStartPresentation: any}> = ({ employees, jobs }) => {
+// Define interface for AdminPanel props with optional handlers to fix TypeScript error in App.tsx
+// These properties are marked as optional since they are not currently utilized within the component logic.
+interface AdminPanelProps {
+  employees: Employee[];
+  jobs: Job[];
+  onAddEmployee?: any;
+  onUpdateEmployee?: any;
+  onToggleEmployeeStatus?: any;
+  onAddJob?: any;
+  onToggleJobStatus?: any;
+  currentUser?: Employee;
+  onStartPresentation?: any;
+}
+
+const AdminPanel: React.FC<AdminPanelProps> = ({ employees, jobs }) => {
   return (
     <div className="space-y-8">
       <section>

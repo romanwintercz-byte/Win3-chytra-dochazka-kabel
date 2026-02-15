@@ -1,14 +1,15 @@
 
 import React from 'react';
-import { TimeEntry, WorkType } from '../types';
+import { TimeEntry } from '../types';
 
 interface TimesheetTableProps {
   entries: TimeEntry[];
   onDelete: (id: string) => void;
   onEdit: (entry: TimeEntry) => void;
+  isLocked?: boolean;
 }
 
-const TimesheetTable: React.FC<TimesheetTableProps> = ({ entries, onDelete, onEdit }) => {
+const TimesheetTable: React.FC<TimesheetTableProps> = ({ entries, onDelete, onEdit, isLocked }) => {
   const sorted = [...entries].sort((a, b) => b.date.localeCompare(a.date));
 
   return (
@@ -20,7 +21,7 @@ const TimesheetTable: React.FC<TimesheetTableProps> = ({ entries, onDelete, onEd
             <th className="p-4 font-bold text-gray-500 uppercase text-[10px]">Projekt</th>
             <th className="p-4 font-bold text-gray-500 uppercase text-[10px]">Popis</th>
             <th className="p-4 font-bold text-gray-500 uppercase text-[10px] text-right">Hodiny</th>
-            <th className="p-4"></th>
+            {!isLocked && <th className="p-4"></th>}
           </tr>
         </thead>
         <tbody className="divide-y divide-gray-100">
@@ -30,26 +31,28 @@ const TimesheetTable: React.FC<TimesheetTableProps> = ({ entries, onDelete, onEd
               <td className="p-4 text-slate-700">{e.project}</td>
               <td className="p-4 text-slate-500 italic">{e.description}</td>
               <td className="p-4 text-right font-bold text-slate-900">{e.hours.toFixed(1)}h</td>
-              <td className="p-4 text-right whitespace-nowrap">
-                <div className="flex justify-end gap-3">
-                  <button 
-                    onClick={() => onEdit(e)} 
-                    className="text-indigo-600 hover:text-indigo-800 font-bold text-xs uppercase"
-                  >
-                    Upravit
-                  </button>
-                  <button 
-                    onClick={() => onDelete(e.id)} 
-                    className="text-red-400 hover:text-red-600 font-bold text-xs uppercase"
-                  >
-                    Smazat
-                  </button>
-                </div>
-              </td>
+              {!isLocked && (
+                <td className="p-4 text-right whitespace-nowrap">
+                  <div className="flex justify-end gap-3">
+                    <button 
+                      onClick={() => onEdit(e)} 
+                      className="text-indigo-600 hover:text-indigo-800 font-bold text-xs uppercase"
+                    >
+                      Upravit
+                    </button>
+                    <button 
+                      onClick={() => onDelete(e.id)} 
+                      className="text-red-400 hover:text-red-600 font-bold text-xs uppercase"
+                    >
+                      Smazat
+                    </button>
+                  </div>
+                </td>
+              )}
             </tr>
           ))}
           {sorted.length === 0 && (
-            <tr><td colSpan={5} className="p-12 text-center text-slate-400">Žádné záznamy</td></tr>
+            <tr><td colSpan={isLocked ? 4 : 5} className="p-12 text-center text-slate-400">Žádné záznamy</td></tr>
           )}
         </tbody>
       </table>
