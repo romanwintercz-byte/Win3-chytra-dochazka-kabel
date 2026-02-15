@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect, useMemo } from 'react';
 import Sidebar from './components/Sidebar';
 import SmartInput from './components/SmartInput';
@@ -18,7 +19,7 @@ import PinPadModal from './components/PinPadModal';
 import MonthNavigator from './components/MonthNavigator';
 import { TimeEntry, MonthStatus, TimesheetStatus, Employee, Job, Notification } from './types';
 import { validateMonth } from './services/validationService';
-import { isSupabaseConfigured } from './credentials';
+import { isSupabaseConfigured, getConfigurationStatus } from './credentials';
 import { MOCK_EMPLOYEES, MOCK_JOBS, MOCK_ENTRIES } from './services/mockData';
 import * as db from './services/supabase';
 
@@ -26,7 +27,7 @@ const getCurrentMonth = () => new Date().toISOString().slice(0, 7);
 
 const App: React.FC = () => {
   const [activeTab, setActiveTab] = useState<'overview' | 'report' | 'settings'>('overview');
-  const [useDemoData, setUseDemoData] = useState(!isSupabaseConfigured());
+  const [useDemoData, setUseDemoData] = useState(true);
   const [employees, setEmployees] = useState<Employee[]>(MOCK_EMPLOYEES);
   const [jobs, setJobs] = useState<Job[]>(MOCK_JOBS);
   const [entries, setEntries] = useState<TimeEntry[]>(MOCK_ENTRIES);
@@ -38,42 +39,67 @@ const App: React.FC = () => {
   const [isPinModalOpen, setIsPinModalOpen] = useState(false);
   const [pendingUserId, setPendingUserId] = useState<string | null>(null);
   const [reviewingUserId, setReviewingUserId] = useState<string | null>(null);
-  const [dbStatus, setDbStatus] = useState<{success: boolean, message: string} | null>(null);
+  
+  // Status pro diagnostický proužek
+  const [diagStatus, setDiagStatus] = useState<{success: boolean, message: string, color: string}>({
+    success: false,
+    message: "Inicializace...",
+    color: "bg-slate-700"
+  });
 
-  // Načtení reálných dat pokud je Supabase k dispozici
   useEffect(() => {
-    if (isSupabaseConfigured()) {
-      const loadData = async () => {
-        setIsLoading(true);
-        const status = await db.checkConnection();
-        setDbStatus(status);
-        
-        if (status.success) {
-          try {
-            const [empData, jobsData, entriesData] = await Promise.all([
-              db.fetchEmployees(),
-              db.fetchJobs(),
-              db.fetchTimeEntries()
-            ]);
-            
-            if (empData.length > 0) {
-              setEmployees(empData);
-              setUseDemoData(false);
-              // Nastavíme prvního zaměstnance jako aktuálního pokud nejsme v demo módu
-              if (currentUserId.includes('worker-')) {
-                 setCurrentUserId(empData[0].id);
-              }
-            }
-            if (jobsData.length > 0) setJobs(jobsData);
-            if (entriesData.length > 0) setEntries(entriesData);
-          } catch (err) {
-            console.error("Chyba při stahování dat:", err);
-          }
-        }
-        setIsLoading(false);
-      };
-      loadData();
+    const config = getConfigurationStatus();
+    
+    if (!config.isOk) {
+      setDiagStatus({
+        success: false,
+        message: `⚠️ ${config.msg} (Aplikace běží v DEMO módu)`,
+        color: "bg-amber-600"
+      });
+      return;
     }
+
+    const loadData = async () => {
+      setIsLoading(true);
+      const conn = await db.checkConnection();
+      
+      if (conn.success) {
+        setDiagStatus({
+          success: true,
+          message: "✓ Propojeno se Supabase",
+          color: "bg-green-600"
+        });
+        
+        try {
+          const [empData, jobsData, entriesData] = await Promise.all([
+            db.fetchEmployees(),
+            db.fetchJobs(),
+            db.fetchTimeEntries()
+          ]);
+          
+          if (empData.length > 0) {
+            setEmployees(empData);
+            setUseDemoData(false);
+            if (currentUserId.includes('worker-')) {
+               setCurrentUserId(empData[0].id);
+            }
+          }
+          if (jobsData.length > 0) setJobs(jobsData);
+          if (entriesData.length > 0) setEntries(entriesData);
+        } catch (err) {
+          console.error("Chyba při stahování dat:", err);
+        }
+      } else {
+        setDiagStatus({
+          success: false,
+          message: `✗ Chyba připojení: ${conn.message}`,
+          color: "bg-red-600"
+        });
+      }
+      setIsLoading(false);
+    };
+    
+    loadData();
   }, []);
 
   const currentUser = employees.find(e => e.id === currentUserId) || employees[0];
@@ -142,16 +168,11 @@ const App: React.FC = () => {
 
   return (
     <div className="flex flex-col md:flex-row min-h-screen bg-gray-50">
-      {/* Diagnostický proužek - pouze pokud je snaha o připojení */}
-      {isSupabaseConfigured() && dbStatus && (
-        <div className={`fixed top-0 left-0 right-0 z-[100] text-[10px] py-1 px-4 flex justify-between items-center no-print ${dbStatus.success ? 'bg-green-600 text-white' : 'bg-red-600 text-white'}`}>
-          <span>
-            {dbStatus.success ? '✓ Propojeno se Supabase' : `✗ Chyba připojení: ${dbStatus.message}`}
-            {useDemoData && ' (Zobrazují se Demo data)'}
-          </span>
-          <button onClick={() => setDbStatus(null)} className="opacity-50 hover:opacity-100">✕</button>
-        </div>
-      )}
+      {/* Diagnostický proužek - nyní se zobrazuje vždy */}
+      <div className={`fixed top-0 left-0 right-0 z-[100] text-[10px] py-1 px-4 flex justify-between items-center no-print text-white font-bold shadow-md ${diagStatus.color}`}>
+        <span>{diagStatus.message}</span>
+        <span className="opacity-50 text-[8px]">DIAGNOSTIKA</span>
+      </div>
 
       <Sidebar 
         activeTab={activeTab} setActiveTab={setActiveTab} 
@@ -161,7 +182,7 @@ const App: React.FC = () => {
         version="1.9.22"
       />
 
-      <div className="md:hidden bg-slate-900 text-white p-4 flex justify-between items-center sticky top-0 z-30 shadow-md">
+      <div className="md:hidden bg-slate-900 text-white p-4 flex justify-between items-center sticky top-0 z-30 shadow-md mt-6">
         <h1 className="font-bold text-lg">Chytrá docházka</h1>
         <div className="flex items-center gap-3">
             <NotificationBell notifications={[]} onMarkAsRead={()=>{}} onMarkAllAsRead={()=>{}} />
@@ -169,7 +190,7 @@ const App: React.FC = () => {
         </div>
       </div>
 
-      <main className="flex-1 overflow-y-auto no-print pt-6">
+      <main className="flex-1 overflow-y-auto no-print pt-10">
         {isLoading && (
           <div className="fixed inset-0 bg-white/50 backdrop-blur-sm z-[90] flex items-center justify-center">
             <div className="flex flex-col items-center">
