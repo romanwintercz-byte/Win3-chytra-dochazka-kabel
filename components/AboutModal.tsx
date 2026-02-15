@@ -1,7 +1,16 @@
 
 import React from 'react';
 
-const AboutModal: React.FC<{isOpen: boolean, onClose: () => void, version: string}> = ({ isOpen, onClose, version }) => {
+// Fix: Defined AboutModalProps and added missing optional handlers passed from App.tsx
+interface AboutModalProps {
+  isOpen: boolean;
+  onClose: () => void;
+  version: string;
+  onContactDeveloper?: () => void;
+  onServiceLogin?: () => void;
+}
+
+const AboutModal: React.FC<AboutModalProps> = ({ isOpen, onClose, version }) => {
   if (!isOpen) return null;
   return (
     <div className="fixed inset-0 z-[60] flex items-center justify-center bg-black/60 p-4 backdrop-blur-sm">

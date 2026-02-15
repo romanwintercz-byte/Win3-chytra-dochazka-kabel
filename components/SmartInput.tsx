@@ -7,6 +7,10 @@ interface SmartInputProps {
   onEntriesAdded: (entries: TimeEntry[]) => void;
   currentUserId: string;
   onManualEntry: () => void;
+  // Fix: Added missing optional props passed from App.tsx
+  onCopyLastDay?: () => void;
+  selectedMonth?: string;
+  existingEntries?: TimeEntry[];
 }
 
 const SmartInput: React.FC<SmartInputProps> = ({ onEntriesAdded, currentUserId, onManualEntry }) => {

@@ -9,6 +9,8 @@ interface EntryFormModalProps {
   onSubmit: (date: string, entries: TimeEntry[]) => void;
   currentUserId: string;
   jobs: Job[];
+  // Fix: Added missing prop passed from App.tsx
+  existingEntries?: TimeEntry[];
 }
 
 const EntryFormModal: React.FC<EntryFormModalProps> = ({ isOpen, onClose, onSubmit, currentUserId, jobs }) => {

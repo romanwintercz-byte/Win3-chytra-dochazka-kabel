@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect, useMemo } from 'react';
 import Sidebar from './components/Sidebar';
 import SmartInput from './components/SmartInput';
@@ -27,7 +26,7 @@ const getCurrentMonth = () => new Date().toISOString().slice(0, 7);
 
 const App: React.FC = () => {
   const [activeTab, setActiveTab] = useState<'overview' | 'report' | 'settings'>('overview');
-  const [useDemoData, setUseDemoData] = useState(true);
+  const [useDemoData, setUseDemoData] = useState(!isSupabaseConfigured());
   const [employees, setEmployees] = useState<Employee[]>(MOCK_EMPLOYEES);
   const [jobs, setJobs] = useState<Job[]>(MOCK_JOBS);
   const [entries, setEntries] = useState<TimeEntry[]>(MOCK_ENTRIES);
@@ -39,8 +38,45 @@ const App: React.FC = () => {
   const [isPinModalOpen, setIsPinModalOpen] = useState(false);
   const [pendingUserId, setPendingUserId] = useState<string | null>(null);
   const [reviewingUserId, setReviewingUserId] = useState<string | null>(null);
+  const [dbStatus, setDbStatus] = useState<{success: boolean, message: string} | null>(null);
 
-  const currentUser = employees.find(e => e.id === currentUserId) || MOCK_EMPLOYEES[0];
+  // Načtení reálných dat pokud je Supabase k dispozici
+  useEffect(() => {
+    if (isSupabaseConfigured()) {
+      const loadData = async () => {
+        setIsLoading(true);
+        const status = await db.checkConnection();
+        setDbStatus(status);
+        
+        if (status.success) {
+          try {
+            const [empData, jobsData, entriesData] = await Promise.all([
+              db.fetchEmployees(),
+              db.fetchJobs(),
+              db.fetchTimeEntries()
+            ]);
+            
+            if (empData.length > 0) {
+              setEmployees(empData);
+              setUseDemoData(false);
+              // Nastavíme prvního zaměstnance jako aktuálního pokud nejsme v demo módu
+              if (currentUserId.includes('worker-')) {
+                 setCurrentUserId(empData[0].id);
+              }
+            }
+            if (jobsData.length > 0) setJobs(jobsData);
+            if (entriesData.length > 0) setEntries(entriesData);
+          } catch (err) {
+            console.error("Chyba při stahování dat:", err);
+          }
+        }
+        setIsLoading(false);
+      };
+      loadData();
+    }
+  }, []);
+
+  const currentUser = employees.find(e => e.id === currentUserId) || employees[0];
   const targetUserId = reviewingUserId || currentUserId;
   const targetUser = employees.find(e => e.id === targetUserId) || currentUser;
   const isManagerMode = currentUser.role === 'Manager';
@@ -64,11 +100,29 @@ const App: React.FC = () => {
       }
   };
 
-  const handleAddEntries = (newEntries: TimeEntry[]) => {
+  const handleAddEntries = async (newEntries: TimeEntry[]) => {
+      if (!useDemoData) {
+        try {
+          await db.addTimeEntriesBulk(newEntries);
+        } catch (e) {
+          alert("Nepodařilo se uložit do databáze.");
+        }
+      }
       setEntries(prev => [...prev, ...newEntries]);
   };
 
-  const handleModalSubmit = (date: string, submittedEntries: TimeEntry[]) => {
+  const handleModalSubmit = async (date: string, submittedEntries: TimeEntry[]) => {
+      if (!useDemoData) {
+        try {
+          if (date !== 'BULK_RANGE') {
+            await db.deleteTimeEntriesForDate(targetUserId, date);
+          }
+          await db.addTimeEntriesBulk(submittedEntries);
+        } catch (e) {
+          alert("Chyba synchronizace s DB.");
+        }
+      }
+
       if (date === 'BULK_RANGE') {
           setEntries(prev => [...prev, ...submittedEntries]);
       } else {
@@ -79,14 +133,32 @@ const App: React.FC = () => {
       }
   };
 
+  const handleDeleteEntry = async (id: string) => {
+    if (!useDemoData) {
+      await db.deleteTimeEntry(id);
+    }
+    setEntries(prev => prev.filter(e => e.id !== id));
+  };
+
   return (
     <div className="flex flex-col md:flex-row min-h-screen bg-gray-50">
+      {/* Diagnostický proužek - pouze pokud je snaha o připojení */}
+      {isSupabaseConfigured() && dbStatus && (
+        <div className={`fixed top-0 left-0 right-0 z-[100] text-[10px] py-1 px-4 flex justify-between items-center no-print ${dbStatus.success ? 'bg-green-600 text-white' : 'bg-red-600 text-white'}`}>
+          <span>
+            {dbStatus.success ? '✓ Propojeno se Supabase' : `✗ Chyba připojení: ${dbStatus.message}`}
+            {useDemoData && ' (Zobrazují se Demo data)'}
+          </span>
+          <button onClick={() => setDbStatus(null)} className="opacity-50 hover:opacity-100">✕</button>
+        </div>
+      )}
+
       <Sidebar 
         activeTab={activeTab} setActiveTab={setActiveTab} 
         currentUser={currentUser} employees={employees.filter(e => e.isActive)}
         onRequestSwitchUser={handleRequestSwitchUser} 
         onShowAbout={() => setIsAboutOpen(true)}
-        version="1.9.21"
+        version="1.9.22"
       />
 
       <div className="md:hidden bg-slate-900 text-white p-4 flex justify-between items-center sticky top-0 z-30 shadow-md">
@@ -97,7 +169,16 @@ const App: React.FC = () => {
         </div>
       </div>
 
-      <main className="flex-1 overflow-y-auto no-print">
+      <main className="flex-1 overflow-y-auto no-print pt-6">
+        {isLoading && (
+          <div className="fixed inset-0 bg-white/50 backdrop-blur-sm z-[90] flex items-center justify-center">
+            <div className="flex flex-col items-center">
+              <div className="w-12 h-12 border-4 border-indigo-600 border-t-transparent rounded-full animate-spin mb-4"></div>
+              <p className="font-bold text-slate-700">Načítám data...</p>
+            </div>
+          </div>
+        )}
+
         {reviewingUserId && (
           <div className="bg-indigo-600 text-white px-6 py-3 sticky top-0 z-40 flex justify-between items-center shadow-md">
              <div className="font-bold text-sm">Kontrola: {targetUser.name}</div>
@@ -126,7 +207,7 @@ const App: React.FC = () => {
             </div>
 
             <h3 className="text-lg font-semibold text-slate-900 mb-4">Výkaz: {targetUser.name}</h3>
-            <TimesheetTable entries={monthlyUserEntries} onDelete={(id)=>setEntries(prev=>prev.filter(e=>e.id!==id))} onEdit={() => setIsEntryModalOpen(true)} />
+            <TimesheetTable entries={monthlyUserEntries} onDelete={handleDeleteEntry} onEdit={() => setIsEntryModalOpen(true)} />
           </div>
         )}
 
@@ -141,7 +222,7 @@ const App: React.FC = () => {
         )}
       </main>
 
-      <AboutModal isOpen={isAboutOpen} onClose={() => setIsAboutOpen(false)} onContactDeveloper={()=>{}} onServiceLogin={()=>{}} version="1.9.21" />
+      <AboutModal isOpen={isAboutOpen} onClose={() => setIsAboutOpen(false)} onContactDeveloper={()=>{}} onServiceLogin={()=>{}} version="1.9.22" />
       <MobileNavigation activeTab={activeTab} setActiveTab={setActiveTab} currentUserRole={currentUser.role} />
       <EntryFormModal isOpen={isEntryModalOpen} onClose={() => setIsEntryModalOpen(false)} onSubmit={handleModalSubmit} existingEntries={[]} currentUserId={targetUserId} jobs={jobs} />
       <HelpSystem />
