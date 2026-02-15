@@ -1,36 +1,38 @@
+
 import { createClient } from '@supabase/supabase-js';
 import { CREDENTIALS, isSupabaseConfigured } from '../credentials';
 import { Employee, Job, TimeEntry, MonthStatus, Notification } from '../types';
 
-// Inicializace klienta pouze pokud jsou klíče dostupné
+// Bezpečná inicializace
 const supabaseUrl = CREDENTIALS.SUPABASE_URL;
 const supabaseKey = CREDENTIALS.SUPABASE_KEY;
 
-export const supabase = isSupabaseConfigured() 
+export const supabase = (supabaseUrl && supabaseKey) 
   ? createClient(supabaseUrl, supabaseKey) 
   : null;
 
-// --- POMOCNÉ FUNKCE PRO DIAGNOSTIKU ---
 export const checkConnection = async () => {
-  if (!supabase) return { success: false, message: 'Klíče nejsou nakonfigurovány.' };
+  if (!supabase) return { success: false, message: 'Klient nebyl vytvořen (chybí klíče).' };
   try {
-    const { data, error } = await supabase.from('employees').select('count', { count: 'exact', head: true });
+    // Zkusíme jednoduchý dotaz pro ověření spojení
+    const { error } = await supabase.from('employees').select('id').limit(1);
     if (error) throw error;
     return { success: true, message: 'Připojeno k Supabase.' };
   } catch (err: any) {
-    return { success: false, message: err.message };
+    return { success: false, message: err.message || 'Nepodařilo se navázat spojení.' };
   }
 };
 
-// --- ZAMĚSTNANCI ---
 export const fetchEmployees = async (): Promise<Employee[]> => {
   if (!supabase) return [];
-  const { data, error } = await supabase.from('employees').select('*').order('name');
-  if (error) {
+  try {
+    const { data, error } = await supabase.from('employees').select('*').order('name');
+    if (error) throw error;
+    return data || [];
+  } catch (error) {
     console.error('Error fetching employees:', error);
     return [];
   }
-  return data || [];
 };
 
 export const addEmployee = async (emp: Employee) => {
@@ -48,15 +50,16 @@ export const updateEmployeeStatus = async (id: string, isActive: boolean) => {
   await supabase.from('employees').update({ isActive }).eq('id', id);
 };
 
-// --- PROJEKTY / ZAKÁZKY ---
 export const fetchJobs = async (): Promise<Job[]> => {
   if (!supabase) return [];
-  const { data, error } = await supabase.from('jobs').select('*').order('code');
-  if (error) {
+  try {
+    const { data, error } = await supabase.from('jobs').select('*').order('code');
+    if (error) throw error;
+    return data || [];
+  } catch (error) {
     console.error('Error fetching jobs:', error);
     return [];
   }
-  return data || [];
 };
 
 export const addJob = async (job: Job) => {
@@ -69,20 +72,19 @@ export const updateJobStatus = async (id: string, isActive: boolean) => {
   await supabase.from('jobs').update({ isActive }).eq('id', id);
 };
 
-// --- DOCHÁZKOVÉ ZÁZNAMY ---
 export const fetchTimeEntries = async (employeeId?: string, month?: string): Promise<TimeEntry[]> => {
   if (!supabase) return [];
-  let query = supabase.from('time_entries').select('*');
-  
-  if (employeeId) query = query.eq('employeeId', employeeId);
-  if (month) query = query.like('date', `${month}%`);
-  
-  const { data, error } = await query.order('date', { ascending: false });
-  if (error) {
+  try {
+    let query = supabase.from('time_entries').select('*');
+    if (employeeId) query = query.eq('employeeId', employeeId);
+    if (month) query = query.like('date', `${month}%`);
+    const { data, error } = await query.order('date', { ascending: false });
+    if (error) throw error;
+    return data || [];
+  } catch (error) {
     console.error('Error fetching entries:', error);
     return [];
   }
-  return data || [];
 };
 
 export const addTimeEntriesBulk = async (entries: TimeEntry[]) => {
@@ -101,7 +103,6 @@ export const deleteTimeEntry = async (id: string) => {
   await supabase.from('time_entries').delete().eq('id', id);
 };
 
-// --- MĚSÍČNÍ STATUSY ---
 export const fetchMonthlyReports = async (month: string): Promise<MonthStatus[]> => {
   if (!supabase) return [];
   const { data, error } = await supabase.from('month_status').select('*').eq('month', month);
@@ -114,7 +115,6 @@ export const upsertMonthlyReport = async (report: MonthStatus) => {
   await supabase.from('month_status').upsert(report);
 };
 
-// --- NOTIFIKACE ---
 export const fetchNotifications = async (userId: string): Promise<Notification[]> => {
   if (!supabase) return [];
   const { data, error } = await supabase.from('notifications')
@@ -143,10 +143,8 @@ export const createNotification = async (userId: string, message: string, type: 
   }]);
 };
 
-// --- REALTIME ---
 export const subscribeToNotifications = (userId: string, onNewNotification: (n: Notification) => void) => {
   if (!supabase) return { unsubscribe: () => {} };
-  
   const channel = supabase.channel(`notifications:${userId}`)
     .on('postgres_changes', { 
       event: 'INSERT', 
@@ -157,6 +155,5 @@ export const subscribeToNotifications = (userId: string, onNewNotification: (n: 
       onNewNotification(payload.new as Notification);
     })
     .subscribe();
-
   return { unsubscribe: () => supabase.removeChannel(channel) };
 };
