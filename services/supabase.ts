@@ -10,10 +10,11 @@ export const supabase = (supabaseUrl && supabaseKey)
   ? createClient(supabaseUrl, supabaseKey) 
   : null;
 
-// Pomocné funkce pro transformaci case (Supabase preferuje snake_case)
-const toCamel = (obj: any) => {
-  if (!obj || typeof obj !== 'object') return obj;
+// Robustní transformace snake_case -> camelCase
+const toCamel = (obj: any): any => {
+  if (obj === null || typeof obj !== 'object' || obj instanceof Date) return obj;
   if (Array.isArray(obj)) return obj.map(toCamel);
+  
   const n: any = {};
   Object.keys(obj).forEach(k => {
     const camel = k.replace(/([-_][a-z])/ig, ($1) => $1.toUpperCase().replace('-', '').replace('_', ''));
@@ -22,9 +23,11 @@ const toCamel = (obj: any) => {
   return n;
 };
 
-const toSnake = (obj: any) => {
-  if (!obj || typeof obj !== 'object') return obj;
+// Robustní transformace camelCase -> snake_case
+const toSnake = (obj: any): any => {
+  if (obj === null || typeof obj !== 'object' || obj instanceof Date) return obj;
   if (Array.isArray(obj)) return obj.map(toSnake);
+  
   const n: any = {};
   Object.keys(obj).forEach(k => {
     const snake = k.replace(/[A-Z]/g, letter => `_${letter.toLowerCase()}`);
@@ -47,10 +50,7 @@ export const checkConnection = async () => {
 export const fetchEmployees = async (): Promise<Employee[]> => {
   if (!supabase) return [];
   const { data, error } = await supabase.from('employees').select('*').order('name');
-  if (error) {
-    console.error('Supabase fetchEmployees error:', error);
-    throw new Error(`Zaměstnanci: ${error.message}`);
-  }
+  if (error) throw new Error(`Zaměstnanci: ${error.message}`);
   return toCamel(data) || [];
 };
 
@@ -75,10 +75,7 @@ export const updateEmployeeStatus = async (id: string, isActive: boolean) => {
 export const fetchJobs = async (): Promise<Job[]> => {
   if (!supabase) return [];
   const { data, error } = await supabase.from('jobs').select('*').order('code');
-  if (error) {
-    console.error('Supabase fetchJobs error:', error);
-    throw new Error(`Zakázky: ${error.message}`);
-  }
+  if (error) throw new Error(`Zakázky: ${error.message}`);
   return toCamel(data) || [];
 };
 
@@ -97,13 +94,22 @@ export const updateJobStatus = async (id: string, isActive: boolean) => {
 export const fetchTimeEntries = async (employeeId?: string, month?: string): Promise<TimeEntry[]> => {
   if (!supabase) return [];
   let query = supabase.from('time_entries').select('*');
-  if (employeeId) query = query.eq('employee_id', employeeId);
-  if (month) query = query.like('date', `${month}%`);
-  const { data, error } = await query.order('date', { ascending: false });
-  if (error) {
-    console.error('Supabase fetchTimeEntries error:', error);
-    throw new Error(`Záznamy: ${error.message}`);
+  
+  if (employeeId) {
+    query = query.eq('employee_id', employeeId);
   }
+  
+  if (month) {
+    const [year, monthNum] = month.split('-').map(Number);
+    const startDate = `${month}-01`;
+    // Získání posledního dne měsíce (0. den následujícího měsíce)
+    const lastDay = new Date(year, monthNum, 0).getDate();
+    const endDate = `${month}-${String(lastDay).padStart(2, '0')}`;
+    query = query.gte('date', startDate).lte('date', endDate);
+  }
+  
+  const { data, error } = await query.order('date', { ascending: false });
+  if (error) throw new Error(`Záznamy: ${error.message}`);
   return toCamel(data) || [];
 };
 
@@ -111,10 +117,7 @@ export const addTimeEntriesBulk = async (entries: TimeEntry[]) => {
   if (!supabase) return;
   const snakeEntries = entries.map(e => toSnake(e));
   const { error } = await supabase.from('time_entries').insert(snakeEntries);
-  if (error) {
-    console.error('Supabase addTimeEntriesBulk error:', error);
-    throw error;
-  }
+  if (error) throw error;
 };
 
 export const deleteTimeEntriesForDate = async (employeeId: string, date: string) => {
@@ -138,7 +141,11 @@ export const fetchMonthlyReports = async (month: string): Promise<MonthStatus[]>
 
 export const upsertMonthlyReport = async (report: MonthStatus) => {
   if (!supabase) return;
-  const { error } = await supabase.from('month_status').upsert(toSnake(report));
+  // Pro upsert v Supabase musíme mít buď ID nebo unikátní constraint (employee_id, month)
+  const snakeReport = toSnake(report);
+  const { error } = await supabase.from('month_status').upsert(snakeReport, {
+    onConflict: 'employee_id,month'
+  });
   if (error) throw error;
 };
 
@@ -170,19 +177,4 @@ export const createNotification = async (userId: string, message: string, type: 
     createdAt: new Date().toISOString()
   })]);
   if (error) throw error;
-};
-
-export const subscribeToNotifications = (userId: string, onNewNotification: (n: Notification) => void) => {
-  if (!supabase) return { unsubscribe: () => {} };
-  const channel = supabase.channel(`notifications:${userId}`)
-    .on('postgres_changes', { 
-      event: 'INSERT', 
-      schema: 'public', 
-      table: 'notifications',
-      filter: `user_id=eq.${userId}`
-    }, (payload) => {
-      onNewNotification(toCamel(payload.new) as Notification);
-    })
-    .subscribe();
-  return { unsubscribe: () => supabase.removeChannel(channel) };
 };

@@ -43,7 +43,6 @@ const App: React.FC = () => {
   const [isConnected, setIsConnected] = useState(false);
   const [editingEntry, setEditingEntry] = useState<TimeEntry | undefined>(undefined);
 
-  // Načítání dat
   useEffect(() => {
     const loadData = async () => {
       setIsLoading(true);
@@ -51,15 +50,16 @@ const App: React.FC = () => {
 
       if (!isSupabaseConfigured()) {
         setIsLoading(false);
-        if (MOCK_EMPLOYEES.length > 1) setCurrentUserId(MOCK_EMPLOYEES[1].id);
+        if (!currentUserId && MOCK_EMPLOYEES.length > 0) setCurrentUserId(MOCK_EMPLOYEES[0].id);
         return;
       }
 
-      const conn = await db.checkConnection();
-      if (conn.success) {
-        setUseDemoData(false);
-        setIsConnected(true);
-        try {
+      try {
+        const conn = await db.checkConnection();
+        if (conn.success) {
+          setUseDemoData(false);
+          setIsConnected(true);
+          
           const [empData, jobsData, entriesData, statusesData] = await Promise.all([
             db.fetchEmployees(),
             db.fetchJobs(),
@@ -72,18 +72,20 @@ const App: React.FC = () => {
           setEntries(entriesData);
           setMonthStatuses(statusesData);
 
-          if (empData.length > 0 && !currentUserId) {
-             const savedUserId = localStorage.getItem('lastUserId');
-             const userExists = empData.find(e => e.id === savedUserId);
-             setCurrentUserId(userExists ? (savedUserId as string) : empData[0].id);
+          const savedUserId = localStorage.getItem('lastUserId');
+          if (empData.length > 0) {
+            const userExists = empData.find(e => String(e.id) === String(savedUserId));
+            const newId = String(userExists ? savedUserId : empData[0].id);
+            if (currentUserId !== newId) setCurrentUserId(newId);
           }
-        } catch (err: any) {
-          setLoadError(err.message || "Nepodařilo se načíst data.");
+        } else {
+          setLoadError(`Spojení s DB: ${conn.message}`);
         }
-      } else {
-        setLoadError(`Připojení selhalo: ${conn.message}`);
+      } catch (err: any) {
+        setLoadError(err.message || "Nepodařilo se synchronizovat data.");
+      } finally {
+        setIsLoading(false);
       }
-      setIsLoading(false);
     };
     
     loadData();
@@ -95,32 +97,33 @@ const App: React.FC = () => {
 
   const currentUser = useMemo(() => {
     const list = useDemoData ? MOCK_EMPLOYEES : employees;
-    const found = list.find(e => e.id === currentUserId);
+    const found = list.find(e => String(e.id) === String(currentUserId));
     return found || list[0] || MOCK_EMPLOYEES[0];
   }, [useDemoData, employees, currentUserId]);
 
   const targetUserId = reviewingUserId || currentUserId;
-  const targetUser = (useDemoData ? MOCK_EMPLOYEES : employees).find(e => e.id === targetUserId) || currentUser;
+  const targetUser = useMemo(() => {
+    const list = useDemoData ? MOCK_EMPLOYEES : employees;
+    return list.find(e => String(e.id) === String(targetUserId)) || currentUser;
+  }, [useDemoData, employees, targetUserId, currentUser]);
+
   const isManagerMode = currentUser.role === 'Manager';
 
-  // Aktuální stav měsíce pro cílového uživatele
   const currentMonthStatus = useMemo(() => {
-    const status = monthStatuses.find(s => s.employeeId === targetUserId && s.month === selectedMonth);
+    const status = monthStatuses.find(s => String(s.employeeId) === String(targetUserId) && s.month === selectedMonth);
     return status || { employeeId: targetUserId, month: selectedMonth, status: TimesheetStatus.DRAFT };
   }, [monthStatuses, targetUserId, selectedMonth]);
 
-  // Docházka je uzamčena pokud je odeslána nebo schválena (a nejsme Lucie v režimu revize)
   const isLocked = useMemo(() => {
     const isSubmittedOrApproved = currentMonthStatus.status === TimesheetStatus.SUBMITTED || 
                                 currentMonthStatus.status === TimesheetStatus.APPROVED;
-    // Manažer může editovat i odeslanou docházku během kontroly
     if (isManagerMode && reviewingUserId) return false; 
     return isSubmittedOrApproved;
   }, [currentMonthStatus, isManagerMode, reviewingUserId]);
 
-  const monthlyUserEntries = useMemo(() => 
-    entries.filter(e => e.employeeId === targetUserId && e.date.startsWith(selectedMonth)), 
-  [entries, targetUserId, selectedMonth]);
+  const monthlyUserEntries = useMemo(() => {
+    return entries.filter(e => String(e.employeeId) === String(targetUserId) && e.date.startsWith(selectedMonth));
+  }, [entries, targetUserId, selectedMonth]);
 
   const validationIssues = useMemo(() => {
     const [year, month] = selectedMonth.split('-');
@@ -140,18 +143,18 @@ const App: React.FC = () => {
       try {
         await db.upsertMonthlyReport(updatedStatus);
       } catch (e: any) {
-        alert("Nepodařilo se uložit stav: " + e.message);
+        alert("Chyba při ukládání stavu: " + e.message);
         return;
       }
     }
 
     setMonthStatuses(prev => [
-      ...prev.filter(s => !(s.employeeId === targetUserId && s.month === selectedMonth)),
+      ...prev.filter(s => !(String(s.employeeId) === String(targetUserId) && s.month === selectedMonth)),
       updatedStatus
     ]);
     
     if (newStatus === TimesheetStatus.APPROVED || newStatus === TimesheetStatus.REJECTED) {
-      setReviewingUserId(null); // Zavřít kontrolu po akci
+      setReviewingUserId(null);
     }
   };
 
@@ -163,11 +166,11 @@ const App: React.FC = () => {
           if (editingEntry) {
               await db.deleteTimeEntry(editingEntry.id);
           } else if (date !== 'BULK_RANGE') {
-              await db.deleteTimeEntriesForDate(targetUserId, date);
+              await db.deleteTimeEntriesForDate(String(targetUserId), date);
           }
           await db.addTimeEntriesBulk(submittedEntries);
         } catch (e: any) {
-          alert(`Chyba synchronizace s DB: ${e.message}`);
+          alert(`Chyba DB: ${e.message}`);
           return;
         }
       }
@@ -176,7 +179,7 @@ const App: React.FC = () => {
           setEntries(prev => [...prev, ...submittedEntries]);
       } else {
           setEntries(prev => [
-              ...prev.filter(e => !(e.employeeId === targetUserId && (editingEntry ? e.id === editingEntry.id : e.date === date))),
+              ...prev.filter(e => !(String(e.employeeId) === String(targetUserId) && (editingEntry ? e.id === editingEntry.id : e.date === date))),
               ...submittedEntries
           ]);
       }
@@ -205,7 +208,7 @@ const App: React.FC = () => {
         employees={(useDemoData ? MOCK_EMPLOYEES : employees).filter(e => e.isActive)}
         onRequestSwitchUser={(id) => {
             const list = useDemoData ? MOCK_EMPLOYEES : employees;
-            const targetEmp = list.find(e => e.id === id);
+            const targetEmp = list.find(e => String(e.id) === String(id));
             if (targetEmp?.pinCode) { 
                 setPendingUserId(id); 
                 setIsPinModalOpen(true); 
@@ -214,7 +217,7 @@ const App: React.FC = () => {
             }
         }} 
         onShowAbout={() => setIsAboutOpen(true)}
-        version="2.0.1"
+        version="2.0.3"
         isConnected={isConnected}
       />
 
@@ -223,8 +226,15 @@ const App: React.FC = () => {
           <div className="fixed inset-0 bg-white/80 backdrop-blur-sm z-[90] flex items-center justify-center">
             <div className="flex flex-col items-center">
               <div className="w-12 h-12 border-4 border-indigo-600 border-t-transparent rounded-full animate-spin mb-4"></div>
-              <p className="font-bold text-slate-700">Synchronizace...</p>
+              <p className="font-bold text-slate-700">Načítám docházku...</p>
             </div>
+          </div>
+        )}
+
+        {loadError && (
+          <div className="bg-red-50 text-red-600 p-4 border-b border-red-100 flex justify-between items-center text-sm font-medium">
+            <span>⚠️ {loadError}</span>
+            <button onClick={() => window.location.reload()} className="underline font-bold">Zkusit znovu</button>
           </div>
         )}
 
@@ -269,7 +279,7 @@ const App: React.FC = () => {
                   if (!useDemoData) db.addTimeEntriesBulk(newE);
                   setEntries(prev => [...prev, ...newE]);
                 }} 
-                currentUserId={targetUserId} 
+                currentUserId={String(targetUserId)} 
                 onManualEntry={() => {setEditingEntry(undefined); setIsEntryModalOpen(true);}} 
               />
             ) : (
@@ -277,7 +287,7 @@ const App: React.FC = () => {
                 <div className="text-2xl">🔒</div>
                 <div>
                   <h3 className="font-bold text-amber-900">Docházka je uzamčena</h3>
-                  <p className="text-sm text-amber-700">Záznamy již byly odeslány ke schválení nebo uzavřeny. Pro změny kontaktujte Lucii.</p>
+                  <p className="text-sm text-amber-700">Záznamy jsou ve stavu {currentMonthStatus.status}. Pro změny kontaktujte Lucii.</p>
                 </div>
               </div>
             )}
@@ -289,7 +299,7 @@ const App: React.FC = () => {
 
             <h3 className="text-lg font-semibold text-slate-900 mb-4 flex items-center gap-2">
               Výkaz: {targetUser.name}
-              {isLocked && <span className="text-[10px] bg-slate-200 text-slate-600 px-2 py-0.5 rounded uppercase font-bold">Pouze pro čtení</span>}
+              {isLocked && <span className="text-[10px] bg-slate-200 text-slate-600 px-2 py-0.5 rounded uppercase font-bold">Jen pro čtení</span>}
             </h3>
             <TimesheetTable 
               entries={monthlyUserEntries} 
@@ -307,7 +317,7 @@ const App: React.FC = () => {
                 employees={employees} 
                 currentUserRole={currentUser.role} 
                 jobs={jobs} 
-                selectedEmployeeId={targetUserId} 
+                selectedEmployeeId={String(targetUserId)} 
                 selectedMonth={selectedMonth} 
                 monthStatus={currentMonthStatus}
               />
@@ -323,7 +333,7 @@ const App: React.FC = () => {
         isOpen={isEntryModalOpen} 
         onClose={() => {setIsEntryModalOpen(false); setEditingEntry(undefined);}} 
         onSubmit={handleModalSubmit} 
-        currentUserId={targetUserId} 
+        currentUserId={String(targetUserId)} 
         jobs={jobs} 
         initialEntry={editingEntry} 
       />
@@ -332,12 +342,12 @@ const App: React.FC = () => {
         isOpen={isPinModalOpen} 
         onClose={() => setIsPinModalOpen(false)} 
         onSuccess={() => {setCurrentUserId(pendingUserId!); setIsPinModalOpen(false);}} 
-        targetPin={(employees.find(e=>e.id===pendingUserId) || MOCK_EMPLOYEES.find(e=>e.id===pendingUserId))?.pinCode || ""} 
-        targetUserName={(employees.find(e=>e.id===pendingUserId) || MOCK_EMPLOYEES.find(e=>e.id===pendingUserId))?.name || ""} 
+        targetPin={(employees.find(e=>String(e.id)===String(pendingUserId)) || MOCK_EMPLOYEES.find(e=>String(e.id)===String(pendingUserId)))?.pinCode || ""} 
+        targetUserName={(employees.find(e=>String(e.id)===String(pendingUserId)) || MOCK_EMPLOYEES.find(e=>String(e.id)===String(pendingUserId)))?.name || ""} 
       />
       
       <HelpSystem />
-      <AboutModal isOpen={isAboutOpen} onClose={() => setIsAboutOpen(false)} version="2.0.1" />
+      <AboutModal isOpen={isAboutOpen} onClose={() => setIsAboutOpen(false)} version="2.0.3" />
       <MobileNavigation activeTab={activeTab} setActiveTab={setActiveTab} currentUserRole={currentUser.role} />
     </div>
   );

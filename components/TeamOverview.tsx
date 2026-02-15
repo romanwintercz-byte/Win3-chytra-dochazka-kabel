@@ -13,7 +13,7 @@ interface TeamOverviewProps {
 
 const TeamOverview: React.FC<TeamOverviewProps> = ({ employees, selectedMonth, onInspect, statuses }) => {
   const getStatusBadge = (empId: string) => {
-    const status = statuses.find(s => s.employeeId === empId && s.month === selectedMonth);
+    const status = statuses.find(s => String(s.employeeId) === String(empId) && s.month === selectedMonth);
     switch (status?.status) {
       case TimesheetStatus.SUBMITTED:
         return <span className="bg-amber-100 text-amber-700 px-2 py-0.5 rounded text-[9px] font-black border border-amber-200 animate-pulse">KE SCHVÁLENÍ</span>;
@@ -40,7 +40,7 @@ const TeamOverview: React.FC<TeamOverviewProps> = ({ employees, selectedMonth, o
                 <td className="p-4 flex items-center gap-3">
                   <div className="relative">
                     <img src={e.avatar} className="w-9 h-9 rounded-full border border-slate-200" alt="" />
-                    {statuses.find(s => s.employeeId === e.id && s.month === selectedMonth)?.status === TimesheetStatus.SUBMITTED && (
+                    {statuses.find(s => String(s.employeeId) === String(e.id) && s.month === selectedMonth)?.status === TimesheetStatus.SUBMITTED && (
                       <span className="absolute -top-1 -right-1 w-3 h-3 bg-amber-500 rounded-full border-2 border-white"></span>
                     )}
                   </div>
@@ -50,11 +50,11 @@ const TeamOverview: React.FC<TeamOverviewProps> = ({ employees, selectedMonth, o
                   </div>
                 </td>
                 <td className="p-4 text-center">
-                  {getStatusBadge(e.id)}
+                  {getStatusBadge(String(e.id))}
                 </td>
                 <td className="p-4 text-right">
                   <button 
-                    onClick={() => onInspect(e.id)} 
+                    onClick={() => onInspect(String(e.id))} 
                     className="bg-white border border-slate-200 hover:border-indigo-600 hover:text-indigo-600 text-slate-600 px-4 py-1.5 rounded-lg font-bold text-[10px] uppercase tracking-wider transition-all shadow-sm"
                   >
                     Zkontrolovat

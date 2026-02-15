@@ -18,11 +18,11 @@ const ReportingModule: React.FC<ReportingModuleProps> = ({ entries, employees, s
   const [year, month] = monthStr.split('-').map(Number);
   
   const employee = useMemo(() => 
-    employees.find(e => e.id === selectedEmployeeId) || employees[0], 
+    employees.find(e => String(e.id) === String(selectedEmployeeId)) || employees[0], 
   [employees, selectedEmployeeId]);
 
   const filteredEntries = useMemo(() => 
-    entries.filter(e => e.employeeId === employee?.id && e.date.startsWith(monthStr)),
+    entries.filter(e => String(e.employeeId) === String(employee?.id) && e.date.startsWith(monthStr)),
   [entries, employee, monthStr]);
 
   const monthStats = useMemo(() => {
