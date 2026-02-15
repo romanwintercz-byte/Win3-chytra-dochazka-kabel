@@ -184,7 +184,19 @@ const App: React.FC = () => {
         <h1 className="font-bold text-lg">Chytrá docházka</h1>
         <div className="flex items-center gap-3">
             <NotificationBell notifications={[]} onMarkAsRead={()=>{}} onMarkAllAsRead={()=>{}} />
-            <img src={currentUser.avatar} className="w-8 h-8 rounded-full border border-indigo-400" alt="User" />
+            <div className="relative group active:scale-95 transition-transform">
+                <img src={currentUser.avatar} className="w-9 h-9 rounded-full border-2 border-indigo-500 shadow-lg" alt="User" />
+                {/* Neviditelný select pro mobilní přepínání uživatelů */}
+                <select 
+                  value={currentUser.id} 
+                  onChange={(e) => handleRequestSwitchUser(e.target.value)}
+                  className="absolute inset-0 opacity-0 w-full h-full cursor-pointer appearance-none"
+                >
+                  {(useDemoData ? MOCK_EMPLOYEES : employees).filter(e => e.isActive).map(e => (
+                    <option key={e.id} value={e.id}>{e.name}</option>
+                  ))}
+                </select>
+            </div>
         </div>
       </div>
 
