@@ -27,35 +27,24 @@ const getCurrentMonth = () => new Date().toISOString().slice(0, 7);
 
 const App: React.FC = () => {
   const [activeTab, setActiveTab] = useState<'overview' | 'report' | 'settings'>('overview');
-  const [useDemoData, setUseDemoData] = useState(true);
-  const [employees, setEmployees] = useState<Employee[]>(MOCK_EMPLOYEES);
-  const [jobs, setJobs] = useState<Job[]>(MOCK_JOBS);
-  const [entries, setEntries] = useState<TimeEntry[]>(MOCK_ENTRIES);
-  const [isLoading, setIsLoading] = useState(false);
-  const [currentUserId, setCurrentUserId] = useState<string>(MOCK_EMPLOYEES[1].id);
+  const [useDemoData, setUseDemoData] = useState(!isSupabaseConfigured());
+  const [employees, setEmployees] = useState<Employee[]>(isSupabaseConfigured() ? [] : MOCK_EMPLOYEES);
+  const [jobs, setJobs] = useState<Job[]>(isSupabaseConfigured() ? [] : MOCK_JOBS);
+  const [entries, setEntries] = useState<TimeEntry[]>(isSupabaseConfigured() ? [] : MOCK_ENTRIES);
+  const [isLoading, setIsLoading] = useState(isSupabaseConfigured());
+  const [currentUserId, setCurrentUserId] = useState<string>('');
   const [selectedMonth, setSelectedMonth] = useState<string>(getCurrentMonth());
   const [isEntryModalOpen, setIsEntryModalOpen] = useState(false);
   const [isAboutOpen, setIsAboutOpen] = useState(false);
   const [isPinModalOpen, setIsPinModalOpen] = useState(false);
   const [pendingUserId, setPendingUserId] = useState<string | null>(null);
   const [reviewingUserId, setReviewingUserId] = useState<string | null>(null);
-  
-  // Status pro diagnostický proužek
-  const [diagStatus, setDiagStatus] = useState<{success: boolean, message: string, color: string}>({
-    success: false,
-    message: "Inicializace...",
-    color: "bg-slate-700"
-  });
+  const [isConnected, setIsConnected] = useState(false);
 
   useEffect(() => {
-    const config = getConfigurationStatus();
-    
-    if (!config.isOk) {
-      setDiagStatus({
-        success: false,
-        message: `⚠️ ${config.msg} (Aplikace běží v DEMO módu)`,
-        color: "bg-amber-600"
-      });
+    if (!isSupabaseConfigured()) {
+      setIsLoading(false);
+      if (MOCK_EMPLOYEES.length > 0) setCurrentUserId(MOCK_EMPLOYEES[1].id);
       return;
     }
 
@@ -64,12 +53,8 @@ const App: React.FC = () => {
       const conn = await db.checkConnection();
       
       if (conn.success) {
-        setDiagStatus({
-          success: true,
-          message: "✓ Propojeno se Supabase",
-          color: "bg-green-600"
-        });
-        
+        setUseDemoData(false);
+        setIsConnected(true);
         try {
           const [empData, jobsData, entriesData] = await Promise.all([
             db.fetchEmployees(),
@@ -77,24 +62,18 @@ const App: React.FC = () => {
             db.fetchTimeEntries()
           ]);
           
+          setEmployees(empData);
+          setJobs(jobsData);
+          setEntries(entriesData);
+
           if (empData.length > 0) {
-            setEmployees(empData);
-            setUseDemoData(false);
-            if (currentUserId.includes('worker-')) {
-               setCurrentUserId(empData[0].id);
-            }
+             const savedUserId = localStorage.getItem('lastUserId');
+             const userExists = empData.find(e => e.id === savedUserId);
+             setCurrentUserId(userExists ? (savedUserId as string) : empData[0].id);
           }
-          if (jobsData.length > 0) setJobs(jobsData);
-          if (entriesData.length > 0) setEntries(entriesData);
         } catch (err) {
-          console.error("Chyba při stahování dat:", err);
+          console.error("Data load failed", err);
         }
-      } else {
-        setDiagStatus({
-          success: false,
-          message: `✗ Chyba připojení: ${conn.message}`,
-          color: "bg-red-600"
-        });
       }
       setIsLoading(false);
     };
@@ -102,7 +81,15 @@ const App: React.FC = () => {
     loadData();
   }, []);
 
-  const currentUser = employees.find(e => e.id === currentUserId) || employees[0];
+  useEffect(() => {
+    if (currentUserId) localStorage.setItem('lastUserId', currentUserId);
+  }, [currentUserId]);
+
+  const currentUser = useMemo(() => {
+    const list = useDemoData ? MOCK_EMPLOYEES : employees;
+    return list.find(e => e.id === currentUserId) || list[0] || MOCK_EMPLOYEES[0];
+  }, [useDemoData, employees, currentUserId]);
+
   const targetUserId = reviewingUserId || currentUserId;
   const targetUser = employees.find(e => e.id === targetUserId) || currentUser;
   const isManagerMode = currentUser.role === 'Manager';
@@ -117,7 +104,7 @@ const App: React.FC = () => {
   }, [monthlyUserEntries, selectedMonth]);
 
   const handleRequestSwitchUser = (targetId: string) => {
-      const targetEmp = employees.find(e => e.id === targetId);
+      const targetEmp = employees.find(e => e.id === targetId) || MOCK_EMPLOYEES.find(e => e.id === targetId);
       if (targetEmp?.pinCode) { 
           setPendingUserId(targetId); 
           setIsPinModalOpen(true); 
@@ -168,21 +155,17 @@ const App: React.FC = () => {
 
   return (
     <div className="flex flex-col md:flex-row min-h-screen bg-gray-50">
-      {/* Diagnostický proužek - nyní se zobrazuje vždy */}
-      <div className={`fixed top-0 left-0 right-0 z-[100] text-[10px] py-1 px-4 flex justify-between items-center no-print text-white font-bold shadow-md ${diagStatus.color}`}>
-        <span>{diagStatus.message}</span>
-        <span className="opacity-50 text-[8px]">DIAGNOSTIKA</span>
-      </div>
-
       <Sidebar 
         activeTab={activeTab} setActiveTab={setActiveTab} 
-        currentUser={currentUser} employees={employees.filter(e => e.isActive)}
+        currentUser={currentUser} 
+        employees={useDemoData ? MOCK_EMPLOYEES : employees.filter(e => e.isActive)}
         onRequestSwitchUser={handleRequestSwitchUser} 
         onShowAbout={() => setIsAboutOpen(true)}
-        version="1.9.22"
+        version="1.9.25"
+        isConnected={isConnected}
       />
 
-      <div className="md:hidden bg-slate-900 text-white p-4 flex justify-between items-center sticky top-0 z-30 shadow-md mt-6">
+      <div className="md:hidden bg-slate-900 text-white p-4 flex justify-between items-center sticky top-0 z-30 shadow-md">
         <h1 className="font-bold text-lg">Chytrá docházka</h1>
         <div className="flex items-center gap-3">
             <NotificationBell notifications={[]} onMarkAsRead={()=>{}} onMarkAllAsRead={()=>{}} />
@@ -190,13 +173,19 @@ const App: React.FC = () => {
         </div>
       </div>
 
-      <main className="flex-1 overflow-y-auto no-print pt-10">
+      <main className="flex-1 overflow-y-auto no-print">
         {isLoading && (
-          <div className="fixed inset-0 bg-white/50 backdrop-blur-sm z-[90] flex items-center justify-center">
+          <div className="fixed inset-0 bg-white/80 backdrop-blur-sm z-[90] flex items-center justify-center">
             <div className="flex flex-col items-center">
               <div className="w-12 h-12 border-4 border-indigo-600 border-t-transparent rounded-full animate-spin mb-4"></div>
-              <p className="font-bold text-slate-700">Načítám data...</p>
+              <p className="font-bold text-slate-700">Synchronizace s databází...</p>
             </div>
+          </div>
+        )}
+
+        {!useDemoData && employees.length === 0 && !isLoading && (
+          <div className="p-8 m-8 bg-white rounded-2xl border-2 border-dashed border-slate-200 text-center">
+            <p className="text-slate-500 font-medium">Databáze je prázdná.</p>
           </div>
         )}
 
@@ -216,11 +205,11 @@ const App: React.FC = () => {
 
             <ApprovalWorkflow status={{month: selectedMonth, status: TimesheetStatus.DRAFT}} onUpdateStatus={()=>{}} isManagerMode={isManagerMode} />
             
-            {isManagerMode && !reviewingUserId && (
+            {isManagerMode && !reviewingUserId && employees.length > 0 && (
                 <TeamOverview employees={employees} allEntries={entries} selectedMonth={selectedMonth} onInspect={setReviewingUserId} currentUserRole={currentUser.role} reports={[]} onMessage={()=>{}} />
             )}
 
-            <SmartInput onEntriesAdded={handleAddEntries} currentUserId={targetUserId} onManualEntry={() => setIsEntryModalOpen(true)} onCopyLastDay={()=>{}} selectedMonth={selectedMonth} existingEntries={monthlyUserEntries} />
+            <SmartInput onEntriesAdded={handleAddEntries} currentUserId={targetUserId} onManualEntry={() => setIsEntryModalOpen(true)} selectedMonth={selectedMonth} existingEntries={monthlyUserEntries} />
             
             <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 mb-8">
                 <div className="lg:col-span-2"><Dashboard entries={monthlyUserEntries} selectedMonth={selectedMonth} /></div>
@@ -243,12 +232,12 @@ const App: React.FC = () => {
         )}
       </main>
 
-      <AboutModal isOpen={isAboutOpen} onClose={() => setIsAboutOpen(false)} onContactDeveloper={()=>{}} onServiceLogin={()=>{}} version="1.9.22" />
+      <AboutModal isOpen={isAboutOpen} onClose={() => setIsAboutOpen(false)} version="1.9.25" />
       <MobileNavigation activeTab={activeTab} setActiveTab={setActiveTab} currentUserRole={currentUser.role} />
-      <EntryFormModal isOpen={isEntryModalOpen} onClose={() => setIsEntryModalOpen(false)} onSubmit={handleModalSubmit} existingEntries={[]} currentUserId={targetUserId} jobs={jobs} />
+      <EntryFormModal isOpen={isEntryModalOpen} onClose={() => setIsEntryModalOpen(false)} onSubmit={handleModalSubmit} currentUserId={targetUserId} jobs={jobs} />
       <HelpSystem />
       {isPinModalOpen && pendingUserId && (
-          <PinPadModal isOpen={isPinModalOpen} onClose={() => setIsPinModalOpen(false)} onSuccess={() => {setCurrentUserId(pendingUserId); setIsPinModalOpen(false);}} targetPin={employees.find(e=>e.id===pendingUserId)?.pinCode || ""} targetUserName={employees.find(e=>e.id===pendingUserId)?.name || ""} />
+          <PinPadModal isOpen={isPinModalOpen} onClose={() => setIsPinModalOpen(false)} onSuccess={() => {setCurrentUserId(pendingUserId); setIsPinModalOpen(false);}} targetPin={(employees.find(e=>e.id===pendingUserId) || MOCK_EMPLOYEES.find(e=>e.id===pendingUserId))?.pinCode || ""} targetUserName={(employees.find(e=>e.id===pendingUserId) || MOCK_EMPLOYEES.find(e=>e.id===pendingUserId))?.name || ""} />
       )}
     </div>
   );
