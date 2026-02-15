@@ -144,6 +144,7 @@ const App: React.FC = () => {
           console.error("DB Error:", err);
           setDbStatus({ ok: false, msg: err.message || 'Chyba připojení' });
           
+          // Pokud selže DB (např. 406), spadneme do demo dat aby se dalo v aplikaci aspoň pohybovat
           if (employees.length === 0) {
             setEmployees(MOCK_EMPLOYEES);
             setUseDemoData(true);
