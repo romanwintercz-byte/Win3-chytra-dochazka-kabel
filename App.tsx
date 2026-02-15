@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect, useMemo } from 'react';
 import Sidebar from './components/Sidebar';
 import SmartInput from './components/SmartInput';
@@ -14,41 +13,47 @@ import TeamOverview from './components/TeamOverview';
 import HelpSystem from './components/HelpSystem';
 import AboutModal from './components/AboutModal';
 import PresentationMode, { PresentationType } from './components/PresentationMode';
+import NotificationBell from './components/NotificationBell';
 import PinPadModal from './components/PinPadModal'; 
 import UpdatePrompt from './components/UpdatePrompt';
+import MessageModal from './components/MessageModal'; 
 import MonthNavigator from './components/MonthNavigator';
-import NotificationBell from './components/NotificationBell';
 import { TimeEntry, MonthStatus, TimesheetStatus, Employee, Job, Notification } from './types';
 import { validateMonth } from './services/validationService';
 import { v4 as uuidv4 } from 'uuid';
-import { isSupabaseConfigured, getDbDiagnostics } from './credentials';
+import { isSupabaseConfigured } from './credentials';
 import { MOCK_EMPLOYEES, MOCK_JOBS, MOCK_ENTRIES } from './services/mockData';
 import { 
-    fetchEmployees, fetchJobs, fetchTimeEntries, 
-    addTimeEntriesBulk, deleteTimeEntriesForDate, 
-    fetchMonthlyReports, upsertMonthlyReport, fetchGlobalLock,
-    fetchNotifications, markNotificationAsRead, markAllNotificationsAsRead,
+    fetchEmployees, addEmployee, updateEmployee, updateEmployeeStatus, 
+    fetchJobs, addJob, updateJobStatus,
+    fetchTimeEntries, addTimeEntriesBulk, deleteTimeEntriesForDate, deleteTimeEntry,
+    fetchMonthlyReports, upsertMonthlyReport,
+    fetchGlobalLock,
+    fetchNotifications, markNotificationAsRead, markAllNotificationsAsRead, createNotification,
     subscribeToPresence, subscribeToNotifications
 } from './services/supabase';
 
-const getLocalMonthStr = (date: Date = new Date()) => {
-  const y = date.getFullYear();
-  const m = String(date.getMonth() + 1).padStart(2, '0');
-  return `${y}-${m}`;
+const getCurrentMonth = () => {
+  return new Date().toISOString().slice(0, 7);
 };
 
-const VERSION = '1.9.28-DIAG';
+const initialMonthStatus: MonthStatus = {
+  month: getCurrentMonth(),
+  status: TimesheetStatus.DRAFT,
+};
+
+const SUPPORT_ID = 'win3-support-id';
+const VERSION = '1.9.21';
 
 const App: React.FC = () => {
   const [activeTab, setActiveTab] = useState<'overview' | 'report' | 'settings'>('overview');
   const [useDemoData, setUseDemoData] = useState(false);
-  const [isCloudSyncing, setIsCloudSyncing] = useState(false);
   
   const [employees, setEmployees] = useState<Employee[]>([]);
   const [jobs, setJobs] = useState<Job[]>([]);
   const [entries, setEntries] = useState<TimeEntry[]>([]);
   const [isLoading, setIsLoading] = useState(true);
-  const [dbStatus, setDbStatus] = useState<{ok: boolean, msg?: string, detail?: any}>({ ok: true });
+  const [error, setError] = useState<string | null>(null);
   
   const [monthlyReports, setMonthlyReports] = useState<MonthStatus[]>([]);
   const [currentUserId, setCurrentUserId] = useState<string>('');
@@ -58,29 +63,25 @@ const App: React.FC = () => {
   const [presentationMode, setPresentationMode] = useState<PresentationType | null>(null);
   const [isPinModalOpen, setIsPinModalOpen] = useState(false);
   const [pendingUserId, setPendingUserId] = useState<string | null>(null);
+  const [isMessageModalOpen, setIsMessageModalOpen] = useState(false);
+  const [messageRecipientId, setMessageRecipientId] = useState<string>('');
+  const [messageRecipientName, setMessageRecipientName] = useState<string>('');
 
-  const currentUser = useMemo(() => {
-    return employees.find(e => e.id === currentUserId) || employees[0] || {
-        id: 'temp', name: 'Načítání...', role: 'Zaměstnanec', email: '', avatar: '', isActive: true
-    } as Employee;
-  }, [employees, currentUserId]);
+  const currentUser = employees.find(e => e.id === currentUserId) || employees[0] || {
+      id: 'temp', name: 'Načítání...', role: 'Zaměstnanec', email: '', avatar: '', isActive: true
+  } as Employee;
 
   const targetUserId = reviewingUserId || currentUserId;
-  const targetUser = useMemo(() => {
-    return employees.find(e => e.id === targetUserId) || currentUser;
-  }, [employees, targetUserId, currentUser]);
+  const targetUser = employees.find(e => e.id === targetUserId) || currentUser;
 
-  const [selectedMonth, setSelectedMonth] = useState<string>(getLocalMonthStr());
+  const [selectedMonth, setSelectedMonth] = useState<string>(getCurrentMonth());
   const [isGlobalLocked, setIsGlobalLocked] = useState(false);
+  const [monthStatus, setMonthStatus] = useState<MonthStatus>(initialMonthStatus);
+  const [installPrompt, setInstallPrompt] = useState<any>(null);
   const [isEntryModalOpen, setIsEntryModalOpen] = useState(false);
   const [editingDate, setEditingDate] = useState<string | null>(null);
   const [isAboutOpen, setIsAboutOpen] = useState(false);
   const [isManagerMode, setIsManagerMode] = useState(false);
-
-  const monthStatus = useMemo(() => {
-      const r = monthlyReports.find(r => r.employeeId === targetUserId && r.month === selectedMonth);
-      return r || { month: selectedMonth, status: TimesheetStatus.DRAFT, employeeId: targetUserId };
-  }, [monthlyReports, targetUserId, selectedMonth]);
 
   const isStatusLocked = useMemo(() => {
     return monthStatus.status === TimesheetStatus.SUBMITTED || monthStatus.status === TimesheetStatus.APPROVED;
@@ -91,14 +92,20 @@ const App: React.FC = () => {
     return !isStatusLocked || isManagerMode;
   }, [isStatusLocked, isManagerMode, isGlobalLocked]);
 
-  const activeEmployees = useMemo(() => employees.filter(e => e.isActive && e.id !== 'win3-support-id'), [employees]);
+  const activeEmployees = useMemo(() => {
+      return employees.filter(e => e.isActive && e.id !== SUPPORT_ID);
+  }, [employees]);
+
   const activeJobs = useMemo(() => jobs.filter(j => j.isActive), [jobs]);
 
   const loadData = async (forceDemo: boolean = false) => {
       setIsLoading(true);
-      setIsCloudSyncing(true);
+      setError(null);
 
-      if (forceDemo || !isSupabaseConfigured()) {
+      const configured = isSupabaseConfigured();
+      
+      if (forceDemo || !configured) {
+          console.warn("Načítám DEMO data.");
           setEmployees(MOCK_EMPLOYEES);
           setJobs(MOCK_JOBS);
           setEntries(MOCK_ENTRIES);
@@ -107,197 +114,278 @@ const App: React.FC = () => {
           if (savedId && MOCK_EMPLOYEES.some(e => e.id === savedId)) setCurrentUserId(savedId);
           else setCurrentUserId(MOCK_EMPLOYEES[1].id);
           setIsLoading(false);
-          setIsCloudSyncing(false);
-          setDbStatus({ ok: true, msg: 'BĚŽÍ V DEMO REŽIMU (Chybí klíče)', detail: getDbDiagnostics() });
           return;
       }
 
       try {
-          const [emps, jbs, entrs] = await Promise.all([
+          let [emps, jbs, entrs] = await Promise.all([
               fetchEmployees(),
               fetchJobs(),
               fetchTimeEntries()
           ]);
-          
           setEmployees(emps);
           setJobs(jbs);
           setEntries(entrs);
-          setUseDemoData(false);
-          setDbStatus({ ok: true });
-
           const savedId = localStorage.getItem('smartwork_current_user_id');
-          if (savedId && emps?.some(e => e.id === savedId && e.isActive !== false)) {
-              setCurrentUserId(savedId);
-          } else if (emps?.[0]) {
-              setCurrentUserId(emps[0].id);
-          }
+          if (savedId && emps?.some(e => e.id === savedId && e.isActive !== false)) setCurrentUserId(savedId);
+          else if (emps?.[0]) setCurrentUserId(emps[0].id);
       } catch (err: any) {
-          console.error("DB Error:", err);
-          setDbStatus({ ok: false, msg: err.message || 'Chyba připojení k Supabase', detail: getDbDiagnostics() });
-          setEmployees(MOCK_EMPLOYEES);
-          setUseDemoData(true);
+          setError(`Chyba: ${err.message}`);
       } finally {
           setIsLoading(false);
-          setIsCloudSyncing(false);
       }
   };
 
   useEffect(() => { loadData(); }, []);
 
+  useEffect(() => { setReviewingUserId(null); }, [currentUserId]);
+
   useEffect(() => {
       if (currentUserId && !useDemoData) {
-          try {
-              const presenceChannel = subscribeToPresence(currentUserId, (ids) => setOnlineUserIds(new Set(ids)));
-              const notificationChannel = subscribeToNotifications(currentUserId, (newNote) => setNotifications(prev => [newNote, ...prev]));
-              fetchNotifications(currentUserId).then(setNotifications).catch(() => {});
-              return () => { presenceChannel.unsubscribe(); notificationChannel.unsubscribe(); };
-          } catch (e) {}
+          const presenceChannel = subscribeToPresence(currentUserId, (ids) => setOnlineUserIds(new Set(ids)));
+          const notificationChannel = subscribeToNotifications(currentUserId, (newNote) => setNotifications(prev => [newNote, ...prev]));
+          const loadNotifications = async () => {
+              const notifs = await fetchNotifications(currentUserId);
+              setNotifications(notifs);
+          };
+          loadNotifications();
+          return () => {
+              presenceChannel.unsubscribe();
+              notificationChannel.unsubscribe();
+          };
       }
   }, [currentUserId, useDemoData]);
 
   useEffect(() => {
     if (!useDemoData && currentUserId) {
-        Promise.all([fetchMonthlyReports(selectedMonth), fetchGlobalLock(selectedMonth)])
-            .then(([reps, lock]) => { setMonthlyReports(reps); setIsGlobalLocked(lock); })
-            .catch(() => {});
+        const loadReportsAndLocks = async () => {
+            try {
+                const reports = await fetchMonthlyReports(selectedMonth);
+                setMonthlyReports(reports);
+                const globalLock = await fetchGlobalLock(selectedMonth);
+                setIsGlobalLocked(globalLock);
+            } catch (e) {}
+        };
+        loadReportsAndLocks();
     }
   }, [selectedMonth, useDemoData, currentUserId]);
 
   useEffect(() => {
-    if (currentUserId) localStorage.setItem('smartwork_current_user_id', currentUserId);
-    setIsManagerMode(currentUser.role === 'Manager');
-  }, [currentUserId, currentUser]);
+      const userReport = monthlyReports.find(r => r.employeeId === targetUserId);
+      setMonthStatus(userReport || { month: selectedMonth, status: TimesheetStatus.DRAFT, employeeId: targetUserId });
+  }, [targetUserId, selectedMonth, monthlyReports]);
 
-  const monthlyUserEntries = useMemo(() => {
-      return entries.filter(e => e.employeeId === targetUserId && e.date && e.date.startsWith(selectedMonth));
-  }, [entries, targetUserId, selectedMonth]);
-  
-  const entriesForEditingDate = useMemo(() => editingDate ? entries.filter(e => e.employeeId === targetUserId && e.date === editingDate) : [], [entries, targetUserId, editingDate]);
-  
+  useEffect(() => {
+    if (currentUserId) localStorage.setItem('smartwork_current_user_id', currentUserId);
+  }, [currentUserId]);
+
+  const allUserEntries = useMemo(() => entries.filter(e => e.employeeId === targetUserId), [entries, targetUserId]);
+  const monthlyUserEntries = useMemo(() => allUserEntries.filter(e => e.date.startsWith(selectedMonth)), [allUserEntries, selectedMonth]);
+  const entriesForEditingDate = useMemo(() => editingDate ? allUserEntries.filter(e => e.date === editingDate) : [], [allUserEntries, editingDate]);
+  const lastActiveDay = useMemo(() => {
+    if (allUserEntries.length === 0) return undefined;
+    const sorted = [...allUserEntries].sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
+    return sorted[0].date;
+  }, [allUserEntries]);
+
   const validationIssues = useMemo(() => {
     const [year, month] = selectedMonth.split('-');
     return validateMonth(monthlyUserEntries, year, month);
   }, [monthlyUserEntries, selectedMonth]);
 
+  useEffect(() => {
+    const handleBeforeInstallPrompt = (e: any) => { e.preventDefault(); setInstallPrompt(e); };
+    window.addEventListener('beforeinstallprompt', handleBeforeInstallPrompt);
+    return () => window.removeEventListener('beforeinstallprompt', handleBeforeInstallPrompt);
+  }, []);
+
+  useEffect(() => { setIsManagerMode(currentUser.role === 'Manager'); }, [currentUser]);
+
+  const handleRequestSwitchUser = (targetId: string) => {
+      const targetEmp = employees.find(e => e.id === targetId);
+      if (targetEmp?.pinCode) { setPendingUserId(targetId); setIsPinModalOpen(true); }
+      else setCurrentUserId(targetId);
+  };
+
+  const handlePinSuccess = () => {
+      if (pendingUserId) setCurrentUserId(pendingUserId);
+      setIsPinModalOpen(false); setPendingUserId(null);
+  };
+
+  const handleInstallClick = () => { if (installPrompt) { installPrompt.prompt(); setInstallPrompt(null); } };
+
   const handleAddEntries = async (newEntries: TimeEntry[]) => {
-    if (!canEdit) return alert("Uzamčeno.");
+    if (!canEdit) return alert("Zamčeno.");
     if (useDemoData) { setEntries(prev => [...prev, ...newEntries]); return; }
-    try { 
-        setIsCloudSyncing(true);
-        await addTimeEntriesBulk(newEntries); 
-        await loadData(); 
-    } catch (e: any) { 
-        alert(`CHYBA ZÁPISU: ${e.message}`); 
-    } finally { setIsCloudSyncing(false); }
+    try { await addTimeEntriesBulk(newEntries); loadData(); } catch (e: any) { alert("Chyba."); }
+  };
+
+  const handleCopyLastDay = async ( ) => {
+    if (!canEdit || !lastActiveDay) return;
+    const entriesToCopy = allUserEntries.filter(e => e.date === lastActiveDay);
+    if (entriesToCopy.length === 0) return;
+    const today = new Date().toISOString().split('T')[0];
+    const newEntries = entriesToCopy.map(e => ({
+        id: uuidv4(), employeeId: targetUserId, date: today, project: e.project, description: e.description, hours: e.hours, type: e.type
+    }));
+    await handleAddEntries(newEntries);
   };
 
   const handleModalSubmit = async (date: string, submittedEntries: TimeEntry[]) => {
-    if (!canEdit) return alert("Uzamčeno.");
+    if (!canEdit) return alert("Zamčeno.");
     if (useDemoData) {
         if (date === 'BULK_RANGE') setEntries(prev => [...prev, ...submittedEntries]);
         else setEntries(prev => [...prev.filter(e => !(e.employeeId === targetUserId && e.date === date)), ...submittedEntries]);
         return;
     }
     try {
-        setIsCloudSyncing(true);
-        if (date !== 'BULK_RANGE') await deleteTimeEntriesForDate(targetUserId, date); 
-        if (submittedEntries.length > 0) await addTimeEntriesBulk(submittedEntries); 
-        await loadData();
-    } catch (e: any) { alert(`CHYBA ULOŽENÍ: ${e.message}`); } finally { setIsCloudSyncing(false); }
+        if (date === 'BULK_RANGE') await addTimeEntriesBulk(submittedEntries);
+        else { await deleteTimeEntriesForDate(targetUserId, date); if (submittedEntries.length > 0) await addTimeEntriesBulk(submittedEntries); }
+        loadData();
+    } catch (e: any) { alert("Chyba."); }
+  };
+
+  const handleDeleteEntry = async (id: string) => {
+    if (!canEdit) return alert("Zamčeno.");
+    if (useDemoData) { setEntries(prev => prev.filter(e => e.id !== id)); return; }
+    try { await deleteTimeEntry(id); setEntries(prev => prev.filter(e => e.id !== id)); } catch (e: any) { alert("Chyba."); }
   };
 
   const handleStatusUpdate = async (newStatus: TimesheetStatus, comment?: string) => {
-    const updated: MonthStatus = { employeeId: targetUserId, month: selectedMonth, status: newStatus, managerComment: comment };
+    const updatedReport: MonthStatus = { employeeId: targetUserId, month: selectedMonth, status: newStatus, managerComment: comment };
     if (useDemoData) {
-        setMonthlyReports(prev => [...prev.filter(r => !(r.employeeId === targetUserId && r.month === selectedMonth)), updated]);
+        setMonthlyReports(prev => [...prev.filter(r => !(r.employeeId === targetUserId && r.month === selectedMonth)), updatedReport]);
         return;
     }
-    try { 
-        setIsCloudSyncing(true);
-        await upsertMonthlyReport(updated); 
-        await loadData(); 
-    } catch (e: any) { alert(`CHYBA STAVU: ${e.message}`); } finally { setIsCloudSyncing(false); }
+    try { await upsertMonthlyReport(updatedReport); loadData(); } catch (e: any) { alert("Chyba."); }
+  };
+
+  const handleMarkRead = async (id: string) => { if (!useDemoData) await markNotificationAsRead(id); setNotifications(prev => prev.map(n => n.id === id ? { ...n, isRead: true } : n)); };
+  const handleMarkAllRead = async () => { if (!useDemoData) await markAllNotificationsAsRead(currentUserId); setNotifications(prev => prev.map(n => ({ ...n, isRead: true }))); };
+  const handleOpenMessage = (recipientId: string, recipientName: string) => { setMessageRecipientId(recipientId); setMessageRecipientName(recipientName); setIsMessageModalOpen(true); };
+  const handleSendMessage = async (text: string) => { try { if (!useDemoData) await createNotification(messageRecipientId, text, 'info', currentUser.id); else alert('Zasláno.'); } catch (e) { alert('Chyba.'); } };
+
+  const handleAddEmployee = async (emp: Employee) => { if (useDemoData) setEmployees(prev => [...prev, emp]); else { await addEmployee(emp); loadData(); } };
+  const handleUpdateEmployee = async (emp: Employee) => { if (useDemoData) setEmployees(prev => prev.map(e => e.id === emp.id ? emp : e)); else { await updateEmployee(emp); loadData(); } };
+  const handleToggleEmployeeStatus = async (id: string, isActive: boolean) => { if (useDemoData) setEmployees(prev => prev.map(e => e.id === id ? { ...e, isActive } : e)); else { await updateEmployeeStatus(id, isActive); loadData(); } };
+  
+  const handleAddJob = async (job: Job) => { if (useDemoData) setJobs(prev => [...prev, job]); else { await addJob(job); loadData(); } };
+  const handleToggleJobStatus = async (id: string, isActive: boolean) => { if (useDemoData) setJobs(prev => prev.map(j => j.id === id ? { ...j, isActive } : j)); else { await updateJobStatus(id, isActive); loadData(); } };
+
+  const handleServiceLogin = async () => {
+    if ((window as any).aistudio && (window as any).aistudio.openSelectKey) {
+      await (window as any).aistudio.openSelectKey();
+    } else {
+      alert("Servisní nastavení klíče není v tomto prostředí k dispozici.");
+    }
   };
 
   if (presentationMode) return <PresentationMode type={presentationMode} onClose={() => setPresentationMode(null)} />;
 
+  if (isLoading && employees.length === 0) {
+      return (
+          <div className="flex items-center justify-center min-h-screen bg-[#0f172a] text-white">
+              <div className="flex flex-col items-center gap-4">
+                  <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-indigo-500"></div>
+                  <p className="text-sm font-medium">Načítání v{VERSION}...</p>
+              </div>
+          </div>
+      );
+  }
+
   return (
     <div className="flex flex-col md:flex-row min-h-screen bg-[#f3f4f6]">
-      {isCloudSyncing && !useDemoData && (
-          <div className="fixed top-0 left-0 right-0 z-[100] h-1 bg-indigo-600 animate-pulse"></div>
-      )}
-
       <Sidebar 
-        activeTab={activeTab} setActiveTab={setActiveTab} installPrompt={null} onInstall={() => {}}
-        currentUser={currentUser} employees={activeEmployees} onRequestSwitchUser={(id) => setCurrentUserId(id)} 
-        onShowAbout={() => setIsAboutOpen(true)} onContactManager={() => alert("Mimo provoz")} onlineUserIds={onlineUserIds} 
+        activeTab={activeTab} setActiveTab={setActiveTab} installPrompt={installPrompt} onInstall={handleInstallClick}
+        currentUser={currentUser} employees={activeEmployees} onRequestSwitchUser={handleRequestSwitchUser} 
+        onShowAbout={() => setIsAboutOpen(true)} onContactManager={() => handleOpenMessage('mgr', 'Manažer')} onlineUserIds={onlineUserIds} 
         version={VERSION}
-        notifications={notifications}
-        onMarkAsRead={markNotificationAsRead}
-        onMarkAllAsRead={() => markAllNotificationsAsRead(currentUserId)}
       />
 
       <div className="md:hidden bg-slate-900 text-white p-4 pt-[env(safe-area-inset-top,20px)] flex justify-between items-center sticky top-0 z-30 shadow-md">
-        <h1 className="font-bold text-lg">Docházka</h1>
+        <button onClick={() => setIsAboutOpen(true)} className="flex items-center gap-2">
+           <div className="w-8 h-8 bg-indigo-600 rounded flex items-center justify-center shadow-lg shadow-indigo-500/30">
+              <svg width="18" height="18" viewBox="0 0 100 100" fill="none" xmlns="http://www.w3.org/2000/svg">
+                <path d="M20 30 L40 75 L60 30 L80 75 L100 30" stroke="white" strokeWidth="12" strokeLinecap="round" strokeLinejoin="round"/>
+             </svg>
+           </div>
+           <div className="flex flex-col">
+             <div className="flex items-baseline gap-1">
+                <h1 className="font-bold text-lg leading-none">Chytrá</h1>
+                <span className="text-[9px] text-slate-400">v{VERSION}</span>
+             </div>
+             <span className="text-[10px] text-indigo-400 font-bold leading-none uppercase">Docházka</span>
+           </div>
+        </button>
         <div className="flex items-center gap-2">
-           <NotificationBell notifications={notifications} onMarkAsRead={markNotificationAsRead} onMarkAllAsRead={() => {}} />
-           <img src={currentUser.avatar} className="w-8 h-8 rounded-full border border-slate-700" alt="User" />
+           <NotificationBell notifications={notifications} onMarkAsRead={handleMarkRead} onMarkAllAsRead={handleMarkAllRead} />
+           <div className="flex items-center gap-2 bg-slate-800 rounded-full pl-1 pr-3 py-1 border border-slate-700 relative">
+              <img src={currentUser.avatar} className="w-6 h-6 rounded-full" alt="User" />
+              <select value={currentUserId} onChange={(e) => handleRequestSwitchUser(e.target.value)} className="bg-transparent text-white text-xs font-medium border-none focus:ring-0 p-0 max-w-[100px] truncate cursor-pointer outline-none">
+                {activeEmployees.map(emp => <option key={emp.id} value={emp.id} className="text-black">{emp.name}</option>)}
+              </select>
+           </div>
         </div>
       </div>
 
-      <main className="flex-1 overflow-y-auto h-screen md:h-auto no-print">
-        {dbStatus.msg && (
-          <div 
-            className={`${dbStatus.ok ? 'bg-amber-500' : 'bg-red-600'} text-white px-4 py-2 text-[11px] font-black uppercase text-center sticky top-0 md:relative z-[60] cursor-help`}
-            onClick={() => alert(`DETAIL DIAGNOSTIKY:\n${JSON.stringify(dbStatus.detail, null, 2)}\n\nCHYBA:\n${dbStatus.msg}`)}
-          >
-            ⚠️ {dbStatus.msg} (Klikni pro detail)
+      <main className="flex-1 p-0 overflow-y-auto flex flex-col h-screen md:h-auto no-print">
+        {useDemoData && <div className="bg-amber-100 text-amber-800 px-4 py-1 text-[10px] font-bold uppercase tracking-widest text-center">DEMO REŽIM</div>}
+        {reviewingUserId && (
+          <div className="bg-indigo-600 text-white px-6 py-3 sticky top-0 md:top-0 z-40 flex justify-between items-center shadow-md animate-fade-in">
+             <div className="font-bold text-sm">Kontrola: {targetUser.name}</div>
+             <button onClick={() => setReviewingUserId(null)} className="bg-white text-indigo-600 px-4 py-2 rounded-lg text-sm font-bold">Zavřít</button>
           </div>
         )}
-        
-        {isLoading ? (
-            <div className="flex-1 flex items-center justify-center h-full">
-                <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-indigo-600"></div>
+
+        {activeTab === 'overview' && (
+            <div className="p-4 md:p-8 pt-6">
+              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-2">
+                <h2 className="text-xl font-bold text-slate-900">Přehled docházky</h2>
+                <MonthNavigator selectedMonth={selectedMonth} onMonthChange={setSelectedMonth} />
+              </div>
+
+              <ApprovalWorkflow status={monthStatus} onUpdateStatus={handleStatusUpdate} isManagerMode={isManagerMode} validationIssues={validationIssues} />
+              
+              {isManagerMode && !reviewingUserId && <TeamOverview employees={activeEmployees} allEntries={entries} selectedMonth={selectedMonth} onInspect={setReviewingUserId} currentUserRole={currentUser.role} reports={monthlyReports} onMessage={handleOpenMessage} onlineUserIds={onlineUserIds} />}
+              
+              {canEdit && <SmartInput onEntriesAdded={handleAddEntries} currentUserId={targetUserId} onManualEntry={() => setIsEntryModalOpen(true)} onCopyLastDay={handleCopyLastDay} lastActiveDay={lastActiveDay} selectedMonth={selectedMonth} existingEntries={monthlyUserEntries} />}
+              
+              <div className="mb-8"><Dashboard entries={monthlyUserEntries} selectedMonth={selectedMonth} /></div>
+              
+              <ValidationStatus issues={validationIssues} />
+              
+              <h3 className="text-lg font-semibold text-slate-900 mb-4">Záznamy ({selectedMonth}) - {targetUser.name}</h3>
+              <TimesheetTable entries={monthlyUserEntries} onDelete={handleDeleteEntry} onEdit={(d) => { setEditingDate(d); setIsEntryModalOpen(true); }} isLocked={isStatusLocked} canEdit={canEdit} />
             </div>
-        ) : (
-            <div className="p-4 md:p-8 pt-6 animate-fade-in">
-                {activeTab === 'overview' && (
-                    <>
-                        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-2">
-                            <h2 className="text-xl font-bold text-slate-900">Přehled docházky</h2>
-                            <MonthNavigator selectedMonth={selectedMonth} onMonthChange={setSelectedMonth} />
-                        </div>
-                        <ApprovalWorkflow status={monthStatus} onUpdateStatus={handleStatusUpdate} isManagerMode={isManagerMode} validationIssues={validationIssues} />
-                        {isManagerMode && !reviewingUserId && <TeamOverview employees={activeEmployees} allEntries={entries} selectedMonth={selectedMonth} onInspect={setReviewingUserId} currentUserRole={currentUser.role} reports={monthlyReports} onMessage={() => {}} onlineUserIds={onlineUserIds} />}
-                        {canEdit && <SmartInput onEntriesAdded={handleAddEntries} currentUserId={targetUserId} onManualEntry={() => setIsEntryModalOpen(true)} onCopyLastDay={() => {}} selectedMonth={selectedMonth} existingEntries={monthlyUserEntries} />}
-                        <div className="mb-8"><Dashboard entries={monthlyUserEntries} selectedMonth={selectedMonth} /></div>
-                        <ValidationStatus issues={validationIssues} />
-                        <h3 className="text-lg font-semibold text-slate-900 mb-4">Záznamy - {targetUser.name}</h3>
-                        <TimesheetTable entries={monthlyUserEntries} onDelete={() => {}} onEdit={(d) => { setEditingDate(d); setIsEntryModalOpen(true); }} isLocked={isStatusLocked} canEdit={canEdit} />
-                    </>
-                )}
-                {activeTab === 'report' && (
-                    <ReportingModule 
-                        entries={isManagerMode ? entries : entries.filter(e => e.employeeId === currentUserId)} 
-                        employees={employees} 
-                        currentUserRole={currentUser.role} 
-                        jobs={jobs} 
-                        selectedEmployeeId={targetUserId} 
-                        selectedMonth={selectedMonth} 
-                    />
-                )}
-                {activeTab === 'settings' && isManagerMode && (
-                    <AdminPanel employees={employees} onAddEmployee={() => {}} onUpdateEmployee={() => {}} onToggleEmployeeStatus={() => {}} jobs={jobs} onAddJob={() => {}} onToggleJobStatus={() => {}} currentUser={currentUser} onStartPresentation={setPresentationMode} />
-                )}
-            </div>
-        )}
+          )}
+
+          {activeTab === 'report' && (
+             <div className="p-4 md:p-8 pt-6 space-y-8">
+               <ReportingModule 
+                  entries={isManagerMode ? entries : allUserEntries} 
+                  employees={employees} 
+                  currentUserRole={currentUser.role} 
+                  jobs={jobs} 
+                  selectedEmployeeId={targetUserId}
+                  selectedMonth={selectedMonth}
+               />
+             </div>
+          )}
+
+          {activeTab === 'settings' && isManagerMode && (
+            <div className="p-4 md:p-8 pt-6 space-y-6"><AdminPanel employees={employees} onAddEmployee={handleAddEmployee} onUpdateEmployee={handleUpdateEmployee} onToggleEmployeeStatus={handleToggleEmployeeStatus} jobs={jobs} onAddJob={handleAddJob} onToggleJobStatus={handleToggleJobStatus} currentUser={currentUser} onStartPresentation={setPresentationMode} /></div>
+          )}
       </main>
       
       <HelpSystem />
-      <AboutModal isOpen={isAboutOpen} onClose={() => setIsAboutOpen(false)} onContactDeveloper={() => {}} onServiceLogin={() => {}} version={VERSION} />
+      <AboutModal isOpen={isAboutOpen} onClose={() => setIsAboutOpen(false)} onContactDeveloper={() => handleOpenMessage('dev', 'Vývojář')} onServiceLogin={handleServiceLogin} version={VERSION} />
       <UpdatePrompt /> 
       <MobileNavigation activeTab={activeTab} setActiveTab={setActiveTab} currentUserRole={currentUser.role} />
       <EntryFormModal isOpen={isEntryModalOpen} onClose={() => setIsEntryModalOpen(false)} onSubmit={handleModalSubmit} initialDate={editingDate || undefined} existingEntries={entriesForEditingDate} currentUserId={targetUserId} jobs={activeJobs} allMonthEntries={monthlyUserEntries} />
+      <MessageModal isOpen={isMessageModalOpen} onClose={() => setIsMessageModalOpen(false)} onSend={handleSendMessage} recipientName={messageRecipientName} isRecipientOnline={onlineUserIds.has(messageRecipientId)} />
+      {pendingUserId && (
+          <PinPadModal isOpen={isPinModalOpen} onClose={() => { setIsPinModalOpen(false); setPendingUserId(null); }} onSuccess={handlePinSuccess} targetPin={employees.find(e => e.id === pendingUserId)?.pinCode || ''} targetUserName={employees.find(e => e.id === pendingUserId)?.name || 'Uživatel'} />
+      )}
     </div>
   );
 };
