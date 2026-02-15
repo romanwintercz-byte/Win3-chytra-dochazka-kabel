@@ -32,6 +32,7 @@ const App: React.FC = () => {
   const [jobs, setJobs] = useState<Job[]>(isSupabaseConfigured() ? [] : MOCK_JOBS);
   const [entries, setEntries] = useState<TimeEntry[]>(isSupabaseConfigured() ? [] : MOCK_ENTRIES);
   const [isLoading, setIsLoading] = useState(isSupabaseConfigured());
+  const [loadError, setLoadError] = useState<string | null>(null);
   const [currentUserId, setCurrentUserId] = useState<string>('');
   const [selectedMonth, setSelectedMonth] = useState<string>(getCurrentMonth());
   const [isEntryModalOpen, setIsEntryModalOpen] = useState(false);
@@ -44,12 +45,13 @@ const App: React.FC = () => {
   useEffect(() => {
     if (!isSupabaseConfigured()) {
       setIsLoading(false);
-      if (MOCK_EMPLOYEES.length > 0) setCurrentUserId(MOCK_EMPLOYEES[1].id);
+      if (MOCK_EMPLOYEES.length > 1) setCurrentUserId(MOCK_EMPLOYEES[1].id);
       return;
     }
 
     const loadData = async () => {
       setIsLoading(true);
+      setLoadError(null);
       const conn = await db.checkConnection();
       
       if (conn.success) {
@@ -71,9 +73,12 @@ const App: React.FC = () => {
              const userExists = empData.find(e => e.id === savedUserId);
              setCurrentUserId(userExists ? (savedUserId as string) : empData[0].id);
           }
-        } catch (err) {
+        } catch (err: any) {
           console.error("Data load failed", err);
+          setLoadError(err.message || "Nepodařilo se načíst data z tabulek.");
         }
+      } else {
+        setLoadError(`Připojení selhalo: ${conn.message}`);
       }
       setIsLoading(false);
     };
@@ -87,11 +92,13 @@ const App: React.FC = () => {
 
   const currentUser = useMemo(() => {
     const list = useDemoData ? MOCK_EMPLOYEES : employees;
-    return list.find(e => e.id === currentUserId) || list[0] || MOCK_EMPLOYEES[0];
+    const found = list.find(e => e.id === currentUserId);
+    if (found) return found;
+    return list[0] || MOCK_EMPLOYEES[0];
   }, [useDemoData, employees, currentUserId]);
 
   const targetUserId = reviewingUserId || currentUserId;
-  const targetUser = employees.find(e => e.id === targetUserId) || currentUser;
+  const targetUser = (useDemoData ? MOCK_EMPLOYEES : employees).find(e => e.id === targetUserId) || currentUser;
   const isManagerMode = currentUser.role === 'Manager';
 
   const monthlyUserEntries = useMemo(() => 
@@ -104,7 +111,8 @@ const App: React.FC = () => {
   }, [monthlyUserEntries, selectedMonth]);
 
   const handleRequestSwitchUser = (targetId: string) => {
-      const targetEmp = employees.find(e => e.id === targetId) || MOCK_EMPLOYEES.find(e => e.id === targetId);
+      const list = useDemoData ? MOCK_EMPLOYEES : employees;
+      const targetEmp = list.find(e => e.id === targetId);
       if (targetEmp?.pinCode) { 
           setPendingUserId(targetId); 
           setIsPinModalOpen(true); 
@@ -117,8 +125,9 @@ const App: React.FC = () => {
       if (!useDemoData) {
         try {
           await db.addTimeEntriesBulk(newEntries);
-        } catch (e) {
-          alert("Nepodařilo se uložit do databáze.");
+        } catch (e: any) {
+          alert(`Nepodařilo se uložit do databáze: ${e.message}`);
+          return;
         }
       }
       setEntries(prev => [...prev, ...newEntries]);
@@ -131,8 +140,9 @@ const App: React.FC = () => {
             await db.deleteTimeEntriesForDate(targetUserId, date);
           }
           await db.addTimeEntriesBulk(submittedEntries);
-        } catch (e) {
-          alert("Chyba synchronizace s DB.");
+        } catch (e: any) {
+          alert(`Chyba synchronizace s DB: ${e.message}`);
+          return;
         }
       }
 
@@ -148,7 +158,12 @@ const App: React.FC = () => {
 
   const handleDeleteEntry = async (id: string) => {
     if (!useDemoData) {
-      await db.deleteTimeEntry(id);
+      try {
+        await db.deleteTimeEntry(id);
+      } catch (e: any) {
+        alert(`Chyba při mazání: ${e.message}`);
+        return;
+      }
     }
     setEntries(prev => prev.filter(e => e.id !== id));
   };
@@ -161,7 +176,7 @@ const App: React.FC = () => {
         employees={useDemoData ? MOCK_EMPLOYEES : employees.filter(e => e.isActive)}
         onRequestSwitchUser={handleRequestSwitchUser} 
         onShowAbout={() => setIsAboutOpen(true)}
-        version="1.9.25"
+        version="1.9.26"
         isConnected={isConnected}
       />
 
@@ -183,9 +198,17 @@ const App: React.FC = () => {
           </div>
         )}
 
-        {!useDemoData && employees.length === 0 && !isLoading && (
+        {loadError && (
+          <div className="m-4 p-4 bg-red-50 border-l-4 border-red-500 text-red-700 rounded shadow-sm">
+            <p className="font-bold">Chyba načítání dat</p>
+            <p className="text-sm">{loadError}</p>
+            <button onClick={() => window.location.reload()} className="mt-2 text-xs font-bold underline">Zkusit znovu</button>
+          </div>
+        )}
+
+        {!useDemoData && employees.length === 0 && !isLoading && !loadError && (
           <div className="p-8 m-8 bg-white rounded-2xl border-2 border-dashed border-slate-200 text-center">
-            <p className="text-slate-500 font-medium">Databáze je prázdná.</p>
+            <p className="text-slate-500 font-medium">Databáze je prázdná nebo nebyla nalezena data.</p>
           </div>
         )}
 
@@ -232,7 +255,7 @@ const App: React.FC = () => {
         )}
       </main>
 
-      <AboutModal isOpen={isAboutOpen} onClose={() => setIsAboutOpen(false)} version="1.9.25" />
+      <AboutModal isOpen={isAboutOpen} onClose={() => setIsAboutOpen(false)} version="1.9.26" />
       <MobileNavigation activeTab={activeTab} setActiveTab={setActiveTab} currentUserRole={currentUser.role} />
       <EntryFormModal isOpen={isEntryModalOpen} onClose={() => setIsEntryModalOpen(false)} onSubmit={handleModalSubmit} currentUserId={targetUserId} jobs={jobs} />
       <HelpSystem />
