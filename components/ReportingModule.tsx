@@ -1,3 +1,4 @@
+
 import React, { useMemo } from 'react';
 import { TimeEntry, Employee, Job, WorkType, MonthStatus, TimesheetStatus } from '../types';
 import { getHolidayName } from '../services/holidayService';
@@ -36,9 +37,9 @@ const ReportingModule: React.FC<ReportingModuleProps> = ({ entries, employees, s
       const holiday = getHolidayName(dateStr);
       if (!isWeekend && !holiday) workingDays++;
       
-      const dayEntries = filteredEntries.filter(e => e.date === dateStr);
+      // Robustní filtrování dne (ignorujeme časovou část)
+      const dayEntries = filteredEntries.filter(e => e.date.split('T')[0] === dateStr);
       
-      // Rozdělení hodin do maticových sloupců
       const stats = {
         work: dayEntries.filter(e => e.type === WorkType.REGULAR || e.type === WorkType.OVERTIME).reduce((s, e) => s + e.hours, 0),
         doctor: dayEntries.filter(e => e.type === WorkType.DOCTOR).reduce((s, e) => s + e.hours, 0),
@@ -46,7 +47,7 @@ const ReportingModule: React.FC<ReportingModuleProps> = ({ entries, employees, s
         sick: dayEntries.filter(e => e.type === WorkType.SICK_DAY).reduce((s, e) => s + e.hours, 0),
         other: dayEntries.filter(e => ![WorkType.REGULAR, WorkType.OVERTIME, WorkType.DOCTOR, WorkType.VACATION, WorkType.SICK_DAY].includes(e.type)).reduce((s, e) => s + e.hours, 0),
         total: dayEntries.reduce((s, e) => s + e.hours, 0),
-        projects: Array.from(new Set(dayEntries.filter(e => e.project).map(e => e.project))).join(', ')
+        projects: Array.from(new Set(dayEntries.filter(e => e.project && e.project !== '').map(e => e.project))).join(', ')
       };
 
       days.push({
@@ -65,7 +66,9 @@ const ReportingModule: React.FC<ReportingModuleProps> = ({ entries, employees, s
   const typeSummary = useMemo(() => {
     const summary: Record<string, number> = {};
     Object.values(WorkType).forEach(t => summary[t] = 0);
-    filteredEntries.forEach(e => summary[e.type] += e.hours);
+    filteredEntries.forEach(e => {
+        if (summary[e.type] !== undefined) summary[e.type] += e.hours;
+    });
     return summary;
   }, [filteredEntries]);
 
@@ -76,7 +79,7 @@ const ReportingModule: React.FC<ReportingModuleProps> = ({ entries, employees, s
     <div className="space-y-6 max-w-5xl mx-auto pb-20">
       <div className="bg-white p-6 rounded-xl border border-gray-200 shadow-sm flex justify-between items-center no-print">
         <div>
-          <h2 className="text-xl font-bold text-slate-900">Mzdový report (Matrix)</h2>
+          <h2 className="text-xl font-bold text-slate-900">Mzdový report</h2>
           <p className="text-xs text-slate-500">Zaměstnanec: {employee?.name} | {monthStr}</p>
         </div>
         <button onClick={() => window.print()} className="bg-indigo-600 hover:bg-indigo-700 text-white px-6 py-2 rounded-lg font-bold text-sm transition-colors shadow-lg">Vytisknout A4</button>
@@ -112,7 +115,7 @@ const ReportingModule: React.FC<ReportingModuleProps> = ({ entries, employees, s
           </div>
           <div className="border-l-4 border-orange-500 pl-3">
             <p className="text-[10px] font-black text-slate-400 uppercase tracking-tighter">Přesčasy</p>
-            <p className="text-2xl font-black text-orange-600">{typeSummary[WorkType.OVERTIME].toFixed(1)}h</p>
+            <p className="text-2xl font-black text-orange-600">{(typeSummary[WorkType.OVERTIME] as number || 0).toFixed(1)}h</p>
           </div>
           <div className={`border-l-4 pl-3 ${monthStats.diff >= 0 ? 'border-green-500' : 'border-red-500'}`}>
             <p className="text-[10px] font-black text-slate-400 uppercase tracking-tighter">Rozdíl</p>
@@ -123,7 +126,7 @@ const ReportingModule: React.FC<ReportingModuleProps> = ({ entries, employees, s
         </div>
 
         <div>
-          <h3 className="text-xs font-black text-slate-900 uppercase mb-3 bg-slate-100 p-2 border-l-2 border-slate-900">Denní přehled (Matrix view)</h3>
+          <h3 className="text-xs font-black text-slate-900 uppercase mb-3 bg-slate-100 p-2 border-l-2 border-slate-900">Denní přehled (Matrix)</h3>
           <table className="w-full border-collapse">
             <thead>
               <tr className="bg-slate-800 text-white">
@@ -143,7 +146,7 @@ const ReportingModule: React.FC<ReportingModuleProps> = ({ entries, employees, s
                   <td className="text-[10px] p-1 font-bold whitespace-nowrap">
                     {new Date(day.dateStr).toLocaleDateString('cs-CZ', { day: '2-digit', weekday: 'short' })}
                   </td>
-                  <td className="text-[9px] p-1 text-slate-600">
+                  <td className="text-[9px] p-1 text-slate-600 italic">
                     {shorten(day.projects, 50)} {day.holiday && <span className="text-amber-600 font-bold ml-1">({day.holiday})</span>}
                   </td>
                   <td className={`text-[10px] p-1 text-center ${day.work > 0 ? 'font-bold' : 'text-slate-300'}`}>{day.work || '-'}</td>
@@ -160,7 +163,6 @@ const ReportingModule: React.FC<ReportingModuleProps> = ({ entries, employees, s
             <tfoot>
               <tr className="bg-slate-50 font-black">
                 <td colSpan={2} className="text-[10px] p-2 text-right uppercase">Součty za měsíc:</td>
-                {/* Fix: Explicitly cast typeSummary values to number to resolve 'unknown' type error when calculating the sum for REGULAR and OVERTIME hours */}
                 <td className="text-[10px] p-2 text-center">{(typeSummary[WorkType.REGULAR] as number || 0) + (typeSummary[WorkType.OVERTIME] as number || 0)}h</td>
                 <td className="text-[10px] p-2 text-center text-indigo-600">{typeSummary[WorkType.DOCTOR]}h</td>
                 <td className="text-[10px] p-2 text-center text-green-600">{typeSummary[WorkType.VACATION]}h</td>
@@ -179,7 +181,7 @@ const ReportingModule: React.FC<ReportingModuleProps> = ({ entries, employees, s
             <p className="text-[9px] font-bold text-slate-400 uppercase">Podpis zaměstnance</p>
           </div>
           <div className="flex-1 border-t border-slate-300 pt-2 text-right">
-            <p className="text-[9px] font-bold text-slate-400 uppercase">Schválil (Lucie)</p>
+            <p className="text-[9px] font-bold text-slate-400 uppercase">Schválil</p>
             {monthStatus?.status === TimesheetStatus.APPROVED && (
               <p className="text-[10px] font-black text-slate-900 mt-2">ELEKTRONICKY POTVRZENO</p>
             )}

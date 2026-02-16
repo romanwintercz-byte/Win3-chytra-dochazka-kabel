@@ -10,6 +10,7 @@ interface TimesheetTableProps {
 }
 
 const TimesheetTable: React.FC<TimesheetTableProps> = ({ entries, onDelete, onEdit, isLocked }) => {
+  // Seřazení podle data sestupně
   const sorted = [...entries].sort((a, b) => b.date.localeCompare(a.date));
 
   const getTypeBadge = (type: WorkType) => {
@@ -37,16 +38,24 @@ const TimesheetTable: React.FC<TimesheetTableProps> = ({ entries, onDelete, onEd
         </thead>
         <tbody className="divide-y divide-gray-100">
           {sorted.map((e, idx) => {
-            const isFirstInDay = idx === 0 || sorted[idx - 1].date !== e.date;
-            const isLastInDay = idx === sorted.length - 1 || sorted[idx + 1].date !== e.date;
+            const dateOnly = e.date.split('T')[0];
+            const isFirstInDay = idx === 0 || sorted[idx - 1].date.split('T')[0] !== dateOnly;
             
+            // Výpočet součtu pro celý den (zobrazujeme jen u prvního řádku dne)
+            const dayTotal = isFirstInDay 
+              ? sorted.filter(entry => entry.date.split('T')[0] === dateOnly).reduce((sum, entry) => sum + entry.hours, 0)
+              : 0;
+
             return (
-              <tr key={e.id} className={`hover:bg-slate-50 transition-colors ${!isFirstInDay ? 'bg-slate-50/30' : ''}`}>
+              <tr key={e.id} className={`hover:bg-slate-50 transition-colors ${!isFirstInDay ? 'bg-slate-50/40 border-l-4 border-l-indigo-300' : ''}`}>
                 <td className="p-4 align-top">
                   {isFirstInDay ? (
-                    <div className="font-bold text-slate-900">{new Date(e.date).toLocaleDateString('cs-CZ', { day: '2-digit', month: '2-digit', weekday: 'short' })}</div>
+                    <div>
+                      <div className="font-bold text-slate-900">{new Date(dateOnly).toLocaleDateString('cs-CZ', { day: '2-digit', month: '2-digit', weekday: 'short' })}</div>
+                      <div className="text-[10px] font-black text-indigo-500 mt-1 uppercase">Suma: {dayTotal.toFixed(1)}h</div>
+                    </div>
                   ) : (
-                    <div className="w-1 h-full bg-slate-200 ml-4 rounded-full"></div>
+                    <div className="text-[9px] text-slate-300 italic pl-4">pokračování...</div>
                   )}
                 </td>
                 <td className="p-4">
@@ -61,12 +70,14 @@ const TimesheetTable: React.FC<TimesheetTableProps> = ({ entries, onDelete, onEd
                       <button 
                         onClick={() => onEdit(e)} 
                         className="text-indigo-600 hover:text-indigo-800 font-bold text-[10px] uppercase p-1"
+                        title="Upravit"
                       >
                         ✏️
                       </button>
                       <button 
                         onClick={() => onDelete(e.id)} 
                         className="text-red-400 hover:text-red-600 font-bold text-[10px] uppercase p-1"
+                        title="Smazat"
                       >
                         🗑️
                       </button>

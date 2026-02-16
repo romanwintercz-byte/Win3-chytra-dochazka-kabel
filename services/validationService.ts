@@ -24,8 +24,8 @@ export const validateMonth = (entries: TimeEntry[], yearStr: string, monthStr: s
     const isWeekend = dateObj.getDay() === 0 || dateObj.getDay() === 6;
     const holiday = getHolidayName(dateStr);
     
-    // Sčítáme všechny hodiny za daný den
-    const dayEntries = entries.filter(e => e.date === dateStr);
+    // Sčítáme všechny hodiny za daný den (robustní matching)
+    const dayEntries = entries.filter(e => e.date.split('T')[0] === dateStr);
     const totalHours = dayEntries.reduce((sum, e) => sum + e.hours, 0);
 
     // Chyba: Pracovní den v minulosti bez jakéhokoliv záznamu
