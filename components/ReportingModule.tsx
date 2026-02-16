@@ -1,4 +1,3 @@
-
 import React, { useMemo } from 'react';
 import { TimeEntry, Employee, Job, WorkType, MonthStatus, TimesheetStatus } from '../types';
 import { getHolidayName } from '../services/holidayService';
@@ -37,11 +36,24 @@ const ReportingModule: React.FC<ReportingModuleProps> = ({ entries, employees, s
       const holiday = getHolidayName(dateStr);
       if (!isWeekend && !holiday) workingDays++;
       
+      const dayEntries = filteredEntries.filter(e => e.date === dateStr);
+      
+      // Rozdělení hodin do maticových sloupců
+      const stats = {
+        work: dayEntries.filter(e => e.type === WorkType.REGULAR || e.type === WorkType.OVERTIME).reduce((s, e) => s + e.hours, 0),
+        doctor: dayEntries.filter(e => e.type === WorkType.DOCTOR).reduce((s, e) => s + e.hours, 0),
+        vacation: dayEntries.filter(e => e.type === WorkType.VACATION).reduce((s, e) => s + e.hours, 0),
+        sick: dayEntries.filter(e => e.type === WorkType.SICK_DAY).reduce((s, e) => s + e.hours, 0),
+        other: dayEntries.filter(e => ![WorkType.REGULAR, WorkType.OVERTIME, WorkType.DOCTOR, WorkType.VACATION, WorkType.SICK_DAY].includes(e.type)).reduce((s, e) => s + e.hours, 0),
+        total: dayEntries.reduce((s, e) => s + e.hours, 0),
+        projects: Array.from(new Set(dayEntries.filter(e => e.project).map(e => e.project))).join(', ')
+      };
+
       days.push({
         dateStr,
         isWeekend,
         holiday,
-        entries: filteredEntries.filter(e => e.date === dateStr)
+        ...stats
       });
     }
 
@@ -57,24 +69,14 @@ const ReportingModule: React.FC<ReportingModuleProps> = ({ entries, employees, s
     return summary;
   }, [filteredEntries]);
 
-  const jobSummary = useMemo(() => {
-    const summary: Record<string, { regular: number, overtime: number }> = {};
-    filteredEntries.forEach(e => {
-      if (!summary[e.project]) summary[e.project] = { regular: 0, overtime: 0 };
-      if (e.type === WorkType.OVERTIME) summary[e.project].overtime += e.hours;
-      else summary[e.project].regular += e.hours;
-    });
-    return summary;
-  }, [filteredEntries]);
-
-  const shorten = (text: string, len: number = 25) => 
+  const shorten = (text: string, len: number = 30) => 
     text.length > len ? text.substring(0, len - 3) + '...' : text;
 
   return (
     <div className="space-y-6 max-w-5xl mx-auto pb-20">
       <div className="bg-white p-6 rounded-xl border border-gray-200 shadow-sm flex justify-between items-center no-print">
         <div>
-          <h2 className="text-xl font-bold text-slate-900">Mzdový report</h2>
+          <h2 className="text-xl font-bold text-slate-900">Mzdový report (Matrix)</h2>
           <p className="text-xs text-slate-500">Zaměstnanec: {employee?.name} | {monthStr}</p>
         </div>
         <button onClick={() => window.print()} className="bg-indigo-600 hover:bg-indigo-700 text-white px-6 py-2 rounded-lg font-bold text-sm transition-colors shadow-lg">Vytisknout A4</button>
@@ -82,7 +84,6 @@ const ReportingModule: React.FC<ReportingModuleProps> = ({ entries, employees, s
 
       <div className="bg-white p-6 md:p-8 rounded-none md:rounded-xl shadow-none md:shadow-sm border-0 md:border border-gray-100 print:p-0 print:m-0 relative overflow-hidden">
         
-        {/* Stavové razítko pro tisk */}
         {monthStatus?.status === TimesheetStatus.APPROVED && (
           <div className="absolute top-10 right-10 border-4 border-green-600/30 text-green-600/30 font-black text-4xl px-4 py-2 rounded-xl -rotate-12 pointer-events-none select-none uppercase tracking-widest hidden print:block">
             SCHVÁLENO
@@ -121,57 +122,55 @@ const ReportingModule: React.FC<ReportingModuleProps> = ({ entries, employees, s
           </div>
         </div>
 
-        <div className="grid grid-cols-2 gap-8 mb-8">
-          <div>
-            <h3 className="text-xs font-black text-slate-900 uppercase mb-3 bg-slate-100 p-2 border-l-2 border-slate-900">Mzdové ukazatele</h3>
-            <div className="grid grid-cols-2 gap-x-6 gap-y-1">
-              {Object.entries(typeSummary).filter(([_, h]) => h > 0).map(([type, hours]) => (
-                <div key={type} className="flex justify-between border-b border-slate-100 py-1">
-                  <span className="text-xs text-slate-600">{type}</span>
-                  <span className="text-xs font-bold text-slate-900">{hours.toFixed(1)}h</span>
-                </div>
-              ))}
-            </div>
-          </div>
-          <div>
-            <h3 className="text-xs font-black text-slate-900 uppercase mb-3 bg-slate-100 p-2 border-l-2 border-slate-900">Přehled zakázek</h3>
-            <table className="w-full text-left">
-              <thead><tr className="border-b border-slate-200"><th className="text-[9px] font-black py-1">ZAKÁZKA</th><th className="text-[9px] font-black py-1 text-right">BĚŽNÁ</th><th className="text-[9px] font-black py-1 text-right text-orange-600">PŘESČAS</th></tr></thead>
-              <tbody className="divide-y divide-slate-50">
-                {Object.entries(jobSummary).map(([name, data]) => (
-                  <tr key={name}>
-                    <td className="text-[10px] py-1">{shorten(name)}</td>
-                    <td className="text-[10px] py-1 text-right font-medium">{data.regular.toFixed(1)}h</td>
-                    <td className="text-[10px] py-1 text-right font-bold text-orange-600">{data.overtime > 0 ? data.overtime.toFixed(1) + 'h' : '-'}</td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-        </div>
-
         <div>
-          <h3 className="text-xs font-black text-slate-900 uppercase mb-3 bg-slate-100 p-2 border-l-2 border-slate-900">Denní detail docházky</h3>
+          <h3 className="text-xs font-black text-slate-900 uppercase mb-3 bg-slate-100 p-2 border-l-2 border-slate-900">Denní přehled (Matrix view)</h3>
           <table className="w-full border-collapse">
-            <thead><tr className="bg-slate-800 text-white"><th className="text-[9px] p-1.5 text-left w-20">DATUM</th><th className="text-[9px] p-1.5 text-left">PROJEKT</th><th className="text-[9px] p-1.5 text-left w-24">DRUH</th><th className="text-[9px] p-1.5 text-right w-16">HODINY</th></tr></thead>
+            <thead>
+              <tr className="bg-slate-800 text-white">
+                <th className="text-[9px] p-1 text-left w-14">DATUM</th>
+                <th className="text-[9px] p-1 text-left">PROJEKTY</th>
+                <th className="text-[9px] p-1 text-center w-10">PRÁCE</th>
+                <th className="text-[9px] p-1 text-center w-10">LÉK.</th>
+                <th className="text-[9px] p-1 text-center w-10">DOV.</th>
+                <th className="text-[9px] p-1 text-center w-10">NEM.</th>
+                <th className="text-[9px] p-1 text-center w-10">OST.</th>
+                <th className="text-[9px] p-1 text-right w-14">CELKEM</th>
+              </tr>
+            </thead>
             <tbody className="divide-y divide-slate-200 border-b border-slate-200">
-              {monthStats.days.map(day => {
-                const rowEntries = day.entries;
-                const totalDayHours = rowEntries.reduce((s, e) => s + e.hours, 0);
-                return (
-                  <tr key={day.dateStr} className={`${day.isWeekend ? 'bg-slate-50' : ''} ${day.holiday ? 'bg-amber-50' : ''}`}>
-                    <td className="text-[10px] p-1.5 font-bold">{new Date(day.dateStr).toLocaleDateString('cs-CZ', { day: '2-digit', month: '2-digit', weekday: 'short' })}</td>
-                    <td className="text-[10px] p-1.5">
-                      {rowEntries.length > 0 ? rowEntries.map((e, idx) => (
-                        <div key={idx} className="flex gap-2"><span>{shorten(e.project, 40)}</span></div>
-                      )) : <span className="text-slate-300 italic">{day.holiday || (day.isWeekend ? 'Víkend' : '-')}</span>}
-                    </td>
-                    <td className="text-[9px] p-1.5 text-slate-500">{rowEntries.map((e, i) => <div key={i}>{e.type}</div>)}</td>
-                    <td className="text-[10px] p-1.5 text-right font-black">{totalDayHours > 0 ? `${totalDayHours.toFixed(1)}h` : ''}</td>
-                  </tr>
-                );
-              })}
+              {monthStats.days.map(day => (
+                <tr key={day.dateStr} className={`${day.isWeekend ? 'bg-slate-50' : ''} ${day.holiday ? 'bg-amber-50' : ''}`}>
+                  <td className="text-[10px] p-1 font-bold whitespace-nowrap">
+                    {new Date(day.dateStr).toLocaleDateString('cs-CZ', { day: '2-digit', weekday: 'short' })}
+                  </td>
+                  <td className="text-[9px] p-1 text-slate-600">
+                    {shorten(day.projects, 50)} {day.holiday && <span className="text-amber-600 font-bold ml-1">({day.holiday})</span>}
+                  </td>
+                  <td className={`text-[10px] p-1 text-center ${day.work > 0 ? 'font-bold' : 'text-slate-300'}`}>{day.work || '-'}</td>
+                  <td className={`text-[10px] p-1 text-center ${day.doctor > 0 ? 'font-bold text-indigo-600' : 'text-slate-300'}`}>{day.doctor || '-'}</td>
+                  <td className={`text-[10px] p-1 text-center ${day.vacation > 0 ? 'font-bold text-green-600' : 'text-slate-300'}`}>{day.vacation || '-'}</td>
+                  <td className={`text-[10px] p-1 text-center ${day.sick > 0 ? 'font-bold text-red-600' : 'text-slate-300'}`}>{day.sick || '-'}</td>
+                  <td className={`text-[10px] p-1 text-center ${day.other > 0 ? 'font-bold text-slate-600' : 'text-slate-300'}`}>{day.other || '-'}</td>
+                  <td className={`text-[10px] p-1 text-right font-black ${day.total > 0 ? 'text-slate-900' : 'text-slate-300'}`}>
+                    {day.total > 0 ? `${day.total.toFixed(1)}h` : '-'}
+                  </td>
+                </tr>
+              ))}
             </tbody>
+            <tfoot>
+              <tr className="bg-slate-50 font-black">
+                <td colSpan={2} className="text-[10px] p-2 text-right uppercase">Součty za měsíc:</td>
+                {/* Fix: Explicitly cast typeSummary values to number to resolve 'unknown' type error when calculating the sum for REGULAR and OVERTIME hours */}
+                <td className="text-[10px] p-2 text-center">{(typeSummary[WorkType.REGULAR] as number || 0) + (typeSummary[WorkType.OVERTIME] as number || 0)}h</td>
+                <td className="text-[10px] p-2 text-center text-indigo-600">{typeSummary[WorkType.DOCTOR]}h</td>
+                <td className="text-[10px] p-2 text-center text-green-600">{typeSummary[WorkType.VACATION]}h</td>
+                <td className="text-[10px] p-2 text-center text-red-600">{typeSummary[WorkType.SICK_DAY]}h</td>
+                <td className="text-[10px] p-2 text-center text-slate-500">
+                  {Object.entries(typeSummary).reduce((s, [k, v]) => ![WorkType.REGULAR, WorkType.OVERTIME, WorkType.DOCTOR, WorkType.VACATION, WorkType.SICK_DAY].includes(k as WorkType) ? s + (v as number) : s, 0)}h
+                </td>
+                <td className="text-[10px] p-2 text-right">{monthStats.totalHours.toFixed(1)}h</td>
+              </tr>
+            </tfoot>
           </table>
         </div>
 
@@ -180,9 +179,9 @@ const ReportingModule: React.FC<ReportingModuleProps> = ({ entries, employees, s
             <p className="text-[9px] font-bold text-slate-400 uppercase">Podpis zaměstnance</p>
           </div>
           <div className="flex-1 border-t border-slate-300 pt-2 text-right">
-            <p className="text-[9px] font-bold text-slate-400 uppercase">Schválil (manažer)</p>
+            <p className="text-[9px] font-bold text-slate-400 uppercase">Schválil (Lucie)</p>
             {monthStatus?.status === TimesheetStatus.APPROVED && (
-              <p className="text-[10px] font-black text-slate-900 mt-2">ELEKTRONICKY SCHVÁLENO</p>
+              <p className="text-[10px] font-black text-slate-900 mt-2">ELEKTRONICKY POTVRZENO</p>
             )}
           </div>
         </div>

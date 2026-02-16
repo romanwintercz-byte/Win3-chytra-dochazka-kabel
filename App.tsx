@@ -165,9 +165,8 @@ const App: React.FC = () => {
         try {
           if (editingEntry) {
               await db.deleteTimeEntry(editingEntry.id);
-          } else if (date !== 'BULK_RANGE') {
-              await db.deleteTimeEntriesForDate(String(targetUserId), date);
           }
+          // Poznámka: Mazání celého dne bylo odstraněno, abychom umožnili multi-zápis
           await db.addTimeEntriesBulk(submittedEntries);
         } catch (e: any) {
           alert(`Chyba DB: ${e.message}`);
@@ -179,7 +178,7 @@ const App: React.FC = () => {
           setEntries(prev => [...prev, ...submittedEntries]);
       } else {
           setEntries(prev => [
-              ...prev.filter(e => !(String(e.employeeId) === String(targetUserId) && (editingEntry ? e.id === editingEntry.id : e.date === date))),
+              ...prev.filter(e => !(String(e.employeeId) === String(targetUserId) && (editingEntry ? e.id === editingEntry.id : false))),
               ...submittedEntries
           ]);
       }
@@ -217,7 +216,7 @@ const App: React.FC = () => {
             }
         }} 
         onShowAbout={() => setIsAboutOpen(true)}
-        version="2.0.3"
+        version="2.1.0"
         isConnected={isConnected}
       />
 
@@ -226,7 +225,7 @@ const App: React.FC = () => {
           <div className="fixed inset-0 bg-white/80 backdrop-blur-sm z-[90] flex items-center justify-center">
             <div className="flex flex-col items-center">
               <div className="w-12 h-12 border-4 border-indigo-600 border-t-transparent rounded-full animate-spin mb-4"></div>
-              <p className="font-bold text-slate-700">Načítám docházku...</p>
+              <p className="font-bold text-slate-700">Synchronizace...</p>
             </div>
           </div>
         )}
@@ -347,7 +346,7 @@ const App: React.FC = () => {
       />
       
       <HelpSystem />
-      <AboutModal isOpen={isAboutOpen} onClose={() => setIsAboutOpen(false)} version="2.0.3" />
+      <AboutModal isOpen={isAboutOpen} onClose={() => setIsAboutOpen(false)} version="2.1.0" />
       <MobileNavigation activeTab={activeTab} setActiveTab={setActiveTab} currentUserRole={currentUser.role} />
     </div>
   );

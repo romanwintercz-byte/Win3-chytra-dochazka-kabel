@@ -15,6 +15,8 @@ export const validateMonth = (entries: TimeEntry[], yearStr: string, monthStr: s
   const year = parseInt(yearStr, 10);
   const month = parseInt(monthStr, 10);
   const daysInMonth = new Date(year, month, 0).getDate();
+  const now = new Date();
+  now.setHours(0,0,0,0);
 
   for (let d = 1; d <= daysInMonth; d++) {
     const dateObj = new Date(year, month - 1, d);
@@ -22,22 +24,26 @@ export const validateMonth = (entries: TimeEntry[], yearStr: string, monthStr: s
     const isWeekend = dateObj.getDay() === 0 || dateObj.getDay() === 6;
     const holiday = getHolidayName(dateStr);
     
+    // Sčítáme všechny hodiny za daný den
     const dayEntries = entries.filter(e => e.date === dateStr);
     const totalHours = dayEntries.reduce((sum, e) => sum + e.hours, 0);
 
-    if (!isWeekend && !holiday && dayEntries.length === 0) {
-      if (dateObj <= new Date()) {
-        issues.push({ date: dateStr, severity: 'error', message: 'Chybí výkaz.', type: 'MISSING_DAY' });
+    // Chyba: Pracovní den v minulosti bez jakéhokoliv záznamu
+    if (!isWeekend && !holiday && totalHours === 0) {
+      if (dateObj < now) {
+        issues.push({ date: dateStr, severity: 'error', message: 'Chybí jakýkoliv výkaz dne.', type: 'MISSING_DAY' });
       }
       continue;
     }
 
+    // Varování: Málo hodin celkem (práce + lékař atd.)
     if (!isWeekend && !holiday && totalHours > 0 && totalHours < 8) {
-      issues.push({ date: dateStr, severity: 'warning', message: `Pouze ${totalHours}h (standard 8h).`, type: 'LOW_HOURS' });
+      issues.push({ date: dateStr, severity: 'warning', message: `Nízký součet dne: ${totalHours}h (standard 8h).`, type: 'LOW_HOURS' });
     }
 
+    // Varování: Příliš mnoho hodin
     if (totalHours > 12) {
-      issues.push({ date: dateStr, severity: 'warning', message: `Vysoký počet hodin: ${totalHours}h.`, type: 'HIGH_HOURS' });
+      issues.push({ date: dateStr, severity: 'warning', message: `Vysoký denní součet: ${totalHours}h.`, type: 'HIGH_HOURS' });
     }
   }
   return issues;
