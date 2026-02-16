@@ -41,7 +41,7 @@ const App: React.FC = () => {
   const [pendingUserId, setPendingUserId] = useState<string | null>(null);
   const [reviewingUserId, setReviewingUserId] = useState<string | null>(null);
   const [isConnected, setIsConnected] = useState(false);
-  const [editingEntry, setEditingEntry] = useState<TimeEntry | undefined>(undefined);
+  const [editingEntries, setEditingEntries] = useState<TimeEntry[]>([]);
 
   useEffect(() => {
     const loadData = async () => {
@@ -161,12 +161,14 @@ const App: React.FC = () => {
   const handleModalSubmit = async (date: string, submittedEntries: TimeEntry[]) => {
       if (isLocked) return;
       
+      const targetDate = date === 'BULK_RANGE' ? null : date;
+
       if (!useDemoData) {
         try {
-          if (editingEntry) {
-              await db.deleteTimeEntry(editingEntry.id);
+          if (targetDate) {
+            // Při editaci dne nejdříve vymažeme vše pro daný den a uživatele
+            await db.deleteTimeEntriesForDate(String(targetUserId), targetDate);
           }
-          // Poznámka: Mazání celého dne bylo odstraněno, abychom umožnili multi-zápis
           await db.addTimeEntriesBulk(submittedEntries);
         } catch (e: any) {
           alert(`Chyba DB: ${e.message}`);
@@ -174,15 +176,16 @@ const App: React.FC = () => {
         }
       }
 
-      if (date === 'BULK_RANGE') {
-          setEntries(prev => [...prev, ...submittedEntries]);
-      } else {
-          setEntries(prev => [
-              ...prev.filter(e => !(String(e.employeeId) === String(targetUserId) && (editingEntry ? e.id === editingEntry.id : false))),
-              ...submittedEntries
-          ]);
-      }
-      setEditingEntry(undefined);
+      setEntries(prev => {
+        let filtered = prev;
+        if (targetDate) {
+          // Lokální promazání starých záznamů dne
+          filtered = prev.filter(e => !(String(e.employeeId) === String(targetUserId) && e.date.split('T')[0] === targetDate.split('T')[0]));
+        }
+        return [...filtered, ...submittedEntries];
+      });
+      
+      setEditingEntries([]);
   };
 
   const handleDeleteEntry = async (id: string) => {
@@ -195,7 +198,9 @@ const App: React.FC = () => {
 
   const handleEditEntry = (entry: TimeEntry) => {
     if (isLocked) return;
-    setEditingEntry(entry);
+    // Najdeme všechny záznamy pro daný den, abychom je v modalitě mohli editovat najednou
+    const dayEntries = monthlyUserEntries.filter(e => e.date.split('T')[0] === entry.date.split('T')[0]);
+    setEditingEntries(dayEntries);
     setIsEntryModalOpen(true);
   };
 
@@ -279,7 +284,7 @@ const App: React.FC = () => {
                   setEntries(prev => [...prev, ...newE]);
                 }} 
                 currentUserId={String(targetUserId)} 
-                onManualEntry={() => {setEditingEntry(undefined); setIsEntryModalOpen(true);}} 
+                onManualEntry={() => {setEditingEntries([]); setIsEntryModalOpen(true);}} 
               />
             ) : (
               <div className="bg-amber-50 border border-amber-200 p-6 rounded-xl mb-6 flex items-center gap-4">
@@ -330,11 +335,11 @@ const App: React.FC = () => {
 
       <EntryFormModal 
         isOpen={isEntryModalOpen} 
-        onClose={() => {setIsEntryModalOpen(false); setEditingEntry(undefined);}} 
+        onClose={() => {setIsEntryModalOpen(false); setEditingEntries([]);}} 
         onSubmit={handleModalSubmit} 
         currentUserId={String(targetUserId)} 
         jobs={jobs} 
-        initialEntry={editingEntry} 
+        initialEntries={editingEntries} 
       />
       
       <PinPadModal 
