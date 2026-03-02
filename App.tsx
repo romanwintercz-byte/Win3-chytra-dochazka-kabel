@@ -225,7 +225,40 @@ const App: React.FC = () => {
         isConnected={isConnected}
       />
 
-      <main className="flex-1 overflow-y-auto no-print">
+      <main className="flex-1 overflow-y-auto no-print pb-16 md:pb-0">
+        {/* Mobile Header */}
+        <div className="md:hidden bg-white border-b border-gray-200 p-3 sticky top-0 z-30 flex items-center justify-between shadow-sm">
+          <div className="flex items-center gap-2">
+            <button onClick={() => setIsAboutOpen(true)} className="w-8 h-8 bg-indigo-600 rounded-lg flex items-center justify-center font-bold text-white shadow-sm">W</button>
+            <div className="flex flex-col">
+              <h1 className="font-bold text-slate-800 text-sm leading-tight">Chytrá docházka</h1>
+              <div className="flex items-center gap-1">
+                <span className="text-[10px] text-slate-500">v2.1.0</span>
+                <div className={`w-1.5 h-1.5 rounded-full ${isConnected ? 'bg-green-500' : 'bg-amber-500'}`}></div>
+              </div>
+            </div>
+          </div>
+          <div className="flex items-center gap-2">
+            <img src={currentUser.avatar} className="w-8 h-8 rounded-full border border-gray-200 object-cover" alt="" />
+            <select 
+              value={currentUser.id} 
+              onChange={(e) => {
+                const id = e.target.value;
+                const list = useDemoData ? MOCK_EMPLOYEES : employees;
+                const targetEmp = list.find(emp => String(emp.id) === String(id));
+                if (targetEmp?.pinCode) { 
+                    setPendingUserId(id); 
+                    setIsPinModalOpen(true); 
+                } else {
+                    setCurrentUserId(id);
+                }
+              }} 
+              className="bg-gray-50 border border-gray-300 rounded-lg text-xs py-1.5 px-2 text-slate-700 outline-none focus:border-indigo-500 max-w-[110px] truncate"
+            >
+              {(useDemoData ? MOCK_EMPLOYEES : employees).filter(e => e.isActive).map(e => <option key={e.id} value={e.id}>{e.name}</option>)}
+            </select>
+          </div>
+        </div>
         {isLoading && (
           <div className="fixed inset-0 bg-white/80 backdrop-blur-sm z-[90] flex items-center justify-center">
             <div className="flex flex-col items-center">
