@@ -172,7 +172,7 @@ const ReportingModule: React.FC<ReportingModuleProps> = ({ entries, employees, s
         <div>
           <h3 className="text-[10px] font-black text-slate-900 uppercase mb-1 bg-slate-100 p-1 border-l-2 border-slate-900">Denní přehled (Matrix)</h3>
           
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+          <div className="grid grid-cols-1 md:grid-cols-2 print:grid-cols-2 gap-4">
             {/* První polovina měsíce */}
             <table className="w-full border-collapse">
               <thead>

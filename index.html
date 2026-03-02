@@ -35,19 +35,10 @@
         * {
           -webkit-print-color-adjust: exact !important;
           print-color-adjust: exact !important;
-          overflow: visible !important;
         }
 
-        /* Zrušení flex/grid vlastností, které by mohly omezovat výšku */
-        .flex, .grid, .flex-1, .flex-col, .flex-row {
-          display: block !important;
-          height: auto !important;
-          min-height: auto !important;
-          overflow: visible !important;
-        }
-
-        /* Zrušení fixních a absolutních pozic */
-        .fixed, .sticky, .absolute {
+        /* Zrušení fixních pozic */
+        .fixed, .sticky {
           position: static !important;
         }
 
