@@ -18,6 +18,16 @@
       @media print {
         .no-print { display: none !important; }
         .print-only { display: block !important; }
+        body, html, #root {
+          display: block !important;
+          height: auto !important;
+          min-height: auto !important;
+          overflow: visible !important;
+          position: static !important;
+          margin: 0 !important;
+          padding: 0 !important;
+          background-color: white !important;
+        }
       }
       .animate-fade-in { animation: fadeIn 0.3s ease-out; }
       @keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
