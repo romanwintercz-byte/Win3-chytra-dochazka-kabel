@@ -99,7 +99,7 @@ const ReportingModule: React.FC<ReportingModuleProps> = ({ entries, employees, s
         <button onClick={() => window.print()} className="bg-indigo-600 hover:bg-indigo-700 text-white px-6 py-2 rounded-lg font-bold text-sm transition-colors shadow-lg">Vytisknout A4</button>
       </div>
 
-      <div className="bg-white p-6 md:p-8 rounded-none md:rounded-xl shadow-none md:shadow-sm border-0 md:border border-gray-100 print:p-0 print:m-0 relative">
+      <div className="bg-white p-6 md:p-8 rounded-none md:rounded-xl shadow-none md:shadow-sm border-0 md:border border-gray-100 print:p-0 print:m-0 print:border-none print:shadow-none relative">
         
         {monthStatus?.status === TimesheetStatus.APPROVED && (
           <div className="absolute top-10 right-10 border-4 border-green-600/30 text-green-600/30 font-black text-4xl px-4 py-2 rounded-xl -rotate-12 pointer-events-none select-none uppercase tracking-widest hidden print:block">

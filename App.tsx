@@ -205,7 +205,7 @@ const App: React.FC = () => {
   };
 
   return (
-    <div className="flex flex-col md:flex-row min-h-screen bg-gray-50">
+    <div className="flex flex-col md:flex-row min-h-screen bg-gray-50 print:block print:bg-white print:min-h-0">
       <Sidebar 
         activeTab={activeTab} setActiveTab={setActiveTab} 
         currentUser={currentUser} 
@@ -225,9 +225,9 @@ const App: React.FC = () => {
         isConnected={isConnected}
       />
 
-      <main className="flex-1 overflow-y-auto no-print pb-16 md:pb-0">
+      <main className={`flex-1 overflow-y-auto print:overflow-visible print:block print:h-auto pb-16 md:pb-0 print:pb-0 print:p-0 print:m-0 ${activeTab !== 'report' ? 'no-print' : ''}`}>
         {/* Mobile Header */}
-        <div className="md:hidden bg-white border-b border-gray-200 p-3 sticky top-0 z-30 flex items-center justify-between shadow-sm">
+        <div className="md:hidden bg-white border-b border-gray-200 p-3 sticky top-0 z-30 flex items-center justify-between shadow-sm no-print">
           <div className="flex items-center gap-2">
             <button onClick={() => setIsAboutOpen(true)} className="w-8 h-8 bg-indigo-600 rounded-lg flex items-center justify-center font-bold text-white shadow-sm">W</button>
             <div className="flex flex-col">
@@ -238,25 +238,27 @@ const App: React.FC = () => {
               </div>
             </div>
           </div>
-          <div className="flex items-center gap-2">
-            <img src={currentUser.avatar} className="w-8 h-8 rounded-full border border-gray-200 object-cover" alt="" />
-            <select 
-              value={currentUser.id} 
-              onChange={(e) => {
-                const id = e.target.value;
-                const list = useDemoData ? MOCK_EMPLOYEES : employees;
-                const targetEmp = list.find(emp => String(emp.id) === String(id));
-                if (targetEmp?.pinCode) { 
-                    setPendingUserId(id); 
-                    setIsPinModalOpen(true); 
-                } else {
-                    setCurrentUserId(id);
-                }
-              }} 
-              className="bg-gray-50 border border-gray-300 rounded-lg text-xs py-1.5 px-2 text-slate-700 outline-none focus:border-indigo-500 max-w-[110px] truncate"
-            >
-              {(useDemoData ? MOCK_EMPLOYEES : employees).filter(e => e.isActive).map(e => <option key={e.id} value={e.id}>{e.name}</option>)}
-            </select>
+          <div className="flex items-center gap-3">
+            <div className="relative group active:scale-95 transition-transform">
+              <img src={currentUser.avatar} className="w-9 h-9 rounded-full border-2 border-indigo-500 shadow-lg object-cover" alt="User" />
+              <select 
+                value={currentUser.id} 
+                onChange={(e) => {
+                  const id = e.target.value;
+                  const list = useDemoData ? MOCK_EMPLOYEES : employees;
+                  const targetEmp = list.find(emp => String(emp.id) === String(id));
+                  if (targetEmp?.pinCode) { 
+                      setPendingUserId(id); 
+                      setIsPinModalOpen(true); 
+                  } else {
+                      setCurrentUserId(id);
+                  }
+                }} 
+                className="absolute inset-0 opacity-0 w-full h-full cursor-pointer appearance-none"
+              >
+                {(useDemoData ? MOCK_EMPLOYEES : employees).filter(e => e.isActive).map(e => <option key={e.id} value={e.id}>{e.name}</option>)}
+              </select>
+            </div>
           </div>
         </div>
         {isLoading && (
@@ -276,7 +278,7 @@ const App: React.FC = () => {
         )}
 
         {reviewingUserId && (
-          <div className="bg-indigo-600 text-white px-6 py-3 sticky top-0 z-40 flex justify-between items-center shadow-md">
+          <div className="bg-indigo-600 text-white px-6 py-3 sticky top-0 z-40 flex justify-between items-center shadow-md no-print">
              <div className="font-bold text-sm flex items-center gap-2">
                 <span className="bg-white/20 p-1 rounded">👁️</span> 
                 Kontrola docházky: {targetUser.name}
@@ -348,7 +350,7 @@ const App: React.FC = () => {
         )}
 
         {activeTab === 'report' && (
-           <div className="p-4 md:p-8">
+           <div className="p-4 md:p-8 print:p-0 print:m-0">
               <ReportingModule 
                 entries={entries} 
                 employees={employees} 
