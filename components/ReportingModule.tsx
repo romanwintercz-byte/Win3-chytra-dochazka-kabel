@@ -72,11 +72,25 @@ const ReportingModule: React.FC<ReportingModuleProps> = ({ entries, employees, s
     return summary;
   }, [filteredEntries]);
 
+  const jobSummary = useMemo(() => {
+    const summary: Record<string, { regular: number, overtime: number }> = {};
+    filteredEntries.forEach(e => {
+      if (!e.project) return;
+      if (!summary[e.project]) summary[e.project] = { regular: 0, overtime: 0 };
+      if (e.type === WorkType.OVERTIME) {
+        summary[e.project].overtime += e.hours;
+      } else if (e.type === WorkType.REGULAR) {
+        summary[e.project].regular += e.hours;
+      }
+    });
+    return summary;
+  }, [filteredEntries]);
+
   const shorten = (text: string, len: number = 30) => 
     text.length > len ? text.substring(0, len - 3) + '...' : text;
 
   return (
-    <div className="space-y-6 max-w-5xl mx-auto pb-20">
+    <div className="space-y-6 max-w-5xl mx-auto pb-20 print:pb-0 print:max-w-none print:m-0">
       <div className="bg-white p-6 rounded-xl border border-gray-200 shadow-sm flex justify-between items-center no-print">
         <div>
           <h2 className="text-xl font-bold text-slate-900">Mzdový report</h2>
@@ -85,7 +99,7 @@ const ReportingModule: React.FC<ReportingModuleProps> = ({ entries, employees, s
         <button onClick={() => window.print()} className="bg-indigo-600 hover:bg-indigo-700 text-white px-6 py-2 rounded-lg font-bold text-sm transition-colors shadow-lg">Vytisknout A4</button>
       </div>
 
-      <div className="bg-white p-6 md:p-8 rounded-none md:rounded-xl shadow-none md:shadow-sm border-0 md:border border-gray-100 print:p-0 print:m-0 relative overflow-hidden">
+      <div className="bg-white p-6 md:p-8 rounded-none md:rounded-xl shadow-none md:shadow-sm border-0 md:border border-gray-100 print:p-0 print:m-0 relative">
         
         {monthStatus?.status === TimesheetStatus.APPROVED && (
           <div className="absolute top-10 right-10 border-4 border-green-600/30 text-green-600/30 font-black text-4xl px-4 py-2 rounded-xl -rotate-12 pointer-events-none select-none uppercase tracking-widest hidden print:block">
@@ -123,6 +137,36 @@ const ReportingModule: React.FC<ReportingModuleProps> = ({ entries, employees, s
               {monthStats.diff > 0 ? '+' : ''}{monthStats.diff.toFixed(1)}h
             </p>
           </div>
+        </div>
+
+        <div className="mb-8">
+          <h3 className="text-xs font-black text-slate-900 uppercase mb-3 bg-slate-100 p-2 border-l-2 border-slate-900">Přehled zakázek</h3>
+          <table className="w-full text-left border-collapse">
+            <thead>
+              <tr className="bg-slate-800 text-white">
+                <th className="text-[9px] p-1.5 font-black">ZAKÁZKA</th>
+                <th className="text-[9px] p-1.5 font-black text-right w-24">BĚŽNÁ PRÁCE</th>
+                <th className="text-[9px] p-1.5 font-black text-right w-24 text-orange-400">PŘESČAS</th>
+                <th className="text-[9px] p-1.5 font-black text-right w-24">CELKEM</th>
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-slate-200 border-b border-slate-200">
+              {Object.entries(jobSummary).length > 0 ? (
+                Object.entries(jobSummary).map(([name, data]) => (
+                  <tr key={name} className="hover:bg-slate-50">
+                    <td className="text-[10px] p-1.5 font-medium text-slate-800">{name}</td>
+                    <td className="text-[10px] p-1.5 text-right">{data.regular > 0 ? `${data.regular.toFixed(1)}h` : '-'}</td>
+                    <td className="text-[10px] p-1.5 text-right font-bold text-orange-600">{data.overtime > 0 ? `${data.overtime.toFixed(1)}h` : '-'}</td>
+                    <td className="text-[10px] p-1.5 text-right font-black text-indigo-600">{(data.regular + data.overtime).toFixed(1)}h</td>
+                  </tr>
+                ))
+              ) : (
+                <tr>
+                  <td colSpan={4} className="text-[10px] p-3 text-center text-slate-500 italic">Žádné záznamy na zakázkách v tomto měsíci.</td>
+                </tr>
+              )}
+            </tbody>
+          </table>
         </div>
 
         <div>
