@@ -204,6 +204,41 @@ const App: React.FC = () => {
     setIsEntryModalOpen(true);
   };
 
+  const handleAddEmployee = async (emp: Employee) => {
+    if (!useDemoData) {
+      try { await db.addEmployee(emp); } catch (e: any) { alert(e.message); return; }
+    }
+    setEmployees(prev => [...prev, emp]);
+  };
+
+  const handleUpdateEmployee = async (emp: Employee) => {
+    if (!useDemoData) {
+      try { await db.updateEmployee(emp); } catch (e: any) { alert(e.message); return; }
+    }
+    setEmployees(prev => prev.map(e => String(e.id) === String(emp.id) ? emp : e));
+  };
+
+  const handleToggleEmployeeStatus = async (id: string, isActive: boolean) => {
+    if (!useDemoData) {
+      try { await db.updateEmployeeStatus(id, isActive); } catch (e: any) { alert(e.message); return; }
+    }
+    setEmployees(prev => prev.map(e => String(e.id) === String(id) ? { ...e, isActive } : e));
+  };
+
+  const handleAddJob = async (job: Job) => {
+    if (!useDemoData) {
+      try { await db.addJob(job); } catch (e: any) { alert(e.message); return; }
+    }
+    setJobs(prev => [...prev, job]);
+  };
+
+  const handleToggleJobStatus = async (id: string, isActive: boolean) => {
+    if (!useDemoData) {
+      try { await db.updateJobStatus(id, isActive); } catch (e: any) { alert(e.message); return; }
+    }
+    setJobs(prev => prev.map(j => String(j.id) === String(id) ? { ...j, isActive } : j));
+  };
+
   return (
     <div className="flex flex-col md:flex-row min-h-screen bg-gray-50 print:block print:bg-white print:min-h-0">
       <Sidebar 
@@ -364,7 +399,17 @@ const App: React.FC = () => {
         )}
 
         {activeTab === 'settings' && isManagerMode && (
-           <div className="p-4 md:p-8"><AdminPanel employees={employees} jobs={jobs} /></div>
+           <div className="p-4 md:p-8">
+             <AdminPanel 
+               employees={employees} 
+               jobs={jobs} 
+               onAddEmployee={handleAddEmployee}
+               onUpdateEmployee={handleUpdateEmployee}
+               onToggleEmployeeStatus={handleToggleEmployeeStatus}
+               onAddJob={handleAddJob}
+               onToggleJobStatus={handleToggleJobStatus}
+             />
+           </div>
         )}
       </main>
 
