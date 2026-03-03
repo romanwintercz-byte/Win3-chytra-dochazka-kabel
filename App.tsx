@@ -232,6 +232,13 @@ const App: React.FC = () => {
     setJobs(prev => [...prev, job]);
   };
 
+  const handleUpdateJob = async (job: Job) => {
+    if (!useDemoData) {
+      try { await db.updateJob(job); } catch (e: any) { alert(e.message); return; }
+    }
+    setJobs(prev => prev.map(j => String(j.id) === String(job.id) ? job : j));
+  };
+
   const handleToggleJobStatus = async (id: string, isActive: boolean) => {
     if (!useDemoData) {
       try { await db.updateJobStatus(id, isActive); } catch (e: any) { alert(e.message); return; }
@@ -407,6 +414,7 @@ const App: React.FC = () => {
                onUpdateEmployee={handleUpdateEmployee}
                onToggleEmployeeStatus={handleToggleEmployeeStatus}
                onAddJob={handleAddJob}
+               onUpdateJob={handleUpdateJob}
                onToggleJobStatus={handleToggleJobStatus}
              />
            </div>

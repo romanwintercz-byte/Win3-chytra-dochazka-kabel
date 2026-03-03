@@ -85,6 +85,12 @@ export const addJob = async (job: Job) => {
   if (error) throw error;
 };
 
+export const updateJob = async (job: Job) => {
+  if (!supabase) return;
+  const { error } = await supabase.from('jobs').update(toSnake(job)).eq('id', job.id);
+  if (error) throw error;
+};
+
 export const updateJobStatus = async (id: string, isActive: boolean) => {
   if (!supabase) return;
   const { error } = await supabase.from('jobs').update({ is_active: isActive }).eq('id', id);
