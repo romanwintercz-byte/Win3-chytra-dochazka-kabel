@@ -13,9 +13,15 @@ interface ReportingModuleProps {
   monthStatus?: MonthStatus;
 }
 
-const ReportingModule: React.FC<ReportingModuleProps> = ({ entries, employees, selectedEmployeeId, selectedMonth, monthStatus }) => {
+const ReportingModule: React.FC<ReportingModuleProps> = ({ entries, employees, selectedEmployeeId, selectedMonth, monthStatus, jobs }) => {
   const monthStr = selectedMonth || new Date().toISOString().slice(0, 7);
   const [year, month] = monthStr.split('-').map(Number);
+  
+  const getProjectName = (projectIdOrName: string) => {
+    if (!projectIdOrName) return '';
+    const job = jobs?.find(j => String(j.id) === String(projectIdOrName));
+    return job ? `${job.code} - ${job.name}` : projectIdOrName;
+  };
   
   const employee = useMemo(() => 
     employees.find(e => String(e.id) === String(selectedEmployeeId)) || employees[0], 
@@ -47,7 +53,7 @@ const ReportingModule: React.FC<ReportingModuleProps> = ({ entries, employees, s
         sick: dayEntries.filter(e => e.type === WorkType.SICK_DAY).reduce((s, e) => s + e.hours, 0),
         other: dayEntries.filter(e => ![WorkType.REGULAR, WorkType.OVERTIME, WorkType.DOCTOR, WorkType.VACATION, WorkType.SICK_DAY].includes(e.type)).reduce((s, e) => s + e.hours, 0),
         total: dayEntries.reduce((s, e) => s + e.hours, 0),
-        projects: Array.from(new Set(dayEntries.filter(e => e.project && e.project !== '').map(e => e.project))).join(', ')
+        projects: Array.from(new Set(dayEntries.filter(e => e.project && e.project !== '').map(e => getProjectName(e.project)))).join(', ')
       };
 
       days.push({
@@ -76,15 +82,16 @@ const ReportingModule: React.FC<ReportingModuleProps> = ({ entries, employees, s
     const summary: Record<string, { regular: number, overtime: number }> = {};
     filteredEntries.forEach(e => {
       if (!e.project) return;
-      if (!summary[e.project]) summary[e.project] = { regular: 0, overtime: 0 };
+      const projectName = getProjectName(e.project);
+      if (!summary[projectName]) summary[projectName] = { regular: 0, overtime: 0 };
       if (e.type === WorkType.OVERTIME) {
-        summary[e.project].overtime += e.hours;
+        summary[projectName].overtime += e.hours;
       } else if (e.type === WorkType.REGULAR) {
-        summary[e.project].regular += e.hours;
+        summary[projectName].regular += e.hours;
       }
     });
     return summary;
-  }, [filteredEntries]);
+  }, [filteredEntries, jobs]);
 
   const shorten = (text: string, len: number = 30) => 
     text.length > len ? text.substring(0, len - 3) + '...' : text;

@@ -35,19 +35,23 @@ const EntryFormModal: React.FC<EntryFormModalProps> = ({ isOpen, onClose, onSubm
       if (initialEntries && initialEntries.length > 0) {
         setMode('single');
         setDate(initialEntries[0].date.split('T')[0]);
-        setRows(initialEntries.map(e => ({
-          id: e.id,
-          project: e.project,
-          type: e.type,
-          hours: String(e.hours),
-          description: e.description || ''
-        })));
+        setRows(initialEntries.map(e => {
+          // Auto-migrate old names to IDs for the dropdown
+          const matchedJob = jobs.find(j => j.name === e.project);
+          return {
+            id: e.id,
+            project: matchedJob ? matchedJob.id : e.project,
+            type: e.type,
+            hours: String(e.hours),
+            description: e.description || ''
+          };
+        }));
       } else {
         setMode('single');
         setDate(new Date().toISOString().split('T')[0]);
         setRows([{
           id: uuidv4(),
-          project: jobs[0]?.name || '',
+          project: jobs[0]?.id || '',
           type: WorkType.REGULAR,
           hours: '8',
           description: ''
@@ -65,7 +69,7 @@ const EntryFormModal: React.FC<EntryFormModalProps> = ({ isOpen, onClose, onSubm
   const addRow = () => {
     setRows([...rows, {
       id: uuidv4(),
-      project: jobs[0]?.name || '',
+      project: jobs[0]?.id || '',
       type: WorkType.REGULAR,
       hours: '0',
       description: ''
@@ -221,7 +225,7 @@ const EntryFormModal: React.FC<EntryFormModalProps> = ({ isOpen, onClose, onSubm
                       className="w-full p-2 bg-white border border-slate-200 rounded-lg text-xs"
                     >
                       <option value="">-- vybrat zakázku --</option>
-                      {jobs.filter(j => j.isActive || j.name === row.project).map(j => <option key={j.id} value={j.name}>{j.code} - {j.name}</option>)}
+                      {jobs.filter(j => j.isActive || String(j.id) === String(row.project) || j.name === row.project).map(j => <option key={j.id} value={j.id}>{j.code} - {j.name}</option>)}
                     </select>
                   </div>
                   <div>

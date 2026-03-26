@@ -387,6 +387,7 @@ const App: React.FC = () => {
               onDelete={handleDeleteEntry} 
               onEdit={handleEditEntry} 
               isLocked={isLocked}
+              jobs={jobs}
             />
           </div>
         )}

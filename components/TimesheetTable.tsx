@@ -1,17 +1,24 @@
 
 import React from 'react';
-import { TimeEntry, WorkType } from '../types';
+import { TimeEntry, WorkType, Job } from '../types';
 
 interface TimesheetTableProps {
   entries: TimeEntry[];
   onDelete: (id: string) => void;
   onEdit: (entry: TimeEntry) => void;
   isLocked?: boolean;
+  jobs: Job[];
 }
 
-const TimesheetTable: React.FC<TimesheetTableProps> = ({ entries, onDelete, onEdit, isLocked }) => {
+const TimesheetTable: React.FC<TimesheetTableProps> = ({ entries, onDelete, onEdit, isLocked, jobs }) => {
   // Seřazení podle data sestupně
   const sorted = [...entries].sort((a, b) => b.date.localeCompare(a.date));
+
+  const getProjectName = (projectIdOrName: string) => {
+    if (!projectIdOrName) return '';
+    const job = jobs.find(j => String(j.id) === String(projectIdOrName));
+    return job ? `${job.code} - ${job.name}` : projectIdOrName;
+  };
 
   const getTypeBadge = (type: WorkType) => {
     const colors: Record<string, string> = {
@@ -60,7 +67,7 @@ const TimesheetTable: React.FC<TimesheetTableProps> = ({ entries, onDelete, onEd
                     )}
                   </td>
                   <td className="px-3 py-4 sm:p-4">
-                    <div className="font-medium text-slate-700">{e.project || '-'}</div>
+                    <div className="font-medium text-slate-700">{getProjectName(e.project) || '-'}</div>
                     <div className="mt-1">{getTypeBadge(e.type)}</div>
                   </td>
                   <td className="px-3 py-4 sm:p-4 text-slate-500 italic text-xs max-w-[150px] truncate" title={e.description || ''}>{e.description || '-'}</td>
