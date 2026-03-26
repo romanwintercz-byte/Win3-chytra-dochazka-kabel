@@ -221,7 +221,7 @@ const EntryFormModal: React.FC<EntryFormModalProps> = ({ isOpen, onClose, onSubm
                       className="w-full p-2 bg-white border border-slate-200 rounded-lg text-xs"
                     >
                       <option value="">-- vybrat zakázku --</option>
-                      {jobs.map(j => <option key={j.id} value={j.name}>{j.name}</option>)}
+                      {jobs.map(j => <option key={j.id} value={j.name}>{j.code} - {j.name}</option>)}
                     </select>
                   </div>
                   <div>

@@ -267,9 +267,9 @@ const App: React.FC = () => {
         isConnected={isConnected}
       />
 
-      <main className={`flex-1 overflow-y-auto print:overflow-visible print:block print:h-auto pb-16 md:pb-0 print:pb-0 print:p-0 print:m-0 ${activeTab !== 'report' ? 'no-print' : ''}`}>
+      <main className={`flex-1 overflow-y-auto print:overflow-visible print:block print:h-auto pb-16 md:pb-0 print:pb-0 print:p-0 print:m-0 ${activeTab !== 'report' ? 'print:hidden' : ''}`}>
         {/* Mobile Header */}
-        <div className="md:hidden bg-white border-b border-gray-200 p-3 sticky top-0 z-30 flex items-center justify-between shadow-sm no-print">
+        <div className="md:hidden bg-white border-b border-gray-200 p-3 sticky top-0 z-30 flex items-center justify-between shadow-sm print:hidden">
           <div className="flex items-center gap-2">
             <button onClick={() => setIsAboutOpen(true)} className="w-8 h-8 bg-indigo-600 rounded-lg flex items-center justify-center font-bold text-white shadow-sm">W</button>
             <div className="flex flex-col">
@@ -320,7 +320,7 @@ const App: React.FC = () => {
         )}
 
         {reviewingUserId && (
-          <div className="bg-indigo-600 text-white px-6 py-3 sticky top-0 z-40 flex justify-between items-center shadow-md no-print">
+          <div className="bg-indigo-600 text-white px-6 py-3 sticky top-0 z-40 flex justify-between items-center shadow-md print:hidden">
              <div className="font-bold text-sm flex items-center gap-2">
                 <span className="bg-white/20 p-1 rounded">👁️</span> 
                 Kontrola docházky: {targetUser.name}

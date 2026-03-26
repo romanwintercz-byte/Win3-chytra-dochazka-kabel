@@ -9,7 +9,7 @@ interface MobileNavigationProps {
 
 const MobileNavigation: React.FC<MobileNavigationProps> = ({ activeTab, setActiveTab, currentUserRole }) => {
   return (
-    <div className="md:hidden fixed bottom-0 inset-x-0 bg-white border-t border-gray-200 flex h-16 shadow-lg z-40">
+    <div className="md:hidden fixed bottom-0 inset-x-0 bg-white border-t border-gray-200 flex h-16 shadow-lg z-40 print:hidden">
       <button onClick={() => setActiveTab('overview')} className={`flex-1 flex flex-col items-center justify-center ${activeTab === 'overview' ? 'text-indigo-600' : 'text-slate-400'}`}>
         <span className="text-xl">📊</span>
         <span className="text-[10px] font-bold uppercase">Přehled</span>

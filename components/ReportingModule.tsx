@@ -91,7 +91,7 @@ const ReportingModule: React.FC<ReportingModuleProps> = ({ entries, employees, s
 
   return (
     <div className="space-y-6 max-w-5xl mx-auto pb-20 print:pb-0 print:max-w-none print:m-0">
-      <div className="bg-white p-6 rounded-xl border border-gray-200 shadow-sm flex justify-between items-center no-print">
+      <div className="bg-white p-6 rounded-xl border border-gray-200 shadow-sm flex justify-between items-center print:hidden">
         <div>
           <h2 className="text-xl font-bold text-slate-900">Mzdový report</h2>
           <p className="text-xs text-slate-500">Zaměstnanec: {employee?.name} | {monthStr}</p>
@@ -172,9 +172,10 @@ const ReportingModule: React.FC<ReportingModuleProps> = ({ entries, employees, s
         <div>
           <h3 className="text-[10px] font-black text-slate-900 uppercase mb-1 bg-slate-100 p-1 border-l-2 border-slate-900">Denní přehled (Matrix)</h3>
           
-          <div className="grid grid-cols-1 md:grid-cols-2 print:grid-cols-2 gap-4">
+          <div className="flex flex-col md:flex-row print:flex-row gap-4">
             {/* První polovina měsíce */}
-            <table className="w-full border-collapse">
+            <div className="w-full md:w-1/2 print:w-1/2">
+              <table className="w-full border-collapse">
               <thead>
                 <tr className="bg-slate-800 text-white">
                   <th className="text-[8px] p-0.5 text-left w-10">DATUM</th>
@@ -208,8 +209,10 @@ const ReportingModule: React.FC<ReportingModuleProps> = ({ entries, employees, s
                 ))}
               </tbody>
             </table>
+            </div>
 
             {/* Druhá polovina měsíce */}
+            <div className="w-full md:w-1/2 print:w-1/2">
             <table className="w-full border-collapse">
               <thead>
                 <tr className="bg-slate-800 text-white">
@@ -244,6 +247,7 @@ const ReportingModule: React.FC<ReportingModuleProps> = ({ entries, employees, s
                 ))}
               </tbody>
             </table>
+            </div>
           </div>
 
           {/* Společná patička se součty */}

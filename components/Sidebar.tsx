@@ -15,7 +15,7 @@ interface SidebarProps {
 
 const Sidebar: React.FC<SidebarProps> = ({ activeTab, setActiveTab, currentUser, employees, onRequestSwitchUser, onShowAbout, version, isConnected }) => {
   return (
-    <div className="hidden md:flex flex-col w-64 bg-slate-900 text-white h-screen sticky top-0 shrink-0 shadow-xl">
+    <div className="hidden md:flex flex-col w-64 bg-slate-900 text-white h-screen sticky top-0 shrink-0 shadow-xl print:hidden">
       <div className="p-6 border-b border-slate-800">
         <button onClick={onShowAbout} className="flex items-center gap-3 text-left w-full group">
           <div className="w-10 h-10 bg-indigo-600 rounded-lg flex items-center justify-center font-bold text-white shadow-lg group-hover:scale-110 transition-transform">W</div>
