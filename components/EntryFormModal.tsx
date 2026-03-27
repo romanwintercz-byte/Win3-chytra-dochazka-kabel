@@ -225,7 +225,10 @@ const EntryFormModal: React.FC<EntryFormModalProps> = ({ isOpen, onClose, onSubm
                       className="w-full p-2 bg-white border border-slate-200 rounded-lg text-xs"
                     >
                       <option value="">-- vybrat zakázku --</option>
-                      {jobs.filter(j => j.isActive || String(j.id) === String(row.project) || j.name === row.project).map(j => <option key={j.id} value={j.id}>{j.code} - {j.name}</option>)}
+                      {jobs
+                        .filter(j => j.isActive || String(j.id) === String(row.project) || j.name === row.project)
+                        .sort((a, b) => `${a.code} ${a.name}`.localeCompare(`${b.code} ${b.name}`))
+                        .map(j => <option key={j.id} value={j.id}>{j.code} - {j.name}</option>)}
                     </select>
                   </div>
                   <div>

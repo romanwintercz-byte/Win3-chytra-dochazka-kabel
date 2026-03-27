@@ -362,6 +362,7 @@ const App: React.FC = () => {
                 }} 
                 currentUserId={String(targetUserId)} 
                 onManualEntry={() => {setEditingEntries([]); setIsEntryModalOpen(true);}} 
+                existingEntries={entries.filter(e => String(e.employeeId) === String(targetUserId))}
               />
             ) : (
               <div className="bg-amber-50 border border-amber-200 p-6 rounded-xl mb-6 flex items-center gap-4">
