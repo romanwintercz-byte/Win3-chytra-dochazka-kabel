@@ -100,8 +100,34 @@ const EntryFormModal: React.FC<EntryFormModalProps> = ({ isOpen, onClose, onSubm
       return;
     }
 
+    const isEditMode = initialEntries && initialEntries.length > 0;
+    let processedRows = validRows;
+
+    if (!isEditMode) {
+      processedRows = [];
+      let accumulatedHours = 0;
+      const DAILY_LIMIT = 8;
+
+      for (const row of validRows) {
+        const hours = parseFloat(row.hours) || 0;
+        if (accumulatedHours >= DAILY_LIMIT) {
+          processedRows.push({ ...row, id: uuidv4(), type: WorkType.OVERTIME });
+          accumulatedHours += hours;
+        } else if (accumulatedHours + hours > DAILY_LIMIT) {
+          const hoursBeforeLimit = DAILY_LIMIT - accumulatedHours;
+          const hoursAfterLimit = hours - hoursBeforeLimit;
+          processedRows.push({ ...row, hours: String(hoursBeforeLimit) });
+          processedRows.push({ ...row, id: uuidv4(), type: WorkType.OVERTIME, hours: String(hoursAfterLimit) });
+          accumulatedHours += hours;
+        } else {
+          processedRows.push(row);
+          accumulatedHours += hours;
+        }
+      }
+    }
+
     if (mode === 'single') {
-      const finalEntries: TimeEntry[] = validRows.map(r => ({
+      const finalEntries: TimeEntry[] = processedRows.map(r => ({
         id: r.id,
         employeeId: currentUserId,
         date,
@@ -120,7 +146,7 @@ const EntryFormModal: React.FC<EntryFormModalProps> = ({ isOpen, onClose, onSubm
       while (current <= end) {
         if (!skipWeekends || !isWeekend(current)) {
           const currentStr = current.toISOString().split('T')[0];
-          validRows.forEach(r => {
+          processedRows.forEach(r => {
             bulkEntries.push({
               id: uuidv4(), // V rozmezí vždy nové ID
               employeeId: currentUserId,
@@ -250,7 +276,9 @@ const EntryFormModal: React.FC<EntryFormModalProps> = ({ isOpen, onClose, onSubm
                       onChange={e => updateRow(row.id, 'type', e.target.value as WorkType)} 
                       className="w-full p-2 bg-white border border-slate-200 rounded-lg text-xs"
                     >
-                      {Object.values(WorkType).map(t => <option key={t} value={t}>{t}</option>)}
+                      {Object.values(WorkType)
+                        .filter(t => (initialEntries && initialEntries.length > 0) || t !== WorkType.OVERTIME)
+                        .map(t => <option key={t} value={t}>{t}</option>)}
                     </select>
                   </div>
                   <div className="md:col-span-2">
