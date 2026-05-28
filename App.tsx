@@ -345,7 +345,7 @@ const App: React.FC = () => {
             
             {isManagerMode && !reviewingUserId && employees.length > 0 && (
                 <TeamOverview 
-                  employees={employees} 
+                  employees={employees.filter(e => e.isActive)} 
                   allEntries={entries} 
                   selectedMonth={selectedMonth} 
                   onInspect={setReviewingUserId} 
