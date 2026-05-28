@@ -1,6 +1,6 @@
 
 import React from 'react';
-import { TimeEntry, WorkType } from '../types';
+import { TimeEntry, WorkType, Employee } from '../types';
 import { v4 as uuidv4 } from 'uuid';
 
 interface SmartInputProps {
@@ -10,15 +10,19 @@ interface SmartInputProps {
   onCopyLastDay?: () => void;
   selectedMonth?: string;
   existingEntries?: TimeEntry[];
+  targetUser?: Employee;
 }
 
-const SmartInput: React.FC<SmartInputProps> = ({ onEntriesAdded, currentUserId, onManualEntry, existingEntries }) => {
+const SmartInput: React.FC<SmartInputProps> = ({ onEntriesAdded, currentUserId, onManualEntry, existingEntries, targetUser }) => {
   const quickLog = (type: WorkType) => {
+    // Attempt to use employee's department job ID if configured
+    const defaultProject = targetUser?.department ? String(targetUser.department) : (type === WorkType.REGULAR ? 'Režie' : '');
+    
     onEntriesAdded([{
         id: uuidv4(),
         employeeId: currentUserId,
         date: new Date().toISOString().split('T')[0],
-        project: type === WorkType.REGULAR ? 'Režie' : '',
+        project: defaultProject,
         description: type,
         hours: 8,
         type

@@ -29,6 +29,7 @@ export interface Employee {
   avatar: string;
   isActive: boolean;
   pinCode?: string;
+  department?: '10000' | '10001';
 }
 
 export interface Job {

@@ -28,6 +28,7 @@ const AdminPanel: React.FC<AdminPanelProps> = ({
   const [newEmpName, setNewEmpName] = useState('');
   const [newEmpRole, setNewEmpRole] = useState('Employee');
   const [newEmpPin, setNewEmpPin] = useState('');
+  const [newEmpDepartment, setNewEmpDepartment] = useState<'10000' | '10001' | ''>('');
   
   const [editingJobId, setEditingJobId] = useState<string | null>(null);
   const [newJobName, setNewJobName] = useState('');
@@ -44,7 +45,8 @@ const AdminPanel: React.FC<AdminPanelProps> = ({
           ...existingEmp,
           name: newEmpName,
           role: newEmpRole as 'Manager' | 'Employee',
-          pinCode: newEmpPin || undefined
+          pinCode: newEmpPin || undefined,
+          department: newEmpDepartment || undefined
         });
       }
       setEditingEmpId(null);
@@ -55,12 +57,14 @@ const AdminPanel: React.FC<AdminPanelProps> = ({
         role: newEmpRole as 'Manager' | 'Employee',
         avatar: `https://api.dicebear.com/7.x/avataaars/svg?seed=${newEmpName}`,
         isActive: true,
-        pinCode: newEmpPin || undefined
+        pinCode: newEmpPin || undefined,
+        department: newEmpDepartment || undefined
       });
     }
     setNewEmpName('');
     setNewEmpRole('Employee');
     setNewEmpPin('');
+    setNewEmpDepartment('');
   };
 
   const handleEditEmpClick = (emp: Employee) => {
@@ -68,6 +72,7 @@ const AdminPanel: React.FC<AdminPanelProps> = ({
     setNewEmpName(emp.name);
     setNewEmpRole(emp.role);
     setNewEmpPin(emp.pinCode || '');
+    setNewEmpDepartment(emp.department || '');
   };
 
   const handleCancelEditEmp = () => {
@@ -75,6 +80,7 @@ const AdminPanel: React.FC<AdminPanelProps> = ({
     setNewEmpName('');
     setNewEmpRole('Employee');
     setNewEmpPin('');
+    setNewEmpDepartment('');
   };
 
   const handleAddJobSubmit = (e: React.FormEvent) => {
@@ -156,6 +162,17 @@ const AdminPanel: React.FC<AdminPanelProps> = ({
                 />
               </div>
               <div className="flex gap-2">
+                <select
+                  value={newEmpDepartment}
+                  onChange={e => setNewEmpDepartment(e.target.value as '10000' | '10001' | '')}
+                  className="w-full p-2 border border-slate-300 rounded-md text-sm"
+                >
+                  <option value="">-- Vyberte středisko --</option>
+                  <option value="10000">10000 - Kancelář</option>
+                  <option value="10001">10001 - Výroba</option>
+                </select>
+              </div>
+              <div className="flex gap-2">
                 <button type="submit" className="flex-1 bg-indigo-600 text-white py-2 rounded-md text-sm font-bold hover:bg-indigo-700 transition-colors">
                   {editingEmpId ? 'Uložit změny' : 'Přidat zaměstnance'}
                 </button>
@@ -174,7 +191,7 @@ const AdminPanel: React.FC<AdminPanelProps> = ({
                     <img src={e.avatar} alt="" className="w-8 h-8 rounded-full bg-slate-100" />
                     <div>
                       <div className="font-medium text-sm text-slate-900">{e.name}</div>
-                      <div className="text-xs text-slate-500">{e.role} {e.pinCode ? '• PIN nastaven' : ''}</div>
+                      <div className="text-xs text-slate-500">{e.role} {e.pinCode ? '• PIN nastaven' : ''} {e.department ? `• ${e.department === '10000' ? '10000 - Kancelář' : '10001 - Výroba'}` : ''}</div>
                     </div>
                   </div>
                   <div className="flex items-center gap-2">

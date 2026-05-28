@@ -1,6 +1,6 @@
 
 import React, { useState, useEffect, useMemo } from 'react';
-import { TimeEntry, Job, WorkType } from '../types';
+import { TimeEntry, Job, WorkType, Employee } from '../types';
 import { v4 as uuidv4 } from 'uuid';
 
 interface EntryFormModalProps {
@@ -10,6 +10,7 @@ interface EntryFormModalProps {
   currentUserId: string;
   jobs: Job[];
   initialEntries?: TimeEntry[];
+  targetUser?: Employee;
 }
 
 interface EntryRow {
@@ -22,13 +23,24 @@ interface EntryRow {
 
 type EntryMode = 'single' | 'range';
 
-const EntryFormModal: React.FC<EntryFormModalProps> = ({ isOpen, onClose, onSubmit, currentUserId, jobs, initialEntries }) => {
+const EntryFormModal: React.FC<EntryFormModalProps> = ({ isOpen, onClose, onSubmit, currentUserId, jobs, initialEntries, targetUser }) => {
   const [mode, setMode] = useState<EntryMode>('single');
   const [date, setDate] = useState(new Date().toISOString().split('T')[0]);
   const [dateTo, setDateTo] = useState(new Date().toISOString().split('T')[0]);
   const [skipWeekends, setSkipWeekends] = useState(true);
   
   const [rows, setRows] = useState<EntryRow[]>([]);
+
+  // Safely find default department job ID
+  const getDefaultJobId = () => {
+    if (targetUser?.department) {
+      const match = jobs.find(j => j.code === targetUser.department);
+      if (match) return match.id;
+      // fallback if job with code not found but department resembles ID
+      return targetUser.department;
+    }
+    return jobs.find(j => j.isActive)?.id || '';
+  };
 
   useEffect(() => {
     if (isOpen) {
@@ -51,14 +63,14 @@ const EntryFormModal: React.FC<EntryFormModalProps> = ({ isOpen, onClose, onSubm
         setDate(new Date().toISOString().split('T')[0]);
         setRows([{
           id: uuidv4(),
-          project: jobs.find(j => j.isActive)?.id || '',
+          project: getDefaultJobId(),
           type: WorkType.REGULAR,
           hours: '8',
           description: ''
         }]);
       }
     }
-  }, [isOpen, initialEntries, jobs]);
+  }, [isOpen, initialEntries, jobs, targetUser]);
 
   const totalHours = useMemo(() => {
     return rows.reduce((sum, row) => sum + (parseFloat(row.hours) || 0), 0);
@@ -69,7 +81,7 @@ const EntryFormModal: React.FC<EntryFormModalProps> = ({ isOpen, onClose, onSubm
   const addRow = () => {
     setRows([...rows, {
       id: uuidv4(),
-      project: jobs.find(j => j.isActive)?.id || '',
+      project: getDefaultJobId(),
       type: WorkType.REGULAR,
       hours: '0',
       description: ''
@@ -253,7 +265,13 @@ const EntryFormModal: React.FC<EntryFormModalProps> = ({ isOpen, onClose, onSubm
                       <option value="">-- vybrat zakázku --</option>
                       {jobs
                         .filter(j => j.isActive || String(j.id) === String(row.project) || j.name === row.project)
-                        .sort((a, b) => `${a.code} ${a.name}`.localeCompare(`${b.code} ${b.name}`))
+                        .sort((a, b) => {
+                          const isADep = targetUser?.department === a.code;
+                          const isBDep = targetUser?.department === b.code;
+                          if (isADep && !isBDep) return -1;
+                          if (!isADep && isBDep) return 1;
+                          return `${a.code} ${a.name}`.localeCompare(`${b.code} ${b.name}`);
+                        })
                         .map(j => <option key={j.id} value={j.id}>{j.code} - {j.name}</option>)}
                     </select>
                   </div>
