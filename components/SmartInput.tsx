@@ -11,12 +11,21 @@ interface SmartInputProps {
   selectedMonth?: string;
   existingEntries?: TimeEntry[];
   targetUser?: Employee;
+  jobs: Job[];
 }
 
-const SmartInput: React.FC<SmartInputProps> = ({ onEntriesAdded, currentUserId, onManualEntry, existingEntries, targetUser }) => {
+const SmartInput: React.FC<SmartInputProps> = ({ onEntriesAdded, currentUserId, onManualEntry, existingEntries, targetUser, jobs }) => {
   const quickLog = (type: WorkType) => {
     // Attempt to use employee's department job ID if configured
-    const defaultProject = targetUser?.department ? String(targetUser.department) : (type === WorkType.REGULAR ? 'Režie' : '');
+    let defaultProject = '';
+    if (targetUser?.department) {
+      const match = jobs.find(j => j.code === targetUser?.department);
+      if (match) defaultProject = match.id;
+    }
+    
+    if (!defaultProject) {
+      defaultProject = type === WorkType.REGULAR ? (jobs.find(j => j.name === 'Režie')?.id || '') : '';
+    }
     
     onEntriesAdded([{
         id: uuidv4(),
