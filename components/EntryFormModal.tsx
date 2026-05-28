@@ -51,7 +51,7 @@ const EntryFormModal: React.FC<EntryFormModalProps> = ({ isOpen, onClose, onSubm
         setDate(new Date().toISOString().split('T')[0]);
         setRows([{
           id: uuidv4(),
-          project: jobs[0]?.id || '',
+          project: jobs.find(j => j.isActive)?.id || '',
           type: WorkType.REGULAR,
           hours: '8',
           description: ''
@@ -69,7 +69,7 @@ const EntryFormModal: React.FC<EntryFormModalProps> = ({ isOpen, onClose, onSubm
   const addRow = () => {
     setRows([...rows, {
       id: uuidv4(),
-      project: jobs[0]?.id || '',
+      project: jobs.find(j => j.isActive)?.id || '',
       type: WorkType.REGULAR,
       hours: '0',
       description: ''
