@@ -27,7 +27,7 @@ const AdminPanel: React.FC<AdminPanelProps> = ({
   const [editingEmpId, setEditingEmpId] = useState<string | null>(null);
   const [newEmpName, setNewEmpName] = useState('');
   const [newEmpEmail, setNewEmpEmail] = useState('');
-  const [newEmpRole, setNewEmpRole] = useState('Employee');
+  const [newEmpRole, setNewEmpRole] = useState('Zaměstnanec');
   const [newEmpPin, setNewEmpPin] = useState('');
   const [newEmpDepartment, setNewEmpDepartment] = useState<'10000' | '10001' | ''>('');
   
@@ -46,7 +46,7 @@ const AdminPanel: React.FC<AdminPanelProps> = ({
           ...existingEmp,
           name: newEmpName,
           email: newEmpEmail,
-          role: newEmpRole as 'Manager' | 'Employee',
+          role: newEmpRole as 'Manager' | 'Zaměstnanec',
           pinCode: newEmpPin || undefined,
           department: newEmpDepartment || undefined
         });
@@ -57,7 +57,7 @@ const AdminPanel: React.FC<AdminPanelProps> = ({
         id: uuidv4(),
         name: newEmpName,
         email: newEmpEmail,
-        role: newEmpRole as 'Manager' | 'Employee',
+        role: newEmpRole as 'Manager' | 'Zaměstnanec',
         avatar: `https://api.dicebear.com/7.x/avataaars/svg?seed=${newEmpName}`,
         isActive: true,
         pinCode: newEmpPin || undefined,
@@ -66,7 +66,7 @@ const AdminPanel: React.FC<AdminPanelProps> = ({
     }
     setNewEmpName('');
     setNewEmpEmail('');
-    setNewEmpRole('Employee');
+    setNewEmpRole('Zaměstnanec');
     setNewEmpPin('');
     setNewEmpDepartment('');
   };
@@ -84,7 +84,7 @@ const AdminPanel: React.FC<AdminPanelProps> = ({
     setEditingEmpId(null);
     setNewEmpName('');
     setNewEmpEmail('');
-    setNewEmpRole('Employee');
+    setNewEmpRole('Zaměstnanec');
     setNewEmpPin('');
     setNewEmpDepartment('');
   };
@@ -164,7 +164,7 @@ const AdminPanel: React.FC<AdminPanelProps> = ({
                   onChange={e => setNewEmpRole(e.target.value)}
                   className="flex-1 p-2 border border-slate-300 rounded-md text-sm"
                 >
-                  <option value="Employee">Zaměstnanec</option>
+                  <option value="Zaměstnanec">Zaměstnanec</option>
                   <option value="Manager">Manažer</option>
                 </select>
                 <input 
