@@ -26,6 +26,7 @@ const AdminPanel: React.FC<AdminPanelProps> = ({
 }) => {
   const [editingEmpId, setEditingEmpId] = useState<string | null>(null);
   const [newEmpName, setNewEmpName] = useState('');
+  const [newEmpEmail, setNewEmpEmail] = useState('');
   const [newEmpRole, setNewEmpRole] = useState('Employee');
   const [newEmpPin, setNewEmpPin] = useState('');
   const [newEmpDepartment, setNewEmpDepartment] = useState<'10000' | '10001' | ''>('');
@@ -44,6 +45,7 @@ const AdminPanel: React.FC<AdminPanelProps> = ({
         onUpdateEmployee({
           ...existingEmp,
           name: newEmpName,
+          email: newEmpEmail,
           role: newEmpRole as 'Manager' | 'Employee',
           pinCode: newEmpPin || undefined,
           department: newEmpDepartment || undefined
@@ -54,6 +56,7 @@ const AdminPanel: React.FC<AdminPanelProps> = ({
       onAddEmployee({
         id: uuidv4(),
         name: newEmpName,
+        email: newEmpEmail,
         role: newEmpRole as 'Manager' | 'Employee',
         avatar: `https://api.dicebear.com/7.x/avataaars/svg?seed=${newEmpName}`,
         isActive: true,
@@ -62,6 +65,7 @@ const AdminPanel: React.FC<AdminPanelProps> = ({
       });
     }
     setNewEmpName('');
+    setNewEmpEmail('');
     setNewEmpRole('Employee');
     setNewEmpPin('');
     setNewEmpDepartment('');
@@ -70,6 +74,7 @@ const AdminPanel: React.FC<AdminPanelProps> = ({
   const handleEditEmpClick = (emp: Employee) => {
     setEditingEmpId(emp.id);
     setNewEmpName(emp.name);
+    setNewEmpEmail(emp.email || '');
     setNewEmpRole(emp.role);
     setNewEmpPin(emp.pinCode || '');
     setNewEmpDepartment(emp.department || '');
@@ -78,6 +83,7 @@ const AdminPanel: React.FC<AdminPanelProps> = ({
   const handleCancelEditEmp = () => {
     setEditingEmpId(null);
     setNewEmpName('');
+    setNewEmpEmail('');
     setNewEmpRole('Employee');
     setNewEmpPin('');
     setNewEmpDepartment('');
@@ -144,6 +150,14 @@ const AdminPanel: React.FC<AdminPanelProps> = ({
                 className="w-full p-2 border border-slate-300 rounded-md text-sm"
                 required
               />
+              <input 
+                type="email" 
+                placeholder="E-mail" 
+                value={newEmpEmail} 
+                onChange={e => setNewEmpEmail(e.target.value)}
+                className="w-full p-2 border border-slate-300 rounded-md text-sm"
+                required
+              />
               <div className="flex gap-2">
                 <select 
                   value={newEmpRole} 
@@ -190,7 +204,7 @@ const AdminPanel: React.FC<AdminPanelProps> = ({
                   <div className="flex items-center gap-3">
                     <img src={e.avatar} alt="" className="w-8 h-8 rounded-full bg-slate-100" />
                     <div>
-                      <div className="font-medium text-sm text-slate-900">{e.name}</div>
+                      <div className="font-medium text-sm text-slate-900">{e.name} <span className="text-normal text-slate-500 font-normal">({e.email})</span></div>
                       <div className="text-xs text-slate-500">{e.role} {e.pinCode ? '• PIN nastaven' : ''} {e.department ? `• ${e.department === '10000' ? '10000 - Kancelář' : '10001 - Výroba'}` : ''}</div>
                     </div>
                   </div>
