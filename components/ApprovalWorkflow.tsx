@@ -55,7 +55,17 @@ const ApprovalWorkflow: React.FC<ApprovalWorkflowProps> = ({ status, onUpdateSta
             onClick={() => onUpdateStatus(TimesheetStatus.SUBMITTED)}
             className="flex-1 md:flex-none bg-indigo-600 hover:bg-indigo-700 text-white px-6 py-2.5 rounded-xl font-bold text-sm shadow-lg shadow-indigo-100 transition-all active:scale-95"
           >
-            Odeslat Lucii ke schválení
+            {isManagerMode ? "Uzavřít měsíc" : "Odeslat Lucii ke schválení"}
+          </button>
+        )}
+
+        {/* Akce pro manažera (když si to omylem poslal sám na sebe nebo uzavřel) */}
+        {!isReviewing && isManagerMode && (status.status === TimesheetStatus.SUBMITTED || status.status === TimesheetStatus.APPROVED) && (
+          <button 
+            onClick={() => onUpdateStatus(TimesheetStatus.DRAFT)}
+            className="flex-1 md:flex-none bg-white border border-slate-200 text-slate-600 hover:bg-slate-50 px-6 py-2.5 rounded-xl font-bold text-sm transition-all"
+          >
+            Zrušit uzavření / odeslání
           </button>
         )}
 
