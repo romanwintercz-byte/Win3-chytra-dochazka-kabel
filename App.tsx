@@ -273,7 +273,7 @@ const App: React.FC = () => {
           <div className="flex items-center gap-2">
             <button onClick={() => setIsAboutOpen(true)} className="w-8 h-8 bg-indigo-600 rounded-lg flex items-center justify-center font-bold text-white shadow-sm">W</button>
             <div className="flex flex-col">
-              <h1 className="font-bold text-slate-800 text-sm leading-tight">Chytrá docházka</h1>
+              <h1 className="font-bold text-slate-800 text-sm leading-tight">K+P</h1>
               <div className="flex items-center gap-1">
                 <span className="text-[10px] text-slate-500">v2.1.0</span>
                 <div className={`w-1.5 h-1.5 rounded-full ${isConnected ? 'bg-green-500' : 'bg-amber-500'}`}></div>

@@ -20,7 +20,7 @@ const Sidebar: React.FC<SidebarProps> = ({ activeTab, setActiveTab, currentUser,
         <button onClick={onShowAbout} className="flex items-center gap-3 text-left w-full group">
           <div className="w-10 h-10 bg-indigo-600 rounded-lg flex items-center justify-center font-bold text-white shadow-lg group-hover:scale-110 transition-transform">W</div>
           <div>
-            <h1 className="font-bold text-sm">Chytrá docházka</h1>
+            <h1 className="font-bold text-sm">K+P</h1>
             <div className="flex items-center gap-1.5 mt-0.5">
               <p className="text-[10px] text-slate-500">v{version}</p>
               <div className={`w-1.5 h-1.5 rounded-full ${isConnected ? 'bg-green-500 shadow-[0_0_8px_rgba(34,197,94,0.6)]' : 'bg-amber-500'}`} title={isConnected ? 'Připojeno k DB' : 'Offline/Demo režim'}></div>
