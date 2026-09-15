@@ -1,8 +1,6 @@
 {
-  "name": "K+P",
-  "description": "Profesionální aplikace pro evidenci pracovní doby, projektů a schvalovací procesy s AI podporou.",
-  "requestFramePermissions": [
-    "camera",
-    "microphone"
-  ]
+  "name": "Kabel - Chytrá docházka",
+  "description": "Docházkový systém pro firmu Kabel.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
 }
