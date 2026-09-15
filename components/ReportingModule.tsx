@@ -17,6 +17,8 @@ const ReportingModule: React.FC<ReportingModuleProps> = ({ entries, employees, s
   const monthStr = selectedMonth || new Date().toISOString().slice(0, 7);
   const [year, month] = monthStr.split('-').map(Number);
   
+  const [reportMode, setReportMode] = React.useState<'compact' | 'detailed'>('compact');
+
   const getProjectName = (projectIdOrName: string) => {
     if (!projectIdOrName) return '';
     const job = jobs?.find(j => String(j.id) === String(projectIdOrName));
@@ -53,7 +55,15 @@ const ReportingModule: React.FC<ReportingModuleProps> = ({ entries, employees, s
         sick: dayEntries.filter(e => e.type === WorkType.SICK_DAY).reduce((s, e) => s + e.hours, 0),
         other: dayEntries.filter(e => ![WorkType.REGULAR, WorkType.OVERTIME, WorkType.DOCTOR, WorkType.VACATION, WorkType.SICK_DAY].includes(e.type)).reduce((s, e) => s + e.hours, 0),
         total: dayEntries.reduce((s, e) => s + e.hours, 0),
-        projects: Array.from(new Set(dayEntries.filter(e => e.project && e.project !== '').map(e => getProjectName(e.project)))).join(', ')
+        projects: Array.from(new Set(dayEntries.filter(e => e.project && e.project !== '').map(e => getProjectName(e.project)))).join(', '),
+        details: dayEntries.map(e => {
+          const proj = getProjectName(e.project);
+          const parts = [];
+          if (proj) parts.push(proj);
+          if (e.description) parts.push(`"${e.description}"`);
+          if (e.hours > 0) parts.push(`(${e.hours}h)`);
+          return parts.join(' ');
+        }).filter(Boolean).join(' | ')
       };
 
       days.push({
@@ -98,12 +108,28 @@ const ReportingModule: React.FC<ReportingModuleProps> = ({ entries, employees, s
 
   return (
     <div className="space-y-6 max-w-5xl mx-auto pb-20 print:pb-0 print:max-w-none print:m-0">
-      <div className="bg-white p-6 rounded-xl border border-gray-200 shadow-sm flex justify-between items-center print:hidden">
+      <div className="bg-white p-6 rounded-xl border border-gray-200 shadow-sm flex flex-col md:flex-row justify-between items-start md:items-center gap-4 print:hidden">
         <div>
           <h2 className="text-xl font-bold text-slate-900">Mzdový report</h2>
           <p className="text-xs text-slate-500">Zaměstnanec: {employee?.name} | {monthStr}</p>
         </div>
-        <button onClick={() => window.print()} className="bg-indigo-600 hover:bg-indigo-700 text-white px-6 py-2 rounded-lg font-bold text-sm transition-colors shadow-lg">Vytisknout A4</button>
+        <div className="flex flex-col md:flex-row items-center gap-4">
+          <div className="flex bg-slate-100 p-1 rounded-lg">
+            <button
+              onClick={() => setReportMode('compact')}
+              className={`px-4 py-1.5 text-sm font-bold rounded-md transition-colors ${reportMode === 'compact' ? 'bg-white text-indigo-600 shadow' : 'text-slate-500 hover:text-slate-700'}`}
+            >
+              Kompaktní (A4)
+            </button>
+            <button
+              onClick={() => setReportMode('detailed')}
+              className={`px-4 py-1.5 text-sm font-bold rounded-md transition-colors ${reportMode === 'detailed' ? 'bg-white text-indigo-600 shadow' : 'text-slate-500 hover:text-slate-700'}`}
+            >
+              Podrobný
+            </button>
+          </div>
+          <button onClick={() => window.print()} className="bg-indigo-600 hover:bg-indigo-700 text-white px-6 py-2 rounded-lg font-bold text-sm transition-colors shadow-lg">Vytisknout report</button>
+        </div>
       </div>
 
       <div className="bg-white p-6 md:p-8 rounded-none md:rounded-xl shadow-none md:shadow-sm border-0 md:border border-gray-100 print:p-0 print:m-0 print:border-none print:shadow-none relative">
@@ -180,81 +206,123 @@ const ReportingModule: React.FC<ReportingModuleProps> = ({ entries, employees, s
           <h3 className="text-[10px] font-black text-slate-900 uppercase mb-1 bg-slate-100 p-1 border-l-2 border-slate-900">Denní přehled (Matrix)</h3>
           
           <div className="flex flex-col md:flex-row print:flex-row gap-4">
-            {/* První polovina měsíce */}
-            <div className="w-full md:w-1/2 print:w-1/2">
-              <table className="w-full border-collapse">
-              <thead>
-                <tr className="bg-slate-800 text-white">
-                  <th className="text-[8px] p-0.5 text-left w-10">DATUM</th>
-                  <th className="text-[8px] p-0.5 text-left">PROJEKTY</th>
-                  <th className="text-[8px] p-0.5 text-center w-6">PR.</th>
-                  <th className="text-[8px] p-0.5 text-center w-6">LÉK.</th>
-                  <th className="text-[8px] p-0.5 text-center w-6">DOV.</th>
-                  <th className="text-[8px] p-0.5 text-center w-6">NEM.</th>
-                  <th className="text-[8px] p-0.5 text-center w-6">OST.</th>
-                  <th className="text-[8px] p-0.5 text-right w-8">CELK.</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-slate-200 border-b border-slate-200">
-                {monthStats.days.slice(0, 16).map(day => (
-                  <tr key={day.dateStr} className={`${day.isWeekend ? 'bg-slate-50' : ''} ${day.holiday ? 'bg-amber-50' : ''}`}>
-                    <td className="text-[8px] p-0.5 font-bold whitespace-nowrap">
-                      {new Date(day.dateStr).toLocaleDateString('cs-CZ', { day: '2-digit', weekday: 'short' })}
-                    </td>
-                    <td className="text-[8px] p-0.5 text-slate-600 italic truncate max-w-[80px]">
-                      {shorten(day.projects, 20)} {day.holiday && <span className="text-amber-600 font-bold ml-1">({day.holiday})</span>}
-                    </td>
-                    <td className={`text-[8px] p-0.5 text-center ${day.work > 0 ? 'font-bold' : 'text-slate-300'}`}>{day.work || '-'}</td>
-                    <td className={`text-[8px] p-0.5 text-center ${day.doctor > 0 ? 'font-bold text-indigo-600' : 'text-slate-300'}`}>{day.doctor || '-'}</td>
-                    <td className={`text-[8px] p-0.5 text-center ${day.vacation > 0 ? 'font-bold text-green-600' : 'text-slate-300'}`}>{day.vacation || '-'}</td>
-                    <td className={`text-[8px] p-0.5 text-center ${day.sick > 0 ? 'font-bold text-red-600' : 'text-slate-300'}`}>{day.sick || '-'}</td>
-                    <td className={`text-[8px] p-0.5 text-center ${day.other > 0 ? 'font-bold text-slate-600' : 'text-slate-300'}`}>{day.other || '-'}</td>
-                    <td className={`text-[8px] p-0.5 text-right font-black ${day.total > 0 ? 'text-slate-900' : 'text-slate-300'}`}>
-                      {day.total > 0 ? `${day.total.toFixed(1)}` : '-'}
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-            </div>
+            {reportMode === 'compact' ? (
+              <>
+                {/* První polovina měsíce */}
+                <div className="w-full md:w-1/2 print:w-1/2">
+                  <table className="w-full border-collapse">
+                  <thead>
+                    <tr className="bg-slate-800 text-white">
+                      <th className="text-[8px] p-0.5 text-left w-10">DATUM</th>
+                      <th className="text-[8px] p-0.5 text-left">PROJEKTY</th>
+                      <th className="text-[8px] p-0.5 text-center w-6">PR.</th>
+                      <th className="text-[8px] p-0.5 text-center w-6">LÉK.</th>
+                      <th className="text-[8px] p-0.5 text-center w-6">DOV.</th>
+                      <th className="text-[8px] p-0.5 text-center w-6">NEM.</th>
+                      <th className="text-[8px] p-0.5 text-center w-6">OST.</th>
+                      <th className="text-[8px] p-0.5 text-right w-8">CELK.</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-slate-200 border-b border-slate-200">
+                    {monthStats.days.slice(0, 16).map(day => (
+                      <tr key={day.dateStr} className={`${day.isWeekend ? 'bg-slate-50' : ''} ${day.holiday ? 'bg-amber-50' : ''}`}>
+                        <td className="text-[8px] p-0.5 font-bold whitespace-nowrap">
+                          {new Date(day.dateStr).toLocaleDateString('cs-CZ', { day: '2-digit', weekday: 'short' })}
+                        </td>
+                        <td className="text-[8px] p-0.5 text-slate-600 italic truncate max-w-[80px]">
+                          {shorten(day.projects, 20)} {day.holiday && <span className="text-amber-600 font-bold ml-1">({day.holiday})</span>}
+                        </td>
+                        <td className={`text-[8px] p-0.5 text-center ${day.work > 0 ? 'font-bold' : 'text-slate-300'}`}>{day.work || '-'}</td>
+                        <td className={`text-[8px] p-0.5 text-center ${day.doctor > 0 ? 'font-bold text-indigo-600' : 'text-slate-300'}`}>{day.doctor || '-'}</td>
+                        <td className={`text-[8px] p-0.5 text-center ${day.vacation > 0 ? 'font-bold text-green-600' : 'text-slate-300'}`}>{day.vacation || '-'}</td>
+                        <td className={`text-[8px] p-0.5 text-center ${day.sick > 0 ? 'font-bold text-red-600' : 'text-slate-300'}`}>{day.sick || '-'}</td>
+                        <td className={`text-[8px] p-0.5 text-center ${day.other > 0 ? 'font-bold text-slate-600' : 'text-slate-300'}`}>{day.other || '-'}</td>
+                        <td className={`text-[8px] p-0.5 text-right font-black ${day.total > 0 ? 'text-slate-900' : 'text-slate-300'}`}>
+                          {day.total > 0 ? `${day.total.toFixed(1)}` : '-'}
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+                </div>
 
-            {/* Druhá polovina měsíce */}
-            <div className="w-full md:w-1/2 print:w-1/2">
-            <table className="w-full border-collapse">
-              <thead>
-                <tr className="bg-slate-800 text-white">
-                  <th className="text-[8px] p-0.5 text-left w-10">DATUM</th>
-                  <th className="text-[8px] p-0.5 text-left">PROJEKTY</th>
-                  <th className="text-[8px] p-0.5 text-center w-6">PR.</th>
-                  <th className="text-[8px] p-0.5 text-center w-6">LÉK.</th>
-                  <th className="text-[8px] p-0.5 text-center w-6">DOV.</th>
-                  <th className="text-[8px] p-0.5 text-center w-6">NEM.</th>
-                  <th className="text-[8px] p-0.5 text-center w-6">OST.</th>
-                  <th className="text-[8px] p-0.5 text-right w-8">CELK.</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-slate-200 border-b border-slate-200">
-                {monthStats.days.slice(16).map(day => (
-                  <tr key={day.dateStr} className={`${day.isWeekend ? 'bg-slate-50' : ''} ${day.holiday ? 'bg-amber-50' : ''}`}>
-                    <td className="text-[8px] p-0.5 font-bold whitespace-nowrap">
-                      {new Date(day.dateStr).toLocaleDateString('cs-CZ', { day: '2-digit', weekday: 'short' })}
-                    </td>
-                    <td className="text-[8px] p-0.5 text-slate-600 italic truncate max-w-[80px]">
-                      {shorten(day.projects, 20)} {day.holiday && <span className="text-amber-600 font-bold ml-1">({day.holiday})</span>}
-                    </td>
-                    <td className={`text-[8px] p-0.5 text-center ${day.work > 0 ? 'font-bold' : 'text-slate-300'}`}>{day.work || '-'}</td>
-                    <td className={`text-[8px] p-0.5 text-center ${day.doctor > 0 ? 'font-bold text-indigo-600' : 'text-slate-300'}`}>{day.doctor || '-'}</td>
-                    <td className={`text-[8px] p-0.5 text-center ${day.vacation > 0 ? 'font-bold text-green-600' : 'text-slate-300'}`}>{day.vacation || '-'}</td>
-                    <td className={`text-[8px] p-0.5 text-center ${day.sick > 0 ? 'font-bold text-red-600' : 'text-slate-300'}`}>{day.sick || '-'}</td>
-                    <td className={`text-[8px] p-0.5 text-center ${day.other > 0 ? 'font-bold text-slate-600' : 'text-slate-300'}`}>{day.other || '-'}</td>
-                    <td className={`text-[8px] p-0.5 text-right font-black ${day.total > 0 ? 'text-slate-900' : 'text-slate-300'}`}>
-                      {day.total > 0 ? `${day.total.toFixed(1)}` : '-'}
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-            </div>
+                {/* Druhá polovina měsíce */}
+                <div className="w-full md:w-1/2 print:w-1/2">
+                <table className="w-full border-collapse">
+                  <thead>
+                    <tr className="bg-slate-800 text-white">
+                      <th className="text-[8px] p-0.5 text-left w-10">DATUM</th>
+                      <th className="text-[8px] p-0.5 text-left">PROJEKTY</th>
+                      <th className="text-[8px] p-0.5 text-center w-6">PR.</th>
+                      <th className="text-[8px] p-0.5 text-center w-6">LÉK.</th>
+                      <th className="text-[8px] p-0.5 text-center w-6">DOV.</th>
+                      <th className="text-[8px] p-0.5 text-center w-6">NEM.</th>
+                      <th className="text-[8px] p-0.5 text-center w-6">OST.</th>
+                      <th className="text-[8px] p-0.5 text-right w-8">CELK.</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-slate-200 border-b border-slate-200">
+                    {monthStats.days.slice(16).map(day => (
+                      <tr key={day.dateStr} className={`${day.isWeekend ? 'bg-slate-50' : ''} ${day.holiday ? 'bg-amber-50' : ''}`}>
+                        <td className="text-[8px] p-0.5 font-bold whitespace-nowrap">
+                          {new Date(day.dateStr).toLocaleDateString('cs-CZ', { day: '2-digit', weekday: 'short' })}
+                        </td>
+                        <td className="text-[8px] p-0.5 text-slate-600 italic truncate max-w-[80px]">
+                          {shorten(day.projects, 20)} {day.holiday && <span className="text-amber-600 font-bold ml-1">({day.holiday})</span>}
+                        </td>
+                        <td className={`text-[8px] p-0.5 text-center ${day.work > 0 ? 'font-bold' : 'text-slate-300'}`}>{day.work || '-'}</td>
+                        <td className={`text-[8px] p-0.5 text-center ${day.doctor > 0 ? 'font-bold text-indigo-600' : 'text-slate-300'}`}>{day.doctor || '-'}</td>
+                        <td className={`text-[8px] p-0.5 text-center ${day.vacation > 0 ? 'font-bold text-green-600' : 'text-slate-300'}`}>{day.vacation || '-'}</td>
+                        <td className={`text-[8px] p-0.5 text-center ${day.sick > 0 ? 'font-bold text-red-600' : 'text-slate-300'}`}>{day.sick || '-'}</td>
+                        <td className={`text-[8px] p-0.5 text-center ${day.other > 0 ? 'font-bold text-slate-600' : 'text-slate-300'}`}>{day.other || '-'}</td>
+                        <td className={`text-[8px] p-0.5 text-right font-black ${day.total > 0 ? 'text-slate-900' : 'text-slate-300'}`}>
+                          {day.total > 0 ? `${day.total.toFixed(1)}` : '-'}
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+                </div>
+              </>
+            ) : (
+              <div className="w-full">
+                <table className="w-full border-collapse">
+                  <thead>
+                    <tr className="bg-slate-800 text-white">
+                      <th className="text-[9px] p-1 text-left w-16">DATUM</th>
+                      <th className="text-[9px] p-1 text-left">PROJEKTY A POZNÁMKY</th>
+                      <th className="text-[9px] p-1 text-center w-8">PR.</th>
+                      <th className="text-[9px] p-1 text-center w-8">LÉK.</th>
+                      <th className="text-[9px] p-1 text-center w-8">DOV.</th>
+                      <th className="text-[9px] p-1 text-center w-8">NEM.</th>
+                      <th className="text-[9px] p-1 text-center w-8">OST.</th>
+                      <th className="text-[9px] p-1 text-right w-10">CELK.</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-slate-200 border-b border-slate-200">
+                    {monthStats.days.map(day => (
+                      <tr key={day.dateStr} className={`${day.isWeekend ? 'bg-slate-50' : ''} ${day.holiday ? 'bg-amber-50' : ''}`}>
+                        <td className="text-[9px] p-1 font-bold whitespace-nowrap">
+                          {new Date(day.dateStr).toLocaleDateString('cs-CZ', { day: '2-digit', weekday: 'short' })}
+                        </td>
+                        <td className="text-[9px] p-1 text-slate-600">
+                          {day.holiday && <span className="text-amber-600 font-bold mr-2">[{day.holiday}]</span>}
+                          {day.details || <span className="italic text-slate-400">Bez záznamu</span>}
+                        </td>
+                        <td className={`text-[9px] p-1 text-center ${day.work > 0 ? 'font-bold' : 'text-slate-300'}`}>{day.work || '-'}</td>
+                        <td className={`text-[9px] p-1 text-center ${day.doctor > 0 ? 'font-bold text-indigo-600' : 'text-slate-300'}`}>{day.doctor || '-'}</td>
+                        <td className={`text-[9px] p-1 text-center ${day.vacation > 0 ? 'font-bold text-green-600' : 'text-slate-300'}`}>{day.vacation || '-'}</td>
+                        <td className={`text-[9px] p-1 text-center ${day.sick > 0 ? 'font-bold text-red-600' : 'text-slate-300'}`}>{day.sick || '-'}</td>
+                        <td className={`text-[9px] p-1 text-center ${day.other > 0 ? 'font-bold text-slate-600' : 'text-slate-300'}`}>{day.other || '-'}</td>
+                        <td className={`text-[9px] p-1 text-right font-black ${day.total > 0 ? 'text-slate-900' : 'text-slate-300'}`}>
+                          {day.total > 0 ? `${day.total.toFixed(1)}` : '-'}
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            )}
           </div>
 
           {/* Společná patička se součty */}
