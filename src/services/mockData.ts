@@ -5,26 +5,29 @@ export const MOCK_EMPLOYEES: Employee[] = [
     {
         id: 'manager-1',
         name: 'Ing. Petr Ředitel',
-        email: 'petr@stavby-design.cz',
+        email: 'petr@kabel.cz',
         role: 'Manager',
-        avatar: 'https://picsum.photos/seed/manager/128/128',
+        department: '10000',
+        avatar: 'https://images.unsplash.com/photo-1494790108377-be9c29b29330?auto=format&fit=crop&w=150',
         isActive: true
     },
     {
         id: 'worker-1',
         name: 'Karel Dělník',
-        email: 'karel@stavby-design.cz',
+        email: 'karel@kabel.cz',
         role: 'Zaměstnanec',
-        avatar: 'https://picsum.photos/seed/worker1/128/128',
+        department: '10000',
+        avatar: 'https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?auto=format&fit=crop&w=150',
         isActive: true,
         pinCode: '1234'
     },
     {
         id: 'worker-2',
         name: 'Jana Administrativa',
-        email: 'jana@stavby-design.cz',
+        email: 'jana@kabel.cz',
         role: 'Zaměstnanec',
-        avatar: 'https://picsum.photos/seed/worker2/128/128',
+        department: '10001',
+        avatar: 'https://images.unsplash.com/photo-1570295999919-56ceb5ecca61?auto=format&fit=crop&w=150',
         isActive: true
     }
 ];
@@ -44,6 +47,10 @@ export const MOCK_ENTRIES: TimeEntry[] = [
         project: 'Rezidence Parková (Byty)',
         description: 'Montáž SDK příček',
         hours: 8,
-        type: WorkType.REGULAR
+        type: WorkType.REGULAR,
+        startTime: '07:00',
+        endTime: '15:30',
+        breakMinutes: 30,
+        lunchTime: '11:00-11:30'
     }
 ];

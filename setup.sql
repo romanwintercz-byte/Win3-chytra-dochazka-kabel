@@ -24,7 +24,11 @@ CREATE TABLE IF NOT EXISTS time_entries (
     description TEXT,
     hours NUMERIC,
     type TEXT NOT NULL,
-    attachment_url TEXT
+    attachment_url TEXT,
+    start_time VARCHAR(10),
+    end_time VARCHAR(10),
+    break_minutes INTEGER DEFAULT 30,
+    lunch_time VARCHAR(30)
 );
 
 CREATE TABLE IF NOT EXISTS month_status (

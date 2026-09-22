@@ -1,4 +1,3 @@
-
 import { createClient } from '@supabase/supabase-js';
 import { CREDENTIALS } from '../credentials';
 import { Employee, Job, TimeEntry, MonthStatus, Notification } from '../types';
@@ -9,6 +8,101 @@ const supabaseKey = CREDENTIALS.SUPABASE_KEY;
 export const supabase = (supabaseUrl && supabaseKey) 
   ? createClient(supabaseUrl, supabaseKey) 
   : null;
+
+// Local storage helpers for extra metadata (inspectorate fields) fallback
+const LOCAL_TIME_META_KEY = 'kabel_dochazka_time_meta_v1';
+
+export const getLocalTimeMeta = (): Record<string, Partial<TimeEntry>> => {
+  try {
+    const stored = localStorage.getItem(LOCAL_TIME_META_KEY);
+    return stored ? JSON.parse(stored) : {};
+  } catch {
+    return {};
+  }
+};
+
+export const saveLocalTimeMeta = (entries: TimeEntry[]) => {
+  try {
+    const current = getLocalTimeMeta();
+    entries.forEach(e => {
+      if (e.id && (e.startTime || e.endTime || e.breakMinutes !== undefined || e.lunchTime)) {
+        current[e.id] = {
+          startTime: e.startTime,
+          endTime: e.endTime,
+          breakMinutes: e.breakMinutes,
+          lunchTime: e.lunchTime
+        };
+      }
+    });
+    localStorage.setItem(LOCAL_TIME_META_KEY, JSON.stringify(current));
+  } catch (err) {
+    console.error('Failed to save local time meta', err);
+  }
+};
+
+export const removeLocalTimeMeta = (id: string) => {
+  try {
+    const current = getLocalTimeMeta();
+    delete current[id];
+    localStorage.setItem(LOCAL_TIME_META_KEY, JSON.stringify(current));
+  } catch {}
+};
+
+// Encode inspection meta into attachment_url as safe fallback: "META:{"s":"07:00","e":"15:30","b":30,"l":"11:00-11:30"}|real_url"
+export const encodeTimeMetaToAttachment = (entry: TimeEntry): string | undefined => {
+  const meta: any = {};
+  if (entry.startTime) meta.s = entry.startTime;
+  if (entry.endTime) meta.e = entry.endTime;
+  if (entry.breakMinutes !== undefined) meta.b = entry.breakMinutes;
+  if (entry.lunchTime) meta.l = entry.lunchTime;
+
+  const hasMeta = Object.keys(meta).length > 0;
+  const originalUrl = entry.attachmentUrl && !entry.attachmentUrl.startsWith('META:')
+    ? entry.attachmentUrl
+    : (entry.attachmentUrl?.includes('|') ? entry.attachmentUrl.split('|')[1] : '');
+
+  if (!hasMeta) return originalUrl || undefined;
+  return `META:${JSON.stringify(meta)}${originalUrl ? '|' + originalUrl : ''}`;
+};
+
+export const parseEntryTimeMeta = (entry: any): Partial<TimeEntry> => {
+  const result: Partial<TimeEntry> = {};
+  
+  // 1. Direct columns if Supabase schema has them
+  if (entry.start_time || entry.startTime) result.startTime = entry.start_time || entry.startTime;
+  if (entry.end_time || entry.endTime) result.endTime = entry.end_time || entry.endTime;
+  if (entry.break_minutes !== undefined || entry.breakMinutes !== undefined) {
+    result.breakMinutes = Number(entry.break_minutes ?? entry.breakMinutes);
+  }
+  if (entry.lunch_time || entry.lunchTime) result.lunchTime = entry.lunch_time || entry.lunchTime;
+
+  // 2. Fallback to attachment_url encoded meta
+  const rawAttachment = entry.attachment_url || entry.attachmentUrl;
+  if (rawAttachment && typeof rawAttachment === 'string' && rawAttachment.startsWith('META:')) {
+    try {
+      const parts = rawAttachment.split('|');
+      const metaJson = parts[0].replace('META:', '');
+      const parsed = JSON.parse(metaJson);
+      if (!result.startTime && parsed.s) result.startTime = parsed.s;
+      if (!result.endTime && parsed.e) result.endTime = parsed.e;
+      if (result.breakMinutes === undefined && parsed.b !== undefined) result.breakMinutes = Number(parsed.b);
+      if (!result.lunchTime && parsed.l) result.lunchTime = parsed.l;
+    } catch {}
+  }
+
+  // 3. Fallback to local storage
+  if (entry.id) {
+    const local = getLocalTimeMeta()[entry.id];
+    if (local) {
+      if (!result.startTime && local.startTime) result.startTime = local.startTime;
+      if (!result.endTime && local.endTime) result.endTime = local.endTime;
+      if (result.breakMinutes === undefined && local.breakMinutes !== undefined) result.breakMinutes = local.breakMinutes;
+      if (!result.lunchTime && local.lunchTime) result.lunchTime = local.lunchTime;
+    }
+  }
+
+  return result;
+};
 
 // Robustní transformace snake_case -> camelCase
 const toCamel = (obj: any): any => {
@@ -72,6 +166,12 @@ export const updateEmployeeStatus = async (id: string, isActive: boolean) => {
   if (error) throw error;
 };
 
+export const deleteEmployee = async (id: string) => {
+  if (!supabase) return;
+  const { error } = await supabase.from('employees').delete().eq('id', id);
+  if (error) throw error;
+};
+
 export const fetchJobs = async (): Promise<Job[]> => {
   if (!supabase) return [];
   const { data, error } = await supabase.from('jobs').select('*').order('code');
@@ -97,6 +197,12 @@ export const updateJobStatus = async (id: string, isActive: boolean) => {
   if (error) throw error;
 };
 
+export const deleteJob = async (id: string) => {
+  if (!supabase) return;
+  const { error } = await supabase.from('jobs').delete().eq('id', id);
+  if (error) throw error;
+};
+
 export const fetchTimeEntries = async (employeeId?: string, month?: string): Promise<TimeEntry[]> => {
   if (!supabase) return [];
   let query = supabase.from('time_entries').select('*');
@@ -108,22 +214,84 @@ export const fetchTimeEntries = async (employeeId?: string, month?: string): Pro
   if (month) {
     const [year, monthNum] = month.split('-').map(Number);
     const startDate = `${month}-01`;
-    // Získání posledního dne měsíce (0. den následujícího měsíce)
     const lastDay = new Date(year, monthNum, 0).getDate();
     const endDate = `${month}-${String(lastDay).padStart(2, '0')}`;
     query = query.gte('date', startDate).lte('date', endDate);
   }
   
   const { data, error } = await query.order('date', { ascending: false });
-  if (error) throw new Error(`Záznamy: ${error.message}`);
-  return toCamel(data) || [];
+  if (error) throw new Error(`Záznamy docházky: ${error.message}`);
+  
+  const entries: TimeEntry[] = (data || []).map((row: any) => {
+    const camel = toCamel(row);
+    const meta = parseEntryTimeMeta(row);
+    
+    // Clean attachmentUrl if it had META: prefix
+    let cleanAttachmentUrl = camel.attachmentUrl;
+    if (cleanAttachmentUrl && cleanAttachmentUrl.startsWith('META:')) {
+      cleanAttachmentUrl = cleanAttachmentUrl.includes('|') ? cleanAttachmentUrl.split('|')[1] : undefined;
+    }
+
+    return {
+      ...camel,
+      attachmentUrl: cleanAttachmentUrl,
+      startTime: meta.startTime,
+      endTime: meta.endTime,
+      breakMinutes: meta.breakMinutes,
+      lunchTime: meta.lunchTime
+    };
+  });
+
+  return entries;
+};
+
+export const saveTimeEntries = async (entries: TimeEntry[], employeeId?: string, date?: string | null) => {
+  if (!supabase) return;
+  
+  if (date && employeeId) {
+    const { error: delError } = await supabase
+      .from('time_entries')
+      .delete()
+      .eq('employee_id', employeeId)
+      .eq('date', date);
+    if (delError) throw delError;
+  }
+
+  if (entries.length > 0) {
+    saveLocalTimeMeta(entries);
+    
+    const fullPayload = entries.map(e => {
+      const snake = toSnake(e);
+      snake.attachment_url = encodeTimeMetaToAttachment(e);
+      if (e.startTime) snake.start_time = e.startTime;
+      if (e.endTime) snake.end_time = e.endTime;
+      if (e.breakMinutes !== undefined) snake.break_minutes = e.breakMinutes;
+      if (e.lunchTime) snake.lunch_time = e.lunchTime;
+      return snake;
+    });
+
+    const { error: insertError } = await supabase.from('time_entries').insert(fullPayload);
+    
+    if (insertError) {
+      console.warn('Direct column insert failed, falling back to attachment_url encoding:', insertError.message);
+      const fallbackPayload = entries.map(e => {
+        const snake = toSnake(e);
+        delete snake.start_time;
+        delete snake.end_time;
+        delete snake.break_minutes;
+        delete snake.lunch_time;
+        snake.attachment_url = encodeTimeMetaToAttachment(e);
+        return snake;
+      });
+
+      const { error: fallbackError } = await supabase.from('time_entries').insert(fallbackPayload);
+      if (fallbackError) throw fallbackError;
+    }
+  }
 };
 
 export const addTimeEntriesBulk = async (entries: TimeEntry[]) => {
-  if (!supabase) return;
-  const snakeEntries = entries.map(e => toSnake(e));
-  const { error } = await supabase.from('time_entries').insert(snakeEntries);
-  if (error) throw error;
+  return saveTimeEntries(entries);
 };
 
 export const deleteTimeEntriesForDate = async (employeeId: string, date: string) => {
@@ -136,24 +304,35 @@ export const deleteTimeEntry = async (id: string) => {
   if (!supabase) return;
   const { error } = await supabase.from('time_entries').delete().eq('id', id);
   if (error) throw error;
+  removeLocalTimeMeta(id);
 };
 
-export const fetchMonthlyReports = async (month: string): Promise<MonthStatus[]> => {
+export const deleteTimeEntries = async (ids: string[]) => {
+  if (!supabase) return;
+  const { error } = await supabase.from('time_entries').delete().in('id', ids);
+  if (error) throw error;
+  ids.forEach(id => removeLocalTimeMeta(id));
+};
+
+export const fetchMonthStatuses = async (month: string): Promise<MonthStatus[]> => {
   if (!supabase) return [];
   const { data, error } = await supabase.from('month_status').select('*').eq('month', month);
   if (error) return [];
   return toCamel(data) || [];
 };
 
-export const upsertMonthlyReport = async (report: MonthStatus) => {
+export const fetchMonthlyReports = fetchMonthStatuses;
+
+export const saveMonthStatus = async (status: MonthStatus) => {
   if (!supabase) return;
-  // Pro upsert v Supabase musíme mít buď ID nebo unikátní constraint (employee_id, month)
-  const snakeReport = toSnake(report);
-  const { error } = await supabase.from('month_status').upsert(snakeReport, {
+  const snakeReport = toSnake(status);
+  const { error } = await supabase.from('month_status').upsert([snakeReport], {
     onConflict: 'employee_id,month'
   });
   if (error) throw error;
 };
+
+export const upsertMonthlyReport = saveMonthStatus;
 
 export const fetchNotifications = async (userId: string): Promise<Notification[]> => {
   if (!supabase) return [];
@@ -172,15 +351,28 @@ export const markNotificationAsRead = async (id: string) => {
   if (error) throw error;
 };
 
-export const createNotification = async (userId: string, message: string, type: string = 'info', senderId?: string) => {
+export const markNotificationRead = markNotificationAsRead;
+
+export const createNotification = async (
+  userIdOrNotif: string | Partial<Notification>,
+  message?: string,
+  type: string = 'info',
+  senderId?: string
+) => {
   if (!supabase) return;
-  const { error } = await supabase.from('notifications').insert([toSnake({
-    userId,
-    message,
-    type,
-    senderId,
-    isRead: false,
-    createdAt: new Date().toISOString()
-  })]);
+  let payload: any;
+  if (typeof userIdOrNotif === 'object') {
+    payload = toSnake(userIdOrNotif);
+  } else {
+    payload = toSnake({
+      userId: userIdOrNotif,
+      message,
+      type,
+      senderId,
+      isRead: false,
+      createdAt: new Date().toISOString()
+    });
+  }
+  const { error } = await supabase.from('notifications').insert([payload]);
   if (error) throw error;
 };

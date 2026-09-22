@@ -48,6 +48,10 @@ export interface TimeEntry {
   hours: number;
   type: WorkType;
   attachmentUrl?: string;
+  startTime?: string;
+  endTime?: string;
+  breakMinutes?: number;
+  lunchTime?: string;
 }
 
 export interface MonthStatus {
