@@ -10,6 +10,7 @@ interface AdminPanelProps {
   onAddEmployee: (emp: Employee) => void;
   onUpdateEmployee: (emp: Employee) => void;
   onToggleEmployeeStatus: (id: string, isActive: boolean) => void;
+  onDeleteEmployee?: (id: string) => void;
   onAddJob: (job: Job) => void;
   onUpdateJob: (job: Job) => void;
   onToggleJobStatus: (id: string, isActive: boolean) => void;
@@ -22,6 +23,7 @@ const AdminPanel: React.FC<AdminPanelProps> = ({
   onAddEmployee, 
   onUpdateEmployee, 
   onToggleEmployeeStatus, 
+  onDeleteEmployee,
   onAddJob, 
   onUpdateJob,
   onToggleJobStatus,
@@ -294,7 +296,7 @@ const AdminPanel: React.FC<AdminPanelProps> = ({
                   className="h-10 px-2 bg-white border border-slate-300 rounded-xl text-xs font-semibold text-slate-800 outline-none"
                 >
                   <option value="Zaměstnanec">Zaměstnanec</option>
-                  <option value="Manager">Manažer (Lucie)</option>
+                  <option value="Manager">Manažer / Admin</option>
                 </select>
 
                 <input 
@@ -367,11 +369,25 @@ const AdminPanel: React.FC<AdminPanelProps> = ({
                       type="button"
                       onClick={() => onToggleEmployeeStatus(e.id, !e.isActive)}
                       className={`text-xs px-2.5 py-1 rounded-lg font-bold transition-colors ${
-                        e.isActive ? 'bg-rose-50 text-rose-700 hover:bg-rose-100' : 'bg-emerald-50 text-emerald-700 hover:bg-emerald-100'
+                        e.isActive ? 'bg-amber-50 text-amber-700 hover:bg-amber-100' : 'bg-emerald-50 text-emerald-700 hover:bg-emerald-100'
                       }`}
                     >
                       {e.isActive ? 'Archivovat' : 'Aktivovat'}
                     </button>
+                    {onDeleteEmployee && (
+                      <button 
+                        type="button"
+                        onClick={() => {
+                          if (confirm(`Opravdu chcete smazat zaměstnance ${e.name}?`)) {
+                            onDeleteEmployee(e.id);
+                          }
+                        }}
+                        className="text-xs px-2 py-1 rounded-lg font-bold bg-rose-50 text-rose-600 hover:bg-rose-100 transition-colors"
+                        title="Smazat zaměstnance"
+                      >
+                        ✕
+                      </button>
+                    )}
                   </div>
                 </div>
               ))}

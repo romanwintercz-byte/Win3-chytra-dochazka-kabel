@@ -85,7 +85,10 @@ const App: React.FC = () => {
         const savedUserId = localStorage.getItem('kabel_last_user_id');
         if (empData.length > 0) {
           const userExists = empData.find(e => String(e.id) === String(savedUserId));
-          const newId = String(userExists ? savedUserId : empData[0].id);
+          // Pokud je uložen uživatel ze starých demo dat, který už v DB není, preferovat Win3 Support nebo prvního manažera
+          const win3 = empData.find(e => e.name.toLowerCase().includes('win3'));
+          const defaultUser = win3 || empData.find(e => e.role === 'Manager') || empData[0];
+          const newId = String(userExists ? savedUserId : defaultUser.id);
           setCurrentUserId(newId);
         }
       } else {
@@ -260,6 +263,24 @@ const App: React.FC = () => {
       }
     }
     setEmployees(prev => prev.map(e => String(e.id) === String(id) ? { ...e, isActive } : e));
+  };
+
+  const handleDeleteEmployee = async (id: string) => {
+    if (!useDemoData) {
+      try {
+        await db.deleteEmployee(id);
+      } catch (e: any) {
+        alert("Chyba při mazání zaměstnance: " + e.message);
+        return;
+      }
+    }
+    setEmployees(prev => prev.filter(e => String(e.id) !== String(id)));
+    if (String(currentUserId) === String(id)) {
+      const remaining = employees.filter(e => String(e.id) !== String(id));
+      if (remaining.length > 0) {
+        setCurrentUserId(String(remaining[0].id));
+      }
+    }
   };
 
   const handleAddJob = async (job: Job) => {
@@ -562,6 +583,7 @@ const App: React.FC = () => {
               onAddEmployee={handleAddEmployee}
               onUpdateEmployee={handleUpdateEmployee}
               onToggleEmployeeStatus={handleToggleEmployeeStatus}
+              onDeleteEmployee={handleDeleteEmployee}
               onAddJob={handleAddJob}
               onUpdateJob={handleUpdateJob}
               onToggleJobStatus={handleToggleJobStatus}

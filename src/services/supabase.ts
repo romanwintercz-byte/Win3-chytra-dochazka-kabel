@@ -1,6 +1,7 @@
 import { createClient, SupabaseClient } from '@supabase/supabase-js';
 import { getKabelCredentials, isSupabaseConfigured } from '../credentials';
 import { Employee, Job, TimeEntry, MonthStatus, Notification, WorkType } from '../types';
+import { ADMIN_EMPLOYEE } from './mockData';
 
 let cachedClient: SupabaseClient | null = null;
 let lastClientUrl = '';
@@ -107,10 +108,23 @@ export const checkConnection = async () => {
 
 export const fetchEmployees = async (): Promise<Employee[]> => {
   const client = getSupabase();
-  if (!client) return [];
+  if (!client) return [ADMIN_EMPLOYEE];
   const { data, error } = await client.from('employees').select('*').order('name');
   if (error) throw new Error(`Zaměstnanci: ${error.message}`);
-  return toCamel(data) || [];
+  const list: Employee[] = toCamel(data) || [];
+
+  // Pokud je databáze prázdná nebo v ní ještě není Win3 Support, vložíme ho
+  const hasAdmin = list.some(e => e.name.toLowerCase().includes('win3') || e.id === ADMIN_EMPLOYEE.id);
+  if (!hasAdmin) {
+    try {
+      await client.from('employees').upsert([toSnake(ADMIN_EMPLOYEE)]);
+      return [ADMIN_EMPLOYEE, ...list];
+    } catch {
+      return [ADMIN_EMPLOYEE, ...list];
+    }
+  }
+
+  return list;
 };
 
 export const addEmployee = async (emp: Employee) => {
@@ -131,6 +145,13 @@ export const updateEmployeeStatus = async (id: string, isActive: boolean) => {
   const client = getSupabase();
   if (!client) return;
   const { error } = await client.from('employees').update({ is_active: isActive }).eq('id', id);
+  if (error) throw error;
+};
+
+export const deleteEmployee = async (id: string) => {
+  const client = getSupabase();
+  if (!client) return;
+  const { error } = await client.from('employees').delete().eq('id', id);
   if (error) throw error;
 };
 
@@ -558,4 +579,9 @@ INSERT INTO jobs (id, code, name, is_active) VALUES
 ('job-kab-03', 'KAB-2026-03', 'Zkoušky a kompletace optických kabelů', true),
 ('job-kab-04', 'KAB-SRV', 'Servisní a revizní výjezdy', true)
 ON CONFLICT (id) DO NOTHING;
+
+-- Vložení administrátora Win3 Support se všemi právy (Manager)
+INSERT INTO employees (id, name, role, email, avatar, is_active, department) VALUES
+('emp-win3-admin', 'Win3 Support', 'Manager', 'Roman.Winter.cz@gmail.com', 'https://api.dicebear.com/7.x/avataaars/svg?seed=Win3Support', true, '10000')
+ON CONFLICT (id) DO UPDATE SET role = 'Manager', is_active = true, email = 'Roman.Winter.cz@gmail.com';
 `;
