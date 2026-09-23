@@ -1,19 +1,62 @@
 <!doctype html>
-<html lang="en">
+<html lang="cs">
   <head>
     <meta charset="UTF-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover" />
+    <meta name="theme-color" content="#0f172a" />
     <title>Kabel - Chytrá docházka</title>
-    <meta name="description" content="Aplikace pro chytrou docházku - verze Kabel" />
-    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <meta name="description" content="Profesionální systém evidence pracovní doby, zakázek a schvalovacích procesů pro firmu Kabel." />
     <meta property="og:title" content="Kabel - Chytrá docházka" />
-    <meta property="og:description" content="Aplikace pro chytrou docházku - verze Kabel" />
+    <meta property="og:description" content="Profesionální systém evidence pracovní doby, zakázek a schvalovacích procesů pro firmu Kabel." />
     <meta property="og:type" content="website" />
     <meta name="twitter:card" content="summary_large_image" />
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800;900&display=swap" rel="stylesheet">
+    <style>
+      body {
+        font-family: 'Inter', system-ui, -apple-system, sans-serif;
+        background-color: #f8fafc;
+        margin: 0;
+        padding: 0;
+        overscroll-behavior-y: none;
+      }
+      @media print {
+        .no-print { display: none !important; }
+        .print-only { display: block !important; }
+        
+        body, html, #root {
+          display: block !important;
+          height: auto !important;
+          min-height: auto !important;
+          overflow: visible !important;
+          position: static !important;
+          margin: 0 !important;
+          padding: 0 !important;
+          background-color: white !important;
+          color: black !important;
+        }
+
+        * {
+          -webkit-print-color-adjust: exact !important;
+          print-color-adjust: exact !important;
+        }
+
+        .fixed, .sticky {
+          position: static !important;
+        }
+
+        table { page-break-inside: auto; }
+        tr { page-break-inside: avoid; page-break-after: auto; }
+        thead { display: table-header-group; }
+        tfoot { display: table-footer-group; }
+      }
+      .animate-fade-in { animation: fadeIn 0.25s ease-out; }
+      @keyframes fadeIn { from { opacity: 0; transform: scale(0.99); } to { opacity: 1; transform: scale(1); } }
+    </style>
   </head>
   <body>
     <div id="root"></div>
     <script type="module" src="/src/main.tsx"></script>
   </body>
 </html>
-

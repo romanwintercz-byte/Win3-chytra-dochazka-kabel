@@ -1,111 +1,41 @@
-import { createClient } from '@supabase/supabase-js';
-import { CREDENTIALS } from '../credentials';
-import { Employee, Job, TimeEntry, MonthStatus, Notification } from '../types';
+import { createClient, SupabaseClient } from '@supabase/supabase-js';
+import { getKabelCredentials, isSupabaseConfigured } from '../credentials';
+import { Employee, Job, TimeEntry, MonthStatus, Notification, WorkType } from '../types';
 
-const supabaseUrl = CREDENTIALS.SUPABASE_URL;
-const supabaseKey = CREDENTIALS.SUPABASE_KEY;
+let cachedClient: SupabaseClient | null = null;
+let lastClientUrl = '';
+let lastClientKey = '';
 
-export const supabase = (supabaseUrl && supabaseKey) 
-  ? createClient(supabaseUrl, supabaseKey) 
-  : null;
-
-// Local storage helpers for extra metadata (inspectorate fields) fallback
-const LOCAL_TIME_META_KEY = 'kabel_dochazka_time_meta_v1';
-
-export const getLocalTimeMeta = (): Record<string, Partial<TimeEntry>> => {
-  try {
-    const stored = localStorage.getItem(LOCAL_TIME_META_KEY);
-    return stored ? JSON.parse(stored) : {};
-  } catch {
-    return {};
+export const getSupabase = (): SupabaseClient | null => {
+  const { url, key } = getKabelCredentials();
+  if (!url || !key || url.length < 10 || key.length < 20) {
+    cachedClient = null;
+    return null;
   }
-};
 
-export const saveLocalTimeMeta = (entries: TimeEntry[]) => {
+  if (cachedClient && lastClientUrl === url && lastClientKey === key) {
+    return cachedClient;
+  }
+
   try {
-    const current = getLocalTimeMeta();
-    entries.forEach(e => {
-      if (e.id && (e.startTime || e.endTime || e.breakMinutes !== undefined || e.lunchTime)) {
-        current[e.id] = {
-          startTime: e.startTime,
-          endTime: e.endTime,
-          breakMinutes: e.breakMinutes,
-          lunchTime: e.lunchTime
-        };
+    cachedClient = createClient(url, key, {
+      auth: {
+        persistSession: false,
+        autoRefreshToken: false
       }
     });
-    localStorage.setItem(LOCAL_TIME_META_KEY, JSON.stringify(current));
+    lastClientUrl = url;
+    lastClientKey = key;
+    return cachedClient;
   } catch (err) {
-    console.error('Failed to save local time meta', err);
+    console.error('Chyba při inicializaci Supabase pro firmu Kabel:', err);
+    cachedClient = null;
+    return null;
   }
 };
 
-export const removeLocalTimeMeta = (id: string) => {
-  try {
-    const current = getLocalTimeMeta();
-    delete current[id];
-    localStorage.setItem(LOCAL_TIME_META_KEY, JSON.stringify(current));
-  } catch {}
-};
-
-// Encode inspection meta into attachment_url as safe fallback: "META:{"s":"07:00","e":"15:30","b":30,"l":"11:00-11:30"}|real_url"
-export const encodeTimeMetaToAttachment = (entry: TimeEntry): string | undefined => {
-  const meta: any = {};
-  if (entry.startTime) meta.s = entry.startTime;
-  if (entry.endTime) meta.e = entry.endTime;
-  if (entry.breakMinutes !== undefined) meta.b = entry.breakMinutes;
-  if (entry.lunchTime) meta.l = entry.lunchTime;
-
-  const hasMeta = Object.keys(meta).length > 0;
-  const originalUrl = entry.attachmentUrl && !entry.attachmentUrl.startsWith('META:')
-    ? entry.attachmentUrl
-    : (entry.attachmentUrl?.includes('|') ? entry.attachmentUrl.split('|')[1] : '');
-
-  if (!hasMeta) return originalUrl || undefined;
-  return `META:${JSON.stringify(meta)}${originalUrl ? '|' + originalUrl : ''}`;
-};
-
-export const parseEntryTimeMeta = (entry: any): Partial<TimeEntry> => {
-  const result: Partial<TimeEntry> = {};
-  
-  // 1. Direct columns if Supabase schema has them
-  if (entry.start_time || entry.startTime) result.startTime = entry.start_time || entry.startTime;
-  if (entry.end_time || entry.endTime) result.endTime = entry.end_time || entry.endTime;
-  if (entry.break_minutes !== undefined || entry.breakMinutes !== undefined) {
-    result.breakMinutes = Number(entry.break_minutes ?? entry.breakMinutes);
-  }
-  if (entry.lunch_time || entry.lunchTime) result.lunchTime = entry.lunch_time || entry.lunchTime;
-
-  // 2. Fallback to attachment_url encoded meta
-  const rawAttachment = entry.attachment_url || entry.attachmentUrl;
-  if (rawAttachment && typeof rawAttachment === 'string' && rawAttachment.startsWith('META:')) {
-    try {
-      const parts = rawAttachment.split('|');
-      const metaJson = parts[0].replace('META:', '');
-      const parsed = JSON.parse(metaJson);
-      if (!result.startTime && parsed.s) result.startTime = parsed.s;
-      if (!result.endTime && parsed.e) result.endTime = parsed.e;
-      if (result.breakMinutes === undefined && parsed.b !== undefined) result.breakMinutes = Number(parsed.b);
-      if (!result.lunchTime && parsed.l) result.lunchTime = parsed.l;
-    } catch {}
-  }
-
-  // 3. Fallback to local storage
-  if (entry.id) {
-    const local = getLocalTimeMeta()[entry.id];
-    if (local) {
-      if (!result.startTime && local.startTime) result.startTime = local.startTime;
-      if (!result.endTime && local.endTime) result.endTime = local.endTime;
-      if (result.breakMinutes === undefined && local.breakMinutes !== undefined) result.breakMinutes = local.breakMinutes;
-      if (!result.lunchTime && local.lunchTime) result.lunchTime = local.lunchTime;
-    }
-  }
-
-  return result;
-};
-
-// Robustní transformace snake_case -> camelCase
-const toCamel = (obj: any): any => {
+// Pomocná transformace snake_case -> camelCase
+export const toCamel = (obj: any): any => {
   if (obj === null || typeof obj !== 'object' || obj instanceof Date) return obj;
   if (Array.isArray(obj)) return obj.map(toCamel);
   
@@ -117,8 +47,8 @@ const toCamel = (obj: any): any => {
   return n;
 };
 
-// Robustní transformace camelCase -> snake_case
-const toSnake = (obj: any): any => {
+// Pomocná transformace camelCase -> snake_case
+export const toSnake = (obj: any): any => {
   if (obj === null || typeof obj !== 'object' || obj instanceof Date) return obj;
   if (Array.isArray(obj)) return obj.map(toSnake);
   
@@ -131,81 +61,232 @@ const toSnake = (obj: any): any => {
 };
 
 export const checkConnection = async () => {
-  if (!supabase) return { success: false, message: 'Klient nebyl vytvořen (chybí klíče).' };
+  const client = getSupabase();
+  if (!client) {
+    return { 
+      success: false, 
+      message: 'Supabase pro firmu Kabel není nakonfigurováno. Zadejte URL a klíč v Nastavení.' 
+    };
+  }
+
   try {
-    const { error } = await supabase.from('employees').select('id').limit(1);
-    if (error) throw error;
-    return { success: true, message: 'Připojeno k Supabase.' };
+    const { error } = await client.from('employees').select('id').limit(1);
+    if (error) {
+      // Pokud tabulka ještě neexistuje, je to specifická chyba
+      if (error.code === '42P01' || error.message?.includes('relation "employees" does not exist')) {
+        return {
+          success: false,
+          needsMigration: true,
+          message: 'Databáze je dostupná, ale chybí v ní vytvořené tabulky pro firmu Kabel. Spusťte SQL skript v Supabase Editoru.'
+        };
+      }
+      throw error;
+    }
+    return { success: true, message: 'Úspěšně připojeno k Supabase pro firmu Kabel.' };
   } catch (err: any) {
-    return { success: false, message: err.message || 'Nepodařilo se navázat spojení.' };
+    return { 
+      success: false, 
+      message: err.message || 'Nepodařilo se navázat spojení se Supabase.' 
+    };
   }
 };
 
 export const fetchEmployees = async (): Promise<Employee[]> => {
-  if (!supabase) return [];
-  const { data, error } = await supabase.from('employees').select('*').order('name');
+  const client = getSupabase();
+  if (!client) return [];
+  const { data, error } = await client.from('employees').select('*').order('name');
   if (error) throw new Error(`Zaměstnanci: ${error.message}`);
   return toCamel(data) || [];
 };
 
 export const addEmployee = async (emp: Employee) => {
-  if (!supabase) return;
-  const { error } = await supabase.from('employees').insert([toSnake(emp)]);
+  const client = getSupabase();
+  if (!client) return;
+  const { error } = await client.from('employees').insert([toSnake(emp)]);
   if (error) throw error;
 };
 
 export const updateEmployee = async (emp: Employee) => {
-  if (!supabase) return;
-  const { error } = await supabase.from('employees').update(toSnake(emp)).eq('id', emp.id);
+  const client = getSupabase();
+  if (!client) return;
+  const { error } = await client.from('employees').update(toSnake(emp)).eq('id', emp.id);
   if (error) throw error;
 };
 
 export const updateEmployeeStatus = async (id: string, isActive: boolean) => {
-  if (!supabase) return;
-  const { error } = await supabase.from('employees').update({ is_active: isActive }).eq('id', id);
-  if (error) throw error;
-};
-
-export const deleteEmployee = async (id: string) => {
-  if (!supabase) return;
-  const { error } = await supabase.from('employees').delete().eq('id', id);
+  const client = getSupabase();
+  if (!client) return;
+  const { error } = await client.from('employees').update({ is_active: isActive }).eq('id', id);
   if (error) throw error;
 };
 
 export const fetchJobs = async (): Promise<Job[]> => {
-  if (!supabase) return [];
-  const { data, error } = await supabase.from('jobs').select('*').order('code');
+  const client = getSupabase();
+  if (!client) return [];
+  const { data, error } = await client.from('jobs').select('*').order('code');
   if (error) throw new Error(`Zakázky: ${error.message}`);
   return toCamel(data) || [];
 };
 
 export const addJob = async (job: Job) => {
-  if (!supabase) return;
-  const { error } = await supabase.from('jobs').insert([toSnake(job)]);
+  const client = getSupabase();
+  if (!client) return;
+  const { error } = await client.from('jobs').insert([toSnake(job)]);
   if (error) throw error;
 };
 
 export const updateJob = async (job: Job) => {
-  if (!supabase) return;
-  const { error } = await supabase.from('jobs').update(toSnake(job)).eq('id', job.id);
+  const client = getSupabase();
+  if (!client) return;
+  const { error } = await client.from('jobs').update(toSnake(job)).eq('id', job.id);
   if (error) throw error;
 };
 
 export const updateJobStatus = async (id: string, isActive: boolean) => {
-  if (!supabase) return;
-  const { error } = await supabase.from('jobs').update({ is_active: isActive }).eq('id', id);
+  const client = getSupabase();
+  if (!client) return;
+  const { error } = await client.from('jobs').update({ is_active: isActive }).eq('id', id);
   if (error) throw error;
 };
 
-export const deleteJob = async (id: string) => {
-  if (!supabase) return;
-  const { error } = await supabase.from('jobs').delete().eq('id', id);
-  if (error) throw error;
+// Local storage klíč pro uchování časových metadat v případě odpojení
+const KABEL_LOCAL_TIME_META_KEY = 'kabel_dochazka_time_meta_v1';
+
+export const encodeTimeMetaToAttachment = (entry: Partial<TimeEntry>): string | undefined => {
+  const meta: { startTime?: string; endTime?: string; breakMinutes?: number; lunchTime?: string } = {};
+  if (entry.startTime) meta.startTime = entry.startTime;
+  if (entry.endTime) meta.endTime = entry.endTime;
+  if (entry.breakMinutes !== undefined) meta.breakMinutes = entry.breakMinutes;
+  if (entry.lunchTime) meta.lunchTime = entry.lunchTime;
+
+  if (Object.keys(meta).length === 0) return entry.attachmentUrl || undefined;
+  const json = JSON.stringify(meta);
+  if (entry.attachmentUrl && !entry.attachmentUrl.startsWith('META:')) {
+    return `${entry.attachmentUrl}#META:${json}`;
+  }
+  return `META:${json}`;
+};
+
+export const parseEntryTimeMeta = (entry: any): TimeEntry => {
+  let startTime = entry.startTime;
+  let endTime = entry.endTime;
+  let breakMinutes = entry.breakMinutes;
+  let lunchTime = entry.lunchTime;
+  let attachmentUrl = entry.attachmentUrl;
+
+  if (attachmentUrl && typeof attachmentUrl === 'string') {
+    if (attachmentUrl.startsWith('META:')) {
+      try {
+        const meta = JSON.parse(attachmentUrl.substring(5));
+        if (meta.startTime && !startTime) startTime = meta.startTime;
+        if (meta.endTime && !endTime) endTime = meta.endTime;
+        if (meta.breakMinutes !== undefined && breakMinutes === undefined) breakMinutes = meta.breakMinutes;
+        if (meta.lunchTime && !lunchTime) lunchTime = meta.lunchTime;
+        attachmentUrl = undefined;
+      } catch {}
+    } else if (attachmentUrl.includes('#META:')) {
+      const parts = attachmentUrl.split('#META:');
+      attachmentUrl = parts[0] || undefined;
+      try {
+        const meta = JSON.parse(parts[1]);
+        if (meta.startTime && !startTime) startTime = meta.startTime;
+        if (meta.endTime && !endTime) endTime = meta.endTime;
+        if (meta.breakMinutes !== undefined && breakMinutes === undefined) breakMinutes = meta.breakMinutes;
+        if (meta.lunchTime && !lunchTime) lunchTime = meta.lunchTime;
+      } catch {}
+    }
+  }
+
+  // Načtení z localStorage mezipaměti
+  if (!startTime && typeof window !== 'undefined' && window.localStorage) {
+    try {
+      const localStr = localStorage.getItem(KABEL_LOCAL_TIME_META_KEY);
+      if (localStr) {
+        const localMap = JSON.parse(localStr);
+        const dateOnly = entry.date ? entry.date.split('T')[0] : '';
+        const meta = localMap[entry.id] || 
+                     localMap[`${entry.employeeId}_${dateOnly}_${entry.hours}_${entry.type}`] ||
+                     localMap[`${entry.employeeId}_${dateOnly}`];
+        if (meta) {
+          if (meta.startTime && !startTime) startTime = meta.startTime;
+          if (meta.endTime && !endTime) endTime = meta.endTime;
+          if (meta.breakMinutes !== undefined && breakMinutes === undefined) breakMinutes = meta.breakMinutes;
+          if (meta.lunchTime && !lunchTime) lunchTime = meta.lunchTime;
+        }
+      }
+    } catch {}
+  }
+
+  // Výchozí fallback pro standardní 8h směnu
+  if (!startTime && entry.hours === 8 && entry.type === WorkType.REGULAR) {
+    const dateObj = entry.date ? new Date(entry.date.split('T')[0]) : null;
+    const isWk = dateObj ? (dateObj.getDay() === 0 || dateObj.getDay() === 6) : false;
+    if (!isWk) {
+      startTime = '06:30';
+      endTime = '15:00';
+      breakMinutes = 30;
+      lunchTime = '11:00 – 11:30';
+    }
+  }
+
+  return {
+    ...entry,
+    startTime,
+    endTime,
+    breakMinutes,
+    lunchTime,
+    attachmentUrl
+  };
+};
+
+export const saveLocalTimeMeta = (entries: TimeEntry[]) => {
+  if (typeof window === 'undefined' || !window.localStorage) return;
+  try {
+    const raw = localStorage.getItem(KABEL_LOCAL_TIME_META_KEY);
+    const map = raw ? JSON.parse(raw) : {};
+    entries.forEach(e => {
+      if (e.startTime || e.endTime || e.lunchTime || e.breakMinutes !== undefined) {
+        const meta = {
+          startTime: e.startTime,
+          endTime: e.endTime,
+          breakMinutes: e.breakMinutes,
+          lunchTime: e.lunchTime
+        };
+        if (e.id) map[e.id] = meta;
+        const dateOnly = e.date ? e.date.split('T')[0] : '';
+        if (e.employeeId && dateOnly) {
+          map[`${e.employeeId}_${dateOnly}_${e.hours}_${e.type}`] = meta;
+          map[`${e.employeeId}_${dateOnly}`] = meta;
+        }
+      }
+    });
+    localStorage.setItem(KABEL_LOCAL_TIME_META_KEY, JSON.stringify(map));
+  } catch {}
+};
+
+export const removeLocalTimeMeta = (predicate: (key: string) => boolean) => {
+  if (typeof window === 'undefined' || !window.localStorage) return;
+  try {
+    const raw = localStorage.getItem(KABEL_LOCAL_TIME_META_KEY);
+    if (!raw) return;
+    const map = JSON.parse(raw);
+    let changed = false;
+    Object.keys(map).forEach(k => {
+      if (predicate(k)) {
+        delete map[k];
+        changed = true;
+      }
+    });
+    if (changed) {
+      localStorage.setItem(KABEL_LOCAL_TIME_META_KEY, JSON.stringify(map));
+    }
+  } catch {}
 };
 
 export const fetchTimeEntries = async (employeeId?: string, month?: string): Promise<TimeEntry[]> => {
-  if (!supabase) return [];
-  let query = supabase.from('time_entries').select('*');
+  const client = getSupabase();
+  if (!client) return [];
+  let query = client.from('time_entries').select('*');
   
   if (employeeId) {
     query = query.eq('employee_id', employeeId);
@@ -220,123 +301,79 @@ export const fetchTimeEntries = async (employeeId?: string, month?: string): Pro
   }
   
   const { data, error } = await query.order('date', { ascending: false });
-  if (error) throw new Error(`Záznamy docházky: ${error.message}`);
-  
-  const entries: TimeEntry[] = (data || []).map((row: any) => {
-    const camel = toCamel(row);
-    const meta = parseEntryTimeMeta(row);
-    
-    // Clean attachmentUrl if it had META: prefix
-    let cleanAttachmentUrl = camel.attachmentUrl;
-    if (cleanAttachmentUrl && cleanAttachmentUrl.startsWith('META:')) {
-      cleanAttachmentUrl = cleanAttachmentUrl.includes('|') ? cleanAttachmentUrl.split('|')[1] : undefined;
-    }
-
-    return {
-      ...camel,
-      attachmentUrl: cleanAttachmentUrl,
-      startTime: meta.startTime,
-      endTime: meta.endTime,
-      breakMinutes: meta.breakMinutes,
-      lunchTime: meta.lunchTime
-    };
-  });
-
-  return entries;
-};
-
-export const saveTimeEntries = async (entries: TimeEntry[], employeeId?: string, date?: string | null) => {
-  if (!supabase) return;
-  
-  if (date && employeeId) {
-    const { error: delError } = await supabase
-      .from('time_entries')
-      .delete()
-      .eq('employee_id', employeeId)
-      .eq('date', date);
-    if (delError) throw delError;
-  }
-
-  if (entries.length > 0) {
-    saveLocalTimeMeta(entries);
-    
-    const fullPayload = entries.map(e => {
-      const snake = toSnake(e);
-      snake.attachment_url = encodeTimeMetaToAttachment(e);
-      if (e.startTime) snake.start_time = e.startTime;
-      if (e.endTime) snake.end_time = e.endTime;
-      if (e.breakMinutes !== undefined) snake.break_minutes = e.breakMinutes;
-      if (e.lunchTime) snake.lunch_time = e.lunchTime;
-      return snake;
-    });
-
-    const { error: insertError } = await supabase.from('time_entries').insert(fullPayload);
-    
-    if (insertError) {
-      console.warn('Direct column insert failed, falling back to attachment_url encoding:', insertError.message);
-      const fallbackPayload = entries.map(e => {
-        const snake = toSnake(e);
-        delete snake.start_time;
-        delete snake.end_time;
-        delete snake.break_minutes;
-        delete snake.lunch_time;
-        snake.attachment_url = encodeTimeMetaToAttachment(e);
-        return snake;
-      });
-
-      const { error: fallbackError } = await supabase.from('time_entries').insert(fallbackPayload);
-      if (fallbackError) throw fallbackError;
-    }
-  }
+  if (error) throw new Error(`Záznamy: ${error.message}`);
+  const camelData = toCamel(data) || [];
+  return camelData.map(parseEntryTimeMeta);
 };
 
 export const addTimeEntriesBulk = async (entries: TimeEntry[]) => {
-  return saveTimeEntries(entries);
+  saveLocalTimeMeta(entries);
+  const client = getSupabase();
+  if (!client) return;
+
+  const snakeEntries = entries.map(e => {
+    const encodedAttachment = encodeTimeMetaToAttachment(e);
+    return toSnake({
+      ...e,
+      attachmentUrl: encodedAttachment
+    });
+  });
+
+  const { error } = await client.from('time_entries').insert(snakeEntries);
+  if (error) {
+    // Pokud sloupce start_time/end_time ještě v databázi neexistují, zkusit bez nich
+    if (error.message?.includes('start_time') || error.message?.includes('lunch_time') || error.message?.includes('column') || error.code === 'PGRST204' || (error as any).code === '42703') {
+      const fallbackEntries = snakeEntries.map((item: any) => {
+        const { start_time, end_time, break_minutes, lunch_time, ...rest } = item;
+        return rest;
+      });
+      const { error: fallbackErr } = await client.from('time_entries').insert(fallbackEntries);
+      if (fallbackErr) throw fallbackErr;
+      return;
+    }
+    throw error;
+  }
 };
 
 export const deleteTimeEntriesForDate = async (employeeId: string, date: string) => {
-  if (!supabase) return;
-  const { error } = await supabase.from('time_entries').delete().eq('employee_id', employeeId).eq('date', date);
+  const dateOnly = date.split('T')[0];
+  removeLocalTimeMeta(key => key.includes(employeeId) && key.includes(dateOnly));
+  const client = getSupabase();
+  if (!client) return;
+  const { error } = await client.from('time_entries').delete().eq('employee_id', employeeId).eq('date', date);
   if (error) throw error;
 };
 
 export const deleteTimeEntry = async (id: string) => {
-  if (!supabase) return;
-  const { error } = await supabase.from('time_entries').delete().eq('id', id);
+  removeLocalTimeMeta(key => key === id);
+  const client = getSupabase();
+  if (!client) return;
+  const { error } = await client.from('time_entries').delete().eq('id', id);
   if (error) throw error;
-  removeLocalTimeMeta(id);
 };
 
-export const deleteTimeEntries = async (ids: string[]) => {
-  if (!supabase) return;
-  const { error } = await supabase.from('time_entries').delete().in('id', ids);
-  if (error) throw error;
-  ids.forEach(id => removeLocalTimeMeta(id));
-};
-
-export const fetchMonthStatuses = async (month: string): Promise<MonthStatus[]> => {
-  if (!supabase) return [];
-  const { data, error } = await supabase.from('month_status').select('*').eq('month', month);
+export const fetchMonthlyReports = async (month: string): Promise<MonthStatus[]> => {
+  const client = getSupabase();
+  if (!client) return [];
+  const { data, error } = await client.from('month_status').select('*').eq('month', month);
   if (error) return [];
   return toCamel(data) || [];
 };
 
-export const fetchMonthlyReports = fetchMonthStatuses;
-
-export const saveMonthStatus = async (status: MonthStatus) => {
-  if (!supabase) return;
-  const snakeReport = toSnake(status);
-  const { error } = await supabase.from('month_status').upsert([snakeReport], {
+export const upsertMonthlyReport = async (report: MonthStatus) => {
+  const client = getSupabase();
+  if (!client) return;
+  const snakeReport = toSnake(report);
+  const { error } = await client.from('month_status').upsert(snakeReport, {
     onConflict: 'employee_id,month'
   });
   if (error) throw error;
 };
 
-export const upsertMonthlyReport = saveMonthStatus;
-
 export const fetchNotifications = async (userId: string): Promise<Notification[]> => {
-  if (!supabase) return [];
-  const { data, error } = await supabase.from('notifications')
+  const client = getSupabase();
+  if (!client) return [];
+  const { data, error } = await client.from('notifications')
     .select('*')
     .eq('user_id', userId)
     .order('created_at', { ascending: false })
@@ -346,33 +383,158 @@ export const fetchNotifications = async (userId: string): Promise<Notification[]
 };
 
 export const markNotificationAsRead = async (id: string) => {
-  if (!supabase) return;
-  const { error } = await supabase.from('notifications').update({ is_read: true }).eq('id', id);
+  const client = getSupabase();
+  if (!client) return;
+  const { error } = await client.from('notifications').update({ is_read: true }).eq('id', id);
   if (error) throw error;
 };
 
-export const markNotificationRead = markNotificationAsRead;
+export const createNotification = async (userId: string, message: string, type: string = 'info', senderId?: string) => {
+  const client = getSupabase();
+  if (!client) return;
+  const { error } = await client.from('notifications').insert([toSnake({
+    userId,
+    message,
+    type,
+    senderId,
+    isRead: false,
+    createdAt: new Date().toISOString()
+  })]);
+  if (error) throw error;
+};
 
-export const createNotification = async (
-  userIdOrNotif: string | Partial<Notification>,
-  message?: string,
-  type: string = 'info',
-  senderId?: string
-) => {
-  if (!supabase) return;
-  let payload: any;
-  if (typeof userIdOrNotif === 'object') {
-    payload = toSnake(userIdOrNotif);
-  } else {
-    payload = toSnake({
-      userId: userIdOrNotif,
-      message,
-      type,
-      senderId,
-      isRead: false,
-      createdAt: new Date().toISOString()
-    });
+export const getFullBackup = async () => {
+  const client = getSupabase();
+  if (!client) throw new Error('Supabase klient není připojen.');
+  const [emp, job, time, status, notifs] = await Promise.all([
+    client.from('employees').select('*'),
+    client.from('jobs').select('*'),
+    client.from('time_entries').select('*'),
+    client.from('month_status').select('*'),
+    client.from('notifications').select('*')
+  ]);
+  
+  return toCamel({
+    company: 'Kabel',
+    exportedAt: new Date().toISOString(),
+    employees: emp.data || [],
+    jobs: job.data || [],
+    time_entries: time.data || [],
+    month_status: status.data || [],
+    notifications: notifs.data || []
+  });
+};
+
+export const restoreBackup = async (backup: any) => {
+  const client = getSupabase();
+  if (!client) throw new Error('Supabase klient není připojen.');
+  
+  // Smazání stávajících dat
+  await client.from('notifications').delete().neq('id', '00000000-0000-0000-0000-000000000000');
+  await client.from('month_status').delete().neq('month', '0000-00');
+  await client.from('time_entries').delete().neq('id', '00000000-0000-0000-0000-000000000000');
+  await client.from('employees').delete().neq('id', '00000000-0000-0000-0000-000000000000');
+  await client.from('jobs').delete().neq('id', '00000000-0000-0000-0000-000000000000');
+
+  // Vložení ze zálohy
+  if (backup.employees?.length) await client.from('employees').insert(toSnake(backup.employees));
+  if (backup.jobs?.length) await client.from('jobs').insert(toSnake(backup.jobs));
+  if (backup.time_entries?.length) {
+    const timeEntriesSnake = toSnake(backup.time_entries);
+    const { error: timeErr } = await client.from('time_entries').insert(timeEntriesSnake);
+    if (timeErr) {
+      const fallback = timeEntriesSnake.map((item: any) => {
+        const { start_time, end_time, break_minutes, lunch_time, ...rest } = item;
+        return rest;
+      });
+      await client.from('time_entries').insert(fallback);
+    }
   }
-  const { error } = await supabase.from('notifications').insert([payload]);
-  if (error) throw error;
+  if (backup.month_status?.length) await client.from('month_status').insert(toSnake(backup.month_status));
+  if (backup.notifications?.length) await client.from('notifications').insert(toSnake(backup.notifications));
 };
+
+// SQL skript pro inicializaci nového projektu Kabel v Supabase
+export const KABEL_SUPABASE_SETUP_SQL = `-- ============================================================
+-- SQL SKRIPT PRO VYTVOŘENÍ DATABÁZE V SUPABASE PRO FIRMU KABEL
+-- Spusťte tento skript v Supabase SQL Editoru nového projektu Kabel
+-- ============================================================
+
+-- 1. Tabulka zaměstnanců firmy Kabel
+CREATE TABLE IF NOT EXISTS employees (
+    id TEXT PRIMARY KEY,
+    name TEXT NOT NULL,
+    role TEXT NOT NULL DEFAULT 'Zaměstnanec',
+    email TEXT,
+    avatar TEXT,
+    is_active BOOLEAN NOT NULL DEFAULT true,
+    pin_code TEXT,
+    department TEXT
+);
+
+-- 2. Tabulka zakázek / projektů
+CREATE TABLE IF NOT EXISTS jobs (
+    id TEXT PRIMARY KEY,
+    code TEXT NOT NULL,
+    name TEXT NOT NULL,
+    is_active BOOLEAN NOT NULL DEFAULT true
+);
+
+-- 3. Tabulka docházkových záznamů
+CREATE TABLE IF NOT EXISTS time_entries (
+    id TEXT PRIMARY KEY,
+    employee_id TEXT NOT NULL REFERENCES employees(id) ON DELETE CASCADE,
+    date TEXT NOT NULL,
+    project TEXT,
+    description TEXT,
+    hours NUMERIC(5,2) NOT NULL DEFAULT 0,
+    type TEXT NOT NULL DEFAULT 'Běžná práce',
+    attachment_url TEXT,
+    start_time VARCHAR(10),
+    end_time VARCHAR(10),
+    break_minutes INTEGER DEFAULT 30,
+    lunch_time VARCHAR(30)
+);
+
+-- Index pro rychlé vyhledávání podle zaměstnance a měsíce
+CREATE INDEX IF NOT EXISTS idx_time_entries_emp_date ON time_entries(employee_id, date);
+
+-- 4. Tabulka měsíčních statusů schválení
+CREATE TABLE IF NOT EXISTS month_status (
+    employee_id TEXT NOT NULL REFERENCES employees(id) ON DELETE CASCADE,
+    month VARCHAR(7) NOT NULL,
+    status TEXT NOT NULL DEFAULT 'DRAFT',
+    manager_comment TEXT,
+    submitted_at TIMESTAMPTZ,
+    approved_at TIMESTAMPTZ,
+    PRIMARY KEY (employee_id, month)
+);
+
+-- 5. Tabulka notifikací
+CREATE TABLE IF NOT EXISTS notifications (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    user_id TEXT NOT NULL,
+    sender_id TEXT,
+    type TEXT NOT NULL DEFAULT 'info',
+    message TEXT NOT NULL,
+    is_read BOOLEAN NOT NULL DEFAULT false,
+    created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+
+-- Vypnutí RLS pro jednoduchý provoz v interní firemní aplikaci
+ALTER TABLE employees DISABLE ROW LEVEL SECURITY;
+ALTER TABLE jobs DISABLE ROW LEVEL SECURITY;
+ALTER TABLE time_entries DISABLE ROW LEVEL SECURITY;
+ALTER TABLE month_status DISABLE ROW LEVEL SECURITY;
+ALTER TABLE notifications DISABLE ROW LEVEL SECURITY;
+
+-- Volitelné vložení výchozích středisek a zakázek firmy Kabel
+INSERT INTO jobs (id, code, name, is_active) VALUES
+('job-10000', '10000', '10000 - Kancelář & administrativa', true),
+('job-10001', '10001', '10001 - Výroba & montáž kabelů', true),
+('job-kab-01', 'KAB-2026-01', 'Kabelové svazky pro automotive', true),
+('job-kab-02', 'KAB-2026-02', 'Průmyslová kabeláž výrobní haly B', true),
+('job-kab-03', 'KAB-2026-03', 'Zkoušky a kompletace optických kabelů', true),
+('job-kab-04', 'KAB-SRV', 'Servisní a revizní výjezdy', true)
+ON CONFLICT (id) DO NOTHING;
+`;

@@ -1,4 +1,3 @@
-
 import React from 'react';
 import { TimeEntry, WorkType, Employee, Job } from '../types';
 import { v4 as uuidv4 } from 'uuid';
@@ -7,16 +6,20 @@ interface SmartInputProps {
   onEntriesAdded: (entries: TimeEntry[]) => void;
   currentUserId: string;
   onManualEntry: () => void;
-  onCopyLastDay?: () => void;
-  selectedMonth?: string;
   existingEntries?: TimeEntry[];
   targetUser?: Employee;
   jobs: Job[];
 }
 
-const SmartInput: React.FC<SmartInputProps> = ({ onEntriesAdded, currentUserId, onManualEntry, existingEntries, targetUser, jobs }) => {
+const SmartInput: React.FC<SmartInputProps> = ({ 
+  onEntriesAdded, 
+  currentUserId, 
+  onManualEntry, 
+  existingEntries = [], 
+  targetUser, 
+  jobs 
+}) => {
   const quickLog = (type: WorkType) => {
-    // Attempt to use employee's department job ID if configured
     let defaultProject = '';
     if (targetUser?.department) {
       const match = jobs.find(j => j.code === targetUser?.department);
@@ -24,17 +27,25 @@ const SmartInput: React.FC<SmartInputProps> = ({ onEntriesAdded, currentUserId, 
     }
     
     if (!defaultProject) {
-      defaultProject = type === WorkType.REGULAR ? (jobs.find(j => j.name === 'Režie')?.id || '') : '';
+      defaultProject = type === WorkType.REGULAR ? (jobs.find(j => j.isActive)?.id || '') : '';
     }
+
+    const todayStr = new Date().toISOString().split('T')[0];
     
     onEntriesAdded([{
-        id: uuidv4(),
-        employeeId: currentUserId,
-        date: new Date().toISOString().split('T')[0],
-        project: defaultProject,
-        description: type,
-        hours: 8,
-        type
+      id: uuidv4(),
+      employeeId: currentUserId,
+      date: todayStr,
+      project: defaultProject,
+      description: type,
+      hours: 8,
+      type,
+      ...(type === WorkType.REGULAR ? {
+        startTime: '06:30',
+        endTime: '15:00',
+        breakMinutes: 30,
+        lunchTime: '11:00 – 11:30'
+      } : {})
     }]);
   };
 
@@ -46,15 +57,15 @@ const SmartInput: React.FC<SmartInputProps> = ({ onEntriesAdded, currentUserId, 
 
     const today = new Date().toISOString().split('T')[0];
     
-    // Find all unique dates before today
-    const pastDates = Array.from<string>(new Set(
+    // Nalezení posledního dne se záznamy před dneškem
+    const pastDates = Array.from(new Set(
       existingEntries
         .map(e => e.date.split('T')[0])
         .filter(d => d < today)
-    )).sort((a, b) => b.localeCompare(a)); // sort descending
+    )).sort((a, b) => b.localeCompare(a));
 
     if (pastDates.length === 0) {
-      alert('Nenalezeny žádné předchozí záznamy k zkopírování.');
+      alert('Nenalezeny žádné předchozí dny k zkopírování.');
       return;
     }
 
@@ -71,15 +82,58 @@ const SmartInput: React.FC<SmartInputProps> = ({ onEntriesAdded, currentUserId, 
   };
 
   return (
-    <div className="bg-white p-6 rounded-xl border border-gray-200 shadow-sm mb-6">
-      <h3 className="font-bold text-slate-800 mb-4">Rychlé akce</h3>
+    <div className="bg-white p-5 md:p-6 rounded-2xl border border-slate-200 shadow-xs mb-6">
+      <div className="flex items-center justify-between mb-3.5">
+        <h3 className="font-extrabold text-sm text-slate-800 uppercase tracking-wider flex items-center gap-2">
+          <span>⚡</span>
+          <span>Rychlé akce na dnešní den</span>
+        </h3>
+        <span className="text-xs text-slate-400 font-medium">Kliknutím rovnou zapíšete 8h směnu</span>
+      </div>
+
       <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
-        <button onClick={onManualEntry} className="p-4 rounded-xl border-2 border-dashed border-slate-200 hover:border-indigo-500 hover:text-indigo-600 transition font-bold text-sm">Editor</button>
-        <button onClick={copyPreviousDay} className="p-4 rounded-xl border border-indigo-100 bg-indigo-50 hover:bg-indigo-100 text-indigo-700 font-bold text-sm">Zkopírovat předchozí den</button>
-        <button onClick={() => quickLog(WorkType.VACATION)} className="p-4 rounded-xl border border-green-100 bg-green-50 hover:bg-green-100 text-green-700 font-bold text-sm">Dovolená (8h)</button>
-        <button onClick={() => quickLog(WorkType.SICK_DAY)} className="p-4 rounded-xl border border-red-100 bg-red-50 hover:bg-red-100 text-red-700 font-bold text-sm">Nemocenská (8h)</button>
+        <button 
+          type="button"
+          onClick={onManualEntry} 
+          className="p-3.5 rounded-xl border-2 border-dashed border-slate-300 hover:border-indigo-500 hover:text-indigo-600 bg-slate-50/50 hover:bg-indigo-50/40 transition-all font-bold text-xs flex flex-col items-center justify-center gap-1.5 shadow-2xs group"
+        >
+          <span className="text-lg group-hover:scale-110 transition-transform">✏️</span>
+          <span>Otevřít denní editor</span>
+          <span className="text-[10px] text-slate-400 font-normal">Více zakázek / časy</span>
+        </button>
+
+        <button 
+          type="button"
+          onClick={copyPreviousDay} 
+          className="p-3.5 rounded-xl border border-indigo-200 bg-indigo-50/60 hover:bg-indigo-100/80 text-indigo-800 transition-all font-bold text-xs flex flex-col items-center justify-center gap-1.5 shadow-2xs group"
+        >
+          <span className="text-lg group-hover:scale-110 transition-transform">📋</span>
+          <span>Zkopírovat minulý den</span>
+          <span className="text-[10px] text-indigo-500 font-normal">Stejné zakázky i časy</span>
+        </button>
+
+        <button 
+          type="button"
+          onClick={() => quickLog(WorkType.VACATION)} 
+          className="p-3.5 rounded-xl border border-emerald-200 bg-emerald-50/60 hover:bg-emerald-100/80 text-emerald-800 transition-all font-bold text-xs flex flex-col items-center justify-center gap-1.5 shadow-2xs group"
+        >
+          <span className="text-lg group-hover:scale-110 transition-transform">🏖️</span>
+          <span>Dovolená (8h)</span>
+          <span className="text-[10px] text-emerald-600 font-normal">Celodenní nepřítomnost</span>
+        </button>
+
+        <button 
+          type="button"
+          onClick={() => quickLog(WorkType.SICK_DAY)} 
+          className="p-3.5 rounded-xl border border-rose-200 bg-rose-50/60 hover:bg-rose-100/80 text-rose-800 transition-all font-bold text-xs flex flex-col items-center justify-center gap-1.5 shadow-2xs group"
+        >
+          <span className="text-lg group-hover:scale-110 transition-transform">🤒</span>
+          <span>Nemocenská (8h)</span>
+          <span className="text-[10px] text-rose-600 font-normal">Celodenní nepřítomnost</span>
+        </button>
       </div>
     </div>
   );
 };
+
 export default SmartInput;

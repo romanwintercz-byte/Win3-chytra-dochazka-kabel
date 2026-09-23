@@ -1,4 +1,3 @@
-
 export enum WorkType {
   REGULAR = 'Běžná práce',
   OVERTIME = 'Přesčas',
@@ -29,7 +28,7 @@ export interface Employee {
   avatar: string;
   isActive: boolean;
   pinCode?: string;
-  department?: '10000' | '10001';
+  department?: '10000' | '10001' | string;
 }
 
 export interface Job {
@@ -48,6 +47,10 @@ export interface TimeEntry {
   hours: number;
   type: WorkType;
   attachmentUrl?: string;
+  startTime?: string;
+  endTime?: string;
+  breakMinutes?: number;
+  lunchTime?: string;
 }
 
 export interface MonthStatus {
@@ -67,4 +70,11 @@ export interface Notification {
   message: string;
   isRead: boolean;
   createdAt: string;
+}
+
+export interface ValidationIssue {
+  date: string;
+  severity: 'error' | 'warning' | 'info';
+  message: string;
+  type: string;
 }
