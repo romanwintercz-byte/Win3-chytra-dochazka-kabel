@@ -401,18 +401,27 @@ const App: React.FC = () => {
 
         {/* Chybový proužek */}
         {loadError && (
-          <div className="bg-rose-50 text-rose-700 p-4 border-b border-rose-200 flex justify-between items-center text-xs font-semibold print:hidden">
+          <div className="bg-rose-50 text-rose-700 p-4 border-b border-rose-200 flex flex-wrap justify-between items-center text-xs font-semibold print:hidden gap-2">
             <div className="flex items-center gap-2">
               <span>⚠️</span>
               <span>{loadError}</span>
             </div>
-            <button 
-              type="button"
-              onClick={() => loadData()} 
-              className="underline font-bold hover:text-rose-900 ml-4"
-            >
-              Zkusit znovu
-            </button>
+            <div className="flex items-center gap-2 ml-auto">
+              <button 
+                type="button"
+                onClick={() => setIsSupabaseModalOpen(true)} 
+                className="bg-rose-600 hover:bg-rose-700 text-white px-3 py-1.5 rounded-lg font-bold shadow-xs transition-colors"
+              >
+                Upravit nastavení
+              </button>
+              <button 
+                type="button"
+                onClick={() => loadData()} 
+                className="underline font-bold hover:text-rose-900 ml-2"
+              >
+                Zkusit znovu
+              </button>
+            </div>
           </div>
         )}
 

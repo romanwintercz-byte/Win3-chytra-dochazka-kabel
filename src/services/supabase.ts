@@ -62,6 +62,8 @@ export const toSnake = (obj: any): any => {
 
 export const checkConnection = async () => {
   const client = getSupabase();
+  const currentCreds = getKabelCredentials();
+  
   if (!client) {
     return { 
       success: false, 
@@ -80,10 +82,22 @@ export const checkConnection = async () => {
           message: 'Databáze je dostupná, ale chybí v ní vytvořené tabulky pro firmu Kabel. Spusťte SQL skript v Supabase Editoru.'
         };
       }
+      if (error.message?.includes('Invalid path') || (error as any).status === 404) {
+        return {
+          success: false,
+          message: `Neplatná cesta v URL (Invalid path). URL musí končit přímo na .supabase.co (bez /rest/v1 nebo lomítka na konci). Aktuální URL: ${currentCreds.url}`
+        };
+      }
       throw error;
     }
     return { success: true, message: 'Úspěšně připojeno k Supabase pro firmu Kabel.' };
   } catch (err: any) {
+    if (err.message?.includes('Invalid path')) {
+      return {
+        success: false,
+        message: `Neplatná cesta v URL (Invalid path). URL musí končit přímo na .supabase.co (bez /rest/v1 nebo lomítka na konci). Aktuální URL: ${currentCreds.url}`
+      };
+    }
     return { 
       success: false, 
       message: err.message || 'Nepodařilo se navázat spojení se Supabase.' 
@@ -457,11 +471,18 @@ export const restoreBackup = async (backup: any) => {
 // SQL skript pro inicializaci nového projektu Kabel v Supabase
 export const KABEL_SUPABASE_SETUP_SQL = `-- ============================================================
 -- SQL SKRIPT PRO VYTVOŘENÍ DATABÁZE V SUPABASE PRO FIRMU KABEL
--- Spusťte tento skript v Supabase SQL Editoru nového projektu Kabel
+-- Spusťte tento skript v Supabase SQL Editoru projektu Kabel
 -- ============================================================
 
+-- 0. Odstranění starých tabulek s nekompatibilními typy (pokud existují z dřívějška)
+DROP TABLE IF EXISTS notifications CASCADE;
+DROP TABLE IF EXISTS month_status CASCADE;
+DROP TABLE IF EXISTS time_entries CASCADE;
+DROP TABLE IF EXISTS jobs CASCADE;
+DROP TABLE IF EXISTS employees CASCADE;
+
 -- 1. Tabulka zaměstnanců firmy Kabel
-CREATE TABLE IF NOT EXISTS employees (
+CREATE TABLE employees (
     id TEXT PRIMARY KEY,
     name TEXT NOT NULL,
     role TEXT NOT NULL DEFAULT 'Zaměstnanec',
@@ -473,7 +494,7 @@ CREATE TABLE IF NOT EXISTS employees (
 );
 
 -- 2. Tabulka zakázek / projektů
-CREATE TABLE IF NOT EXISTS jobs (
+CREATE TABLE jobs (
     id TEXT PRIMARY KEY,
     code TEXT NOT NULL,
     name TEXT NOT NULL,
@@ -481,7 +502,7 @@ CREATE TABLE IF NOT EXISTS jobs (
 );
 
 -- 3. Tabulka docházkových záznamů
-CREATE TABLE IF NOT EXISTS time_entries (
+CREATE TABLE time_entries (
     id TEXT PRIMARY KEY,
     employee_id TEXT NOT NULL REFERENCES employees(id) ON DELETE CASCADE,
     date TEXT NOT NULL,
@@ -497,10 +518,10 @@ CREATE TABLE IF NOT EXISTS time_entries (
 );
 
 -- Index pro rychlé vyhledávání podle zaměstnance a měsíce
-CREATE INDEX IF NOT EXISTS idx_time_entries_emp_date ON time_entries(employee_id, date);
+CREATE INDEX idx_time_entries_emp_date ON time_entries(employee_id, date);
 
 -- 4. Tabulka měsíčních statusů schválení
-CREATE TABLE IF NOT EXISTS month_status (
+CREATE TABLE month_status (
     employee_id TEXT NOT NULL REFERENCES employees(id) ON DELETE CASCADE,
     month VARCHAR(7) NOT NULL,
     status TEXT NOT NULL DEFAULT 'DRAFT',
@@ -511,7 +532,7 @@ CREATE TABLE IF NOT EXISTS month_status (
 );
 
 -- 5. Tabulka notifikací
-CREATE TABLE IF NOT EXISTS notifications (
+CREATE TABLE notifications (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     user_id TEXT NOT NULL,
     sender_id TEXT,
@@ -528,7 +549,7 @@ ALTER TABLE time_entries DISABLE ROW LEVEL SECURITY;
 ALTER TABLE month_status DISABLE ROW LEVEL SECURITY;
 ALTER TABLE notifications DISABLE ROW LEVEL SECURITY;
 
--- Volitelné vložení výchozích středisek a zakázek firmy Kabel
+-- Vložení výchozích středisek a zakázek firmy Kabel
 INSERT INTO jobs (id, code, name, is_active) VALUES
 ('job-10000', '10000', '10000 - Kancelář & administrativa', true),
 ('job-10001', '10001', '10001 - Výroba & montáž kabelů', true),
