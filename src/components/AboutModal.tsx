@@ -4,10 +4,9 @@ interface AboutModalProps {
   isOpen: boolean;
   onClose: () => void;
   version: string;
-  onOpenSupabaseConfig?: () => void;
 }
 
-const AboutModal: React.FC<AboutModalProps> = ({ isOpen, onClose, version, onOpenSupabaseConfig }) => {
+const AboutModal: React.FC<AboutModalProps> = ({ isOpen, onClose, version }) => {
   if (!isOpen) return null;
   return (
     <div className="fixed inset-0 z-[70] flex items-center justify-center bg-black/60 p-4 backdrop-blur-sm animate-fade-in">
@@ -27,19 +26,6 @@ const AboutModal: React.FC<AboutModalProps> = ({ isOpen, onClose, version, onOpe
         <p className="text-slate-600 mb-6 text-sm leading-relaxed">
           Profesionální firemní systém pro evidenci pracovní doby, kabelových zakázek, přesčasů a mzdových podkladů pro firmu <strong>Kabel</strong>.
         </p>
-
-        {onOpenSupabaseConfig && (
-          <button
-            onClick={() => {
-              onClose();
-              onOpenSupabaseConfig();
-            }}
-            className="w-full py-2.5 mb-3 bg-indigo-50 hover:bg-indigo-100 text-indigo-700 font-bold text-xs rounded-xl border border-indigo-200 transition-colors flex items-center justify-center gap-2"
-          >
-            <span>⚡</span>
-            <span>Konfigurace databáze Supabase</span>
-          </button>
-        )}
 
         <button 
           onClick={onClose} 

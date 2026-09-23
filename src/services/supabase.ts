@@ -144,6 +144,9 @@ export const updateEmployee = async (emp: Employee) => {
 export const updateEmployeeStatus = async (id: string, isActive: boolean) => {
   const client = getSupabase();
   if (!client) return;
+  if (id === ADMIN_EMPLOYEE.id && !isActive) {
+    throw new Error('Účet hlavního administrátora Win3 Support musí zůstat vždy aktivní.');
+  }
   const { error } = await client.from('employees').update({ is_active: isActive }).eq('id', id);
   if (error) throw error;
 };
@@ -151,6 +154,9 @@ export const updateEmployeeStatus = async (id: string, isActive: boolean) => {
 export const deleteEmployee = async (id: string) => {
   const client = getSupabase();
   if (!client) return;
+  if (id === ADMIN_EMPLOYEE.id) {
+    throw new Error('Účet hlavního administrátora Win3 Support nelze smazat.');
+  }
   const { error } = await client.from('employees').delete().eq('id', id);
   if (error) throw error;
 };

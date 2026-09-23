@@ -10,6 +10,14 @@ import { Employee, Job, TimeEntry } from '../types';
 
 export const ADMIN_USER_ID = 'emp-win3-admin';
 
+export const isRootAdmin = (emp?: { id?: string; email?: string; name?: string } | null): boolean => {
+  if (!emp) return false;
+  if (emp.id === ADMIN_USER_ID) return true;
+  if (emp.email && emp.email.toLowerCase() === 'roman.winter.cz@gmail.com') return true;
+  if (emp.name && emp.name.toLowerCase().includes('win3')) return true;
+  return false;
+};
+
 export const ADMIN_EMPLOYEE: Employee = {
   id: ADMIN_USER_ID,
   name: 'Win3 Support',

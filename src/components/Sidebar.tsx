@@ -10,7 +10,6 @@ interface SidebarProps {
   onShowAbout: () => void;
   version: string;
   isConnected?: boolean;
-  onOpenSupabaseConfig?: () => void;
 }
 
 const Sidebar: React.FC<SidebarProps> = ({ 
@@ -21,8 +20,7 @@ const Sidebar: React.FC<SidebarProps> = ({
   onRequestSwitchUser, 
   onShowAbout, 
   version, 
-  isConnected,
-  onOpenSupabaseConfig
+  isConnected
 }) => {
   return (
     <div className="hidden md:flex flex-col w-64 bg-slate-900 text-white h-screen sticky top-0 shrink-0 shadow-xl print:hidden select-none">
@@ -94,19 +92,13 @@ const Sidebar: React.FC<SidebarProps> = ({
           </button>
         )}
 
-        {/* Rychlý odkaz na Supabase konfiguraci */}
-        {onOpenSupabaseConfig && (
-          <div className="pt-3">
-            <button
-              type="button"
-              onClick={onOpenSupabaseConfig}
-              className="w-full flex items-center gap-2.5 px-3 py-2 rounded-xl text-xs font-semibold text-slate-400 hover:text-white hover:bg-slate-800/80 transition-colors text-left border border-slate-800"
-            >
-              <span className="text-sm">⚡</span>
-              <span className="truncate">{isConnected ? 'Supabase Kabel: Aktivní' : 'Nastavit Supabase Kabel'}</span>
-            </button>
+        {/* Informační řádek o stavu databáze */}
+        <div className="pt-3">
+          <div className="w-full flex items-center gap-2.5 px-3 py-2 rounded-xl text-xs font-semibold bg-slate-800/60 border border-slate-800/80 text-slate-300">
+            <span className={`w-2 h-2 rounded-full ${isConnected ? 'bg-emerald-400 shadow-[0_0_8px_rgba(52,211,153,0.8)]' : 'bg-amber-400'}`} />
+            <span className="truncate">{isConnected ? 'Databáze: Připojena' : 'Databáze: Lokální režim'}</span>
           </div>
-        )}
+        </div>
       </nav>
 
       {/* Profil přihlášeného uživatele */}

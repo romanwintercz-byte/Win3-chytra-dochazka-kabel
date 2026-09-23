@@ -1,10 +1,12 @@
 import React, { useState, useRef } from 'react';
 import { Employee, Job } from '../types';
 import { v4 as uuidv4 } from 'uuid';
-import { getFullBackup, restoreBackup, KABEL_SUPABASE_SETUP_SQL, checkConnection } from '../services/supabase';
-import { getKabelCredentials, isSupabaseConfigured } from '../credentials';
+import { getFullBackup, restoreBackup } from '../services/supabase';
+import { isRootAdmin } from '../services/mockData';
+import PinPadModal from './PinPadModal';
 
 interface AdminPanelProps {
+  currentUser: Employee;
   employees: Employee[];
   jobs: Job[];
   onAddEmployee: (emp: Employee) => void;
@@ -14,10 +16,10 @@ interface AdminPanelProps {
   onAddJob: (job: Job) => void;
   onUpdateJob: (job: Job) => void;
   onToggleJobStatus: (id: string, isActive: boolean) => void;
-  onOpenSupabaseConfig: () => void;
 }
 
 const AdminPanel: React.FC<AdminPanelProps> = ({ 
+  currentUser,
   employees, 
   jobs, 
   onAddEmployee, 
@@ -26,39 +28,26 @@ const AdminPanel: React.FC<AdminPanelProps> = ({
   onDeleteEmployee,
   onAddJob, 
   onUpdateJob,
-  onToggleJobStatus,
-  onOpenSupabaseConfig
+  onToggleJobStatus
 }) => {
   const [editingEmpId, setEditingEmpId] = useState<string | null>(null);
   const [newEmpName, setNewEmpName] = useState('');
   const [newEmpEmail, setNewEmpEmail] = useState('');
   const [newEmpRole, setNewEmpRole] = useState<'Manager' | 'Zaměstnanec'>('Zaměstnanec');
   const [newEmpPin, setNewEmpPin] = useState('');
+  const [showPinField, setShowPinField] = useState(false);
   const [newEmpDepartment, setNewEmpDepartment] = useState<'10000' | '10001' | string>('10001');
   
+  // Bezpečnostní ověření PINem pro administrátora Win3 Support
+  const [isVerifyingAdminPin, setIsVerifyingAdminPin] = useState(false);
+  const [pendingAdminEditEmp, setPendingAdminEditEmp] = useState<Employee | null>(null);
+
   const [editingJobId, setEditingJobId] = useState<string | null>(null);
   const [newJobName, setNewJobName] = useState('');
   const [newJobCode, setNewJobCode] = useState('');
 
   const [isBackupLoading, setIsBackupLoading] = useState(false);
-  const [copiedSql, setCopiedSql] = useState(false);
-  const [testResult, setTestResult] = useState<string | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
-
-  const creds = getKabelCredentials();
-  const configured = isSupabaseConfigured();
-
-  const handleCopySql = () => {
-    navigator.clipboard.writeText(KABEL_SUPABASE_SETUP_SQL);
-    setCopiedSql(true);
-    setTimeout(() => setCopiedSql(false), 2500);
-  };
-
-  const handleTestConnection = async () => {
-    setTestResult('Testuji spojení se Supabase...');
-    const res = await checkConnection();
-    setTestResult(res.success ? `✓ ${res.message}` : `✗ ${res.message}`);
-  };
 
   const handleDownloadBackup = async () => {
     setIsBackupLoading(true);
@@ -111,17 +100,34 @@ const AdminPanel: React.FC<AdminPanelProps> = ({
     if (editingEmpId) {
       const existingEmp = employees.find(emp => String(emp.id) === String(editingEmpId));
       if (existingEmp) {
+        // Kontrola oprávnění pro profil Win3 Support
+        if (isRootAdmin(existingEmp) && !isRootAdmin(currentUser)) {
+          alert('Profil hlavního administrátora Win3 Support nemohou běžní manažeři upravovat.');
+          return;
+        }
+
+        const isTargetRootAdmin = isRootAdmin(existingEmp);
+        const finalRole = isTargetRootAdmin ? 'Manager' : newEmpRole;
+        // Ponechat stávající PIN, pokud nebyl zadán nový
+        const finalPin = newEmpPin.trim() ? newEmpPin.trim() : existingEmp.pinCode;
+
         onUpdateEmployee({
           ...existingEmp,
           name: newEmpName.trim(),
           email: newEmpEmail.trim(),
-          role: newEmpRole,
-          pinCode: newEmpPin.trim() || undefined,
+          role: finalRole,
+          pinCode: finalPin,
           department: newEmpDepartment || undefined
         });
       }
       setEditingEmpId(null);
     } else {
+      // Ochrana před zneužitím jména administrátora
+      if (newEmpName.toLowerCase().includes('win3') && !isRootAdmin(currentUser)) {
+        alert('Tento název profilu je vyhrazen pro hlavního administrátora.');
+        return;
+      }
+
       onAddEmployee({
         id: uuidv4(),
         name: newEmpName.trim(),
@@ -140,13 +146,34 @@ const AdminPanel: React.FC<AdminPanelProps> = ({
     setNewEmpDepartment('10001');
   };
 
-  const handleEditEmpClick = (emp: Employee) => {
+  const startEditingEmp = (emp: Employee) => {
     setEditingEmpId(emp.id);
     setNewEmpName(emp.name);
     setNewEmpEmail(emp.email || '');
     setNewEmpRole(emp.role);
-    setNewEmpPin(emp.pinCode || '');
+    // Nikdy nevypisujeme existující PIN v čistém textu
+    setNewEmpPin('');
     setNewEmpDepartment(emp.department || '10001');
+  };
+
+  const handleEditEmpClick = (emp: Employee) => {
+    // 1. Pokud je editovaný profil Win3 Support
+    if (isRootAdmin(emp)) {
+      // Běžní manažeři nemají k Win3 Support přístup
+      if (!isRootAdmin(currentUser)) {
+        alert('Profil hlavního administrátora Win3 Support nemohou ostatní manažeři upravovat.');
+        return;
+      }
+
+      // Pokud má Win3 nastaven PIN, vyžadujeme jeho zadání před vstupem do editace
+      if (emp.pinCode) {
+        setPendingAdminEditEmp(emp);
+        setIsVerifyingAdminPin(true);
+        return;
+      }
+    }
+
+    startEditingEmp(emp);
   };
 
   const handleCancelEditEmp = () => {
@@ -209,55 +236,36 @@ const AdminPanel: React.FC<AdminPanelProps> = ({
           </p>
         </div>
 
-        {/* 1. KABEL SUPABASE KONFIGURACE */}
-        <section className="bg-gradient-to-br from-slate-900 to-indigo-950 text-white p-6 rounded-2xl shadow-md border border-slate-800">
-          <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
-            <div>
-              <div className="flex items-center gap-2">
-                <span className="text-xl">⚡</span>
-                <h3 className="text-lg font-black text-white">Databáze Supabase pro firmu Kabel</h3>
-              </div>
-              <p className="text-xs text-slate-300 mt-1">
-                {configured ? (
-                  <span>Aktivní připojení: <code className="bg-slate-800 text-emerald-400 px-2 py-0.5 rounded font-mono text-[11px]">{creds.url}</code></span>
-                ) : (
-                  <span>Databáze není připojena (aplikace běží v lokálním Demo režimu s ukázkovými daty). Původní vazby na K+P byly odstraněny.</span>
-                )}
-              </p>
-              {testResult && (
-                <p className={`text-xs mt-2 font-bold ${testResult.startsWith('✓') ? 'text-emerald-400' : 'text-rose-400'}`}>
-                  {testResult}
-                </p>
-              )}
-            </div>
-
-            <div className="flex flex-wrap gap-2.5">
-              <button
-                type="button"
-                onClick={handleCopySql}
-                className="h-10 px-4 bg-slate-800 hover:bg-slate-700 text-slate-200 border border-slate-700 rounded-xl text-xs font-bold transition-colors flex items-center gap-1.5"
-              >
-                {copiedSql ? '✓ Zkopírováno!' : '📋 Zkopírovat SQL pro Supabase'}
-              </button>
-              {configured && (
-                <button
-                  type="button"
-                  onClick={handleTestConnection}
-                  className="h-10 px-4 bg-slate-800 hover:bg-slate-700 text-slate-200 border border-slate-700 rounded-xl text-xs font-bold transition-colors"
-                >
-                  Otestovat
-                </button>
-              )}
-              <button
-                type="button"
-                onClick={onOpenSupabaseConfig}
-                className="h-10 px-5 bg-indigo-600 hover:bg-indigo-500 text-white rounded-xl text-xs font-black uppercase tracking-wider transition-all shadow-md"
-              >
-                {configured ? 'Změnit konfiguraci' : 'Připojit novou Supabase'}
-              </button>
-            </div>
+        {/* Informace o připojení k databázi - pouze stavový řádek bez zobrazení klíčů */}
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between p-4 bg-emerald-50/80 border border-emerald-200 rounded-2xl text-emerald-950 text-xs font-semibold shadow-2xs gap-3">
+          <div className="flex items-center gap-2.5">
+            <span className="w-2.5 h-2.5 rounded-full bg-emerald-500 shadow-[0_0_8px_rgba(16,185,129,0.8)]" />
+            <span>Databáze Kabel: <strong className="font-bold">Připojena a synchronizována</strong></span>
           </div>
-        </section>
+          <div className="flex items-center gap-2">
+            <button
+              type="button"
+              onClick={handleDownloadBackup}
+              disabled={isBackupLoading}
+              className="h-8 px-3 bg-white hover:bg-emerald-100 text-emerald-800 border border-emerald-300 rounded-lg text-xs font-bold transition-colors shadow-2xs flex items-center gap-1.5 cursor-pointer"
+              title="Zálohovat docházku a data firmy Kabel do JSON"
+            >
+              <span>📥</span>
+              <span>{isBackupLoading ? 'Stahuji...' : 'Zálohovat data'}</span>
+            </button>
+            <label className="h-8 px-3 bg-white hover:bg-emerald-100 text-emerald-800 border border-emerald-300 rounded-lg text-xs font-bold transition-colors shadow-2xs flex items-center gap-1.5 cursor-pointer">
+              <span>📤</span>
+              <span>Obnovit</span>
+              <input 
+                type="file" 
+                accept=".json" 
+                onChange={handleRestoreBackup} 
+                className="hidden" 
+                ref={fileInputRef} 
+              />
+            </label>
+          </div>
+        </div>
 
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
           {/* Zaměstnanci */}
@@ -293,21 +301,39 @@ const AdminPanel: React.FC<AdminPanelProps> = ({
                 <select 
                   value={newEmpRole} 
                   onChange={e => setNewEmpRole(e.target.value as any)}
-                  className="h-10 px-2 bg-white border border-slate-300 rounded-xl text-xs font-semibold text-slate-800 outline-none"
+                  disabled={!!(editingEmpId && isRootAdmin(employees.find(e => e.id === editingEmpId)))}
+                  className="h-10 px-2 bg-white border border-slate-300 rounded-xl text-xs font-semibold text-slate-800 outline-none disabled:bg-slate-100 disabled:text-slate-500"
                 >
                   <option value="Zaměstnanec">Zaměstnanec</option>
                   <option value="Manager">Manažer / Admin</option>
                 </select>
 
-                <input 
-                  type="text" 
-                  placeholder="PIN kód (4 číslice)" 
-                  value={newEmpPin} 
-                  maxLength={4}
-                  onChange={e => setNewEmpPin(e.target.value.replace(/\D/g, ''))}
-                  className="h-10 px-3 bg-white border border-slate-300 rounded-xl text-xs font-mono text-slate-900 outline-none text-center"
-                />
+                <div className="relative">
+                  <input 
+                    type={showPinField ? "text" : "password"} 
+                    placeholder={editingEmpId && employees.find(e => e.id === editingEmpId)?.pinCode ? "•••• (PIN nastaven)" : "PIN (4 čísla)"} 
+                    value={newEmpPin} 
+                    maxLength={4}
+                    onChange={e => setNewEmpPin(e.target.value.replace(/\D/g, ''))}
+                    className="w-full h-10 pl-3 pr-8 bg-white border border-slate-300 rounded-xl text-xs font-mono text-slate-900 outline-none text-center"
+                  />
+                  <button
+                    type="button"
+                    onClick={() => setShowPinField(prev => !prev)}
+                    className="absolute right-2 top-2.5 text-slate-400 hover:text-slate-600 text-xs"
+                    title={showPinField ? "Skrýt PIN" : "Zobrazit PIN"}
+                  >
+                    {showPinField ? "🙈" : "👁️"}
+                  </button>
+                </div>
               </div>
+
+              {editingEmpId && isRootAdmin(employees.find(e => e.id === editingEmpId)) && (
+                <div className="bg-indigo-50 border border-indigo-200 rounded-xl p-2.5 text-[11px] text-indigo-900 flex items-center gap-2">
+                  <span>🛡️</span>
+                  <span>Upravujete profil <strong>Win3 Support</strong>. Pole PIN vyplňte pouze, pokud jej chcete změnit.</span>
+                </div>
+              )}
 
               <div>
                 <label className="text-[10px] font-bold text-slate-500 uppercase block mb-1">Výchozí středisko:</label>
@@ -342,55 +368,83 @@ const AdminPanel: React.FC<AdminPanelProps> = ({
             </form>
 
             <div className="bg-white rounded-2xl border border-slate-200 divide-y divide-slate-100 max-h-96 overflow-y-auto">
-              {employees.map(e => (
-                <div key={e.id} className={`p-3 flex justify-between items-center ${!e.isActive ? 'opacity-50 bg-slate-50' : ''}`}>
-                  <div className="flex items-center gap-3">
-                    <img src={e.avatar} alt="" className="w-9 h-9 rounded-full bg-slate-100 object-cover" />
-                    <div>
-                      <div className="font-bold text-xs text-slate-900 flex items-center gap-1.5">
-                        <span>{e.name}</span>
-                        {e.pinCode && <span title="Chráněno PINem">🔒</span>}
-                      </div>
-                      <div className="text-[11px] text-slate-500">
-                        {e.role} • {e.department === '10000' ? 'Kancelář' : e.department === '10001' ? 'Výroba' : e.department || 'Bez střediska'}
+              {employees.map(e => {
+                const isThisAdmin = isRootAdmin(e);
+                const isViewerAdmin = isRootAdmin(currentUser);
+
+                return (
+                  <div key={e.id} className={`p-3.5 flex justify-between items-center gap-3 ${!e.isActive ? 'opacity-50 bg-slate-50' : ''} ${isThisAdmin ? 'bg-indigo-50/30' : ''}`}>
+                    <div className="flex items-center gap-3 min-w-0">
+                      <img src={e.avatar} alt="" className="w-10 h-10 rounded-full bg-slate-100 object-cover shrink-0 border border-slate-200" />
+                      <div className="min-w-0">
+                        <div className="font-bold text-xs text-slate-900 flex items-center gap-1.5 flex-wrap">
+                          <span className="truncate">{e.name}</span>
+                          {isThisAdmin && (
+                            <span className="text-[10px] bg-indigo-600 text-white font-black px-2 py-0.5 rounded-md flex items-center gap-1 shadow-2xs">
+                              <span>👑</span>
+                              <span>Hlavní správce</span>
+                            </span>
+                          )}
+                          {e.pinCode && <span title="Chráněno PIN kódem" className="text-xs">🔒</span>}
+                        </div>
+                        <div className="text-[11px] text-slate-500 mt-0.5">
+                          <span className="font-medium text-slate-700">{e.role}</span> • {e.department === '10000' ? 'Kancelář' : e.department === '10001' ? 'Výroba' : e.department || 'Bez střediska'}
+                          {e.email && <span className="hidden sm:inline text-slate-400 font-normal"> • {e.email}</span>}
+                        </div>
                       </div>
                     </div>
+                    
+                    <div className="flex items-center gap-1.5 shrink-0">
+                      {isThisAdmin && !isViewerAdmin ? (
+                        <span 
+                          className="text-[11px] px-3 py-1.5 rounded-xl font-bold bg-slate-100 text-slate-500 border border-slate-200 flex items-center gap-1.5 select-none"
+                          title="Profil hlavního administrátora nemohou ostatní manažeři upravovat"
+                        >
+                          <span>🔒</span>
+                          <span>Chráněný účet</span>
+                        </span>
+                      ) : (
+                        <>
+                          <button 
+                            type="button"
+                            onClick={() => handleEditEmpClick(e)}
+                            className="text-xs px-2.5 py-1.5 rounded-lg font-bold bg-slate-100 hover:bg-slate-200 text-slate-700 transition-colors cursor-pointer"
+                          >
+                            Upravit
+                          </button>
+                          {!isThisAdmin && (
+                            <>
+                              <button 
+                                type="button"
+                                onClick={() => onToggleEmployeeStatus(e.id, !e.isActive)}
+                                className={`text-xs px-2.5 py-1.5 rounded-lg font-bold transition-colors cursor-pointer ${
+                                  e.isActive ? 'bg-amber-50 text-amber-700 hover:bg-amber-100' : 'bg-emerald-50 text-emerald-700 hover:bg-emerald-100'
+                                }`}
+                              >
+                                {e.isActive ? 'Archivovat' : 'Aktivovat'}
+                              </button>
+                              {onDeleteEmployee && (
+                                <button 
+                                  type="button"
+                                  onClick={() => {
+                                    if (confirm(`Opravdu chcete smazat zaměstnance ${e.name}?`)) {
+                                      onDeleteEmployee(e.id);
+                                    }
+                                  }}
+                                  className="text-xs px-2.5 py-1.5 rounded-lg font-bold bg-rose-50 text-rose-600 hover:bg-rose-100 transition-colors cursor-pointer"
+                                  title="Smazat zaměstnance"
+                                >
+                                  ✕
+                                </button>
+                              )}
+                            </>
+                          )}
+                        </>
+                      )}
+                    </div>
                   </div>
-                  
-                  <div className="flex items-center gap-1.5">
-                    <button 
-                      type="button"
-                      onClick={() => handleEditEmpClick(e)}
-                      className="text-xs px-2.5 py-1 rounded-lg font-bold bg-slate-100 hover:bg-slate-200 text-slate-700 transition-colors"
-                    >
-                      Upravit
-                    </button>
-                    <button 
-                      type="button"
-                      onClick={() => onToggleEmployeeStatus(e.id, !e.isActive)}
-                      className={`text-xs px-2.5 py-1 rounded-lg font-bold transition-colors ${
-                        e.isActive ? 'bg-amber-50 text-amber-700 hover:bg-amber-100' : 'bg-emerald-50 text-emerald-700 hover:bg-emerald-100'
-                      }`}
-                    >
-                      {e.isActive ? 'Archivovat' : 'Aktivovat'}
-                    </button>
-                    {onDeleteEmployee && (
-                      <button 
-                        type="button"
-                        onClick={() => {
-                          if (confirm(`Opravdu chcete smazat zaměstnance ${e.name}?`)) {
-                            onDeleteEmployee(e.id);
-                          }
-                        }}
-                        className="text-xs px-2 py-1 rounded-lg font-bold bg-rose-50 text-rose-600 hover:bg-rose-100 transition-colors"
-                        title="Smazat zaměstnance"
-                      >
-                        ✕
-                      </button>
-                    )}
-                  </div>
-                </div>
-              ))}
+                );
+              })}
             </div>
           </section>
 
@@ -527,6 +581,26 @@ const AdminPanel: React.FC<AdminPanelProps> = ({
           </section>
         </div>
       </div>
+
+      {/* PIN ověření pro administrátora Win3 Support před úpravou profilu či změnou PIN */}
+      <PinPadModal
+        isOpen={isVerifyingAdminPin}
+        onClose={() => {
+          setIsVerifyingAdminPin(false);
+          setPendingAdminEditEmp(null);
+        }}
+        onSuccess={() => {
+          setIsVerifyingAdminPin(false);
+          if (pendingAdminEditEmp) {
+            startEditingEmp(pendingAdminEditEmp);
+            setPendingAdminEditEmp(null);
+          }
+        }}
+        targetPin={pendingAdminEditEmp?.pinCode || ''}
+        targetUserName={pendingAdminEditEmp?.name || ''}
+        title="Ověření administrátora"
+        subtitle="Pro úpravu profilu Win3 Support zadejte stávající PIN kód"
+      />
     </div>
   );
 };

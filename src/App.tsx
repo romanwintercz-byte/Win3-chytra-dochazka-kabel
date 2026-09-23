@@ -15,11 +15,10 @@ import AboutModal from './components/AboutModal';
 import NotificationBell from './components/NotificationBell';
 import PinPadModal from './components/PinPadModal'; 
 import MonthNavigator from './components/MonthNavigator';
-import SupabaseConfigModal from './components/SupabaseConfigModal';
 import { TimeEntry, MonthStatus, TimesheetStatus, Employee, Job, Notification } from './types';
 import { validateMonth } from './services/validationService';
-import { isSupabaseConfigured, getConfigurationStatus } from './credentials';
-import { MOCK_EMPLOYEES, MOCK_JOBS, MOCK_ENTRIES } from './services/mockData';
+import { isSupabaseConfigured } from './credentials';
+import { MOCK_EMPLOYEES, MOCK_JOBS, MOCK_ENTRIES, isRootAdmin } from './services/mockData';
 import * as db from './services/supabase';
 
 const getCurrentMonth = () => new Date().toISOString().slice(0, 7);
@@ -43,7 +42,6 @@ const App: React.FC = () => {
   const [isEntryModalOpen, setIsEntryModalOpen] = useState(false);
   const [isAboutOpen, setIsAboutOpen] = useState(false);
   const [isPinModalOpen, setIsPinModalOpen] = useState(false);
-  const [isSupabaseModalOpen, setIsSupabaseModalOpen] = useState(false);
   const [pendingUserId, setPendingUserId] = useState<string | null>(null);
   const [reviewingUserId, setReviewingUserId] = useState<string | null>(null);
   const [isConnected, setIsConnected] = useState(false);
@@ -242,6 +240,10 @@ const App: React.FC = () => {
   };
 
   const handleUpdateEmployee = async (emp: Employee) => {
+    if (isRootAdmin(emp) && !isRootAdmin(currentUser)) {
+      alert("Profil hlavního administrátora Win3 Support nemohou ostatní manažeři upravovat.");
+      return;
+    }
     if (!useDemoData) {
       try { 
         await db.updateEmployee(emp); 
@@ -254,6 +256,11 @@ const App: React.FC = () => {
   };
 
   const handleToggleEmployeeStatus = async (id: string, isActive: boolean) => {
+    const target = employees.find(e => String(e.id) === String(id));
+    if (isRootAdmin(target) && !isActive) {
+      alert("Profil hlavního administrátora Win3 Support musí zůstat vždy aktivní.");
+      return;
+    }
     if (!useDemoData) {
       try { 
         await db.updateEmployeeStatus(id, isActive); 
@@ -266,6 +273,11 @@ const App: React.FC = () => {
   };
 
   const handleDeleteEmployee = async (id: string) => {
+    const target = employees.find(e => String(e.id) === String(id));
+    if (isRootAdmin(target)) {
+      alert("Profil hlavního administrátora Win3 Support nelze smazat.");
+      return;
+    }
     if (!useDemoData) {
       try {
         await db.deleteEmployee(id);
@@ -342,7 +354,6 @@ const App: React.FC = () => {
         onShowAbout={() => setIsAboutOpen(true)}
         version={APP_VERSION}
         isConnected={isConnected}
-        onOpenSupabaseConfig={() => setIsSupabaseModalOpen(true)}
       />
 
       <main className={`flex-1 overflow-y-auto print:overflow-visible print:block print:h-auto pb-16 md:pb-0 print:pb-0 print:p-0 print:m-0 ${activeTab !== 'report' ? 'print:hidden' : ''}`}>
@@ -361,7 +372,7 @@ const App: React.FC = () => {
               <div className="flex items-center gap-1.5">
                 <span className="text-[10px] text-slate-400 font-medium">v{APP_VERSION}</span>
                 <div className={`w-1.5 h-1.5 rounded-full ${isConnected ? 'bg-emerald-400' : 'bg-amber-400'}`} />
-                <span className="text-[9px] text-slate-400">{isConnected ? 'Online' : 'Demo'}</span>
+                <span className="text-[9px] text-slate-400">{isConnected ? 'Online' : 'Lokální'}</span>
               </div>
             </div>
           </div>
@@ -393,20 +404,11 @@ const App: React.FC = () => {
           </div>
         </div>
 
-        {/* Informační proužek o Demo režimu pro firmu Kabel */}
+        {/* Informační proužek o lokálním režimu (pouze při odpojení) */}
         {!isConnected && (
-          <div className="bg-amber-500/10 border-b border-amber-500/20 px-4 py-2 text-xs text-amber-900 flex flex-wrap items-center justify-between gap-2 print:hidden">
-            <div className="flex items-center gap-2">
-              <span className="text-sm">ℹ️</span>
-              <span><strong>Aplikace Kabel běží v lokálním / ukázkovém režimu.</strong> Původní projekt K+P byl odpojen.</span>
-            </div>
-            <button
-              type="button"
-              onClick={() => setIsSupabaseModalOpen(true)}
-              className="px-3 py-1 bg-amber-500 hover:bg-amber-600 text-white font-bold rounded-lg text-xs transition-colors shadow-2xs"
-            >
-              Připojit novou Supabase pro Kabel
-            </button>
+          <div className="bg-amber-500/10 border-b border-amber-500/20 px-4 py-2 text-xs text-amber-900 flex items-center gap-2 print:hidden">
+            <span className="text-sm">ℹ️</span>
+            <span><strong>Aplikace Kabel běží v lokálním režimu.</strong> Cloudová databáze není připojena.</span>
           </div>
         )}
 
@@ -430,15 +432,8 @@ const App: React.FC = () => {
             <div className="flex items-center gap-2 ml-auto">
               <button 
                 type="button"
-                onClick={() => setIsSupabaseModalOpen(true)} 
-                className="bg-rose-600 hover:bg-rose-700 text-white px-3 py-1.5 rounded-lg font-bold shadow-xs transition-colors"
-              >
-                Upravit nastavení
-              </button>
-              <button 
-                type="button"
                 onClick={() => loadData()} 
-                className="underline font-bold hover:text-rose-900 ml-2"
+                className="bg-rose-600 hover:bg-rose-700 text-white px-3 py-1.5 rounded-lg font-bold shadow-xs transition-colors"
               >
                 Zkusit znovu
               </button>
@@ -578,6 +573,7 @@ const App: React.FC = () => {
         {activeTab === 'settings' && isManagerMode && (
           <div className="p-4 md:p-8">
             <AdminPanel 
+              currentUser={currentUser}
               employees={employees.length > 0 ? employees : MOCK_EMPLOYEES} 
               jobs={jobs.length > 0 ? jobs : MOCK_JOBS} 
               onAddEmployee={handleAddEmployee}
@@ -587,7 +583,6 @@ const App: React.FC = () => {
               onAddJob={handleAddJob}
               onUpdateJob={handleUpdateJob}
               onToggleJobStatus={handleToggleJobStatus}
-              onOpenSupabaseConfig={() => setIsSupabaseModalOpen(true)}
             />
           </div>
         )}
@@ -620,15 +615,6 @@ const App: React.FC = () => {
         targetPin={(employees.find(e => String(e.id) === String(pendingUserId)) || MOCK_EMPLOYEES.find(e => String(e.id) === String(pendingUserId)))?.pinCode || ""} 
         targetUserName={(employees.find(e => String(e.id) === String(pendingUserId)) || MOCK_EMPLOYEES.find(e => String(e.id) === String(pendingUserId)))?.name || ""} 
       />
-      
-      {/* Konfigurační dialog pro novou Supabase Kabel */}
-      <SupabaseConfigModal 
-        isOpen={isSupabaseModalOpen}
-        onClose={() => setIsSupabaseModalOpen(false)}
-        onConfigSaved={() => {
-          loadData();
-        }}
-      />
 
       {/* Systém nápovědy a O aplikaci */}
       <HelpSystem />
@@ -636,7 +622,6 @@ const App: React.FC = () => {
         isOpen={isAboutOpen} 
         onClose={() => setIsAboutOpen(false)} 
         version={APP_VERSION} 
-        onOpenSupabaseConfig={() => setIsSupabaseModalOpen(true)}
       />
       
       {/* Spodní navigace pro mobily */}

@@ -6,9 +6,19 @@ interface PinPadModalProps {
   onSuccess: () => void;
   targetPin: string;
   targetUserName: string;
+  title?: string;
+  subtitle?: string;
 }
 
-const PinPadModal: React.FC<PinPadModalProps> = ({ isOpen, onClose, onSuccess, targetPin, targetUserName }) => {
+const PinPadModal: React.FC<PinPadModalProps> = ({ 
+  isOpen, 
+  onClose, 
+  onSuccess, 
+  targetPin, 
+  targetUserName,
+  title,
+  subtitle
+}) => {
   const [pin, setPin] = useState('');
   const [error, setError] = useState(false);
 
@@ -47,8 +57,12 @@ const PinPadModal: React.FC<PinPadModalProps> = ({ isOpen, onClose, onSuccess, t
         <div className="w-14 h-14 bg-indigo-50 text-indigo-600 rounded-2xl flex items-center justify-center mx-auto mb-3 text-2xl shadow-xs">
           🔒
         </div>
-        <h3 className="text-xl font-bold text-slate-900 mb-1">Zadejte PIN kód</h3>
-        <p className="text-xs text-slate-500 mb-6">Přístup k profilu: <strong className="text-slate-800">{targetUserName}</strong></p>
+        <h3 className="text-xl font-bold text-slate-900 mb-1">{title || 'Zadejte PIN kód'}</h3>
+        <p className="text-xs text-slate-500 mb-6">
+          {subtitle || (
+            <>Přístup k profilu: <strong className="text-slate-800">{targetUserName}</strong></>
+          )}
+        </p>
         
         {/* PIN tečky */}
         <div className="flex justify-center gap-3 mb-6 h-6 items-center">
