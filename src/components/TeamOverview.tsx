@@ -1,5 +1,6 @@
-import React from 'react';
+import React, { useState, useMemo } from 'react';
 import { Employee, TimeEntry, MonthStatus, TimesheetStatus, formatDepartment, WorkType } from '../types';
+import { getStoredRoles } from '../services/roleService';
 
 interface TeamOverviewProps {
   employees: Employee[];
@@ -7,6 +8,7 @@ interface TeamOverviewProps {
   selectedMonth: string;
   onInspect: (id: string) => void;
   currentUserRole: string;
+  currentUser?: Employee;
   statuses: MonthStatus[];
 }
 
@@ -15,8 +17,13 @@ const TeamOverview: React.FC<TeamOverviewProps> = ({
   allEntries, 
   selectedMonth, 
   onInspect, 
+  currentUser,
   statuses 
 }) => {
+  const roles = useMemo(() => getStoredRoles(), []);
+  const [filterMode, setFilterMode] = useState<'all' | 'my_team'>('all');
+  const [selectedSupervisorFilter, setSelectedSupervisorFilter] = useState<string>('all');
+
   const getStatusBadge = (empId: string) => {
     const status = statuses.find(s => String(s.employeeId) === String(empId) && s.month === selectedMonth);
     switch (status?.status) {
@@ -59,21 +66,94 @@ const TeamOverview: React.FC<TeamOverviewProps> = ({
       .reduce((sum, e) => sum + (e.hours || 0), 0);
   };
 
-  const activeEmployees = employees.filter(e => e.isActive && e.role !== 'Manager');
+  // Všichni vedoucí k filtrování
+  const supervisorsList = useMemo(() => {
+    return employees.filter(e => e.isActive && employees.some(sub => sub.supervisorId === e.id));
+  }, [employees]);
+
+  // Podřízení přihlášeného uživatele (pokud je vedoucí/mistr)
+  const mySubordinates = useMemo(() => {
+    if (!currentUser) return [];
+    return employees.filter(e => e.isActive && e.supervisorId === currentUser.id);
+  }, [employees, currentUser]);
+
+  const activeEmployees = useMemo(() => {
+    return employees
+      .filter(e => e.isActive && e.role !== 'Manager')
+      .filter(e => {
+        if (filterMode === 'my_team' && currentUser) {
+          return e.supervisorId === currentUser.id;
+        }
+        if (selectedSupervisorFilter !== 'all') {
+          if (selectedSupervisorFilter === 'unassigned') {
+            return !e.supervisorId;
+          }
+          return e.supervisorId === selectedSupervisorFilter;
+        }
+        return true;
+      });
+  }, [employees, filterMode, currentUser, selectedSupervisorFilter]);
 
   return (
     <div className="bg-white rounded-2xl border border-slate-200 shadow-xs overflow-hidden mb-8">
-      <div className="p-4 sm:px-6 bg-slate-50 border-b border-slate-200 flex justify-between items-center">
+      <div className="p-4 sm:px-6 bg-slate-50 border-b border-slate-200 flex flex-col sm:flex-row justify-between sm:items-center gap-3">
         <div className="flex items-center gap-2">
           <span className="text-lg">👥</span>
           <div>
             <h3 className="font-extrabold text-sm text-slate-900">Týmový přehled zaměstnanců firmy Kabel</h3>
-            <p className="text-[11px] text-slate-500">Měsíční kontrola a schvalování docházky mzdovou účetní</p>
+            <p className="text-[11px] text-slate-500">Měsíční kontrola a schvalování docházky vedoucími a mistry</p>
           </div>
         </div>
-        <span className="text-xs text-slate-500 font-black bg-white px-3 py-1 rounded-lg border border-slate-200 shadow-2xs">
-          {selectedMonth}
-        </span>
+
+        <div className="flex flex-wrap items-center gap-2">
+          {/* Přepínač Můj tým vs Všichni (pokud má přihlášený uživatel podřízené) */}
+          {mySubordinates.length > 0 && (
+            <div className="flex items-center bg-white p-0.5 rounded-xl border border-slate-200 shadow-2xs text-xs font-bold">
+              <button
+                type="button"
+                onClick={() => {
+                  setFilterMode('my_team');
+                  setSelectedSupervisorFilter('all');
+                }}
+                className={`px-2.5 py-1 rounded-lg transition-all cursor-pointer ${
+                  filterMode === 'my_team' ? 'bg-indigo-600 text-white' : 'text-slate-600 hover:text-slate-900'
+                }`}
+              >
+                Můj tým ({mySubordinates.length})
+              </button>
+              <button
+                type="button"
+                onClick={() => setFilterMode('all')}
+                className={`px-2.5 py-1 rounded-lg transition-all cursor-pointer ${
+                  filterMode === 'all' ? 'bg-indigo-600 text-white' : 'text-slate-600 hover:text-slate-900'
+                }`}
+              >
+                Celá firma
+              </button>
+            </div>
+          )}
+
+          {/* Filtr podle vedoucího */}
+          {filterMode === 'all' && supervisorsList.length > 0 && (
+            <select
+              value={selectedSupervisorFilter}
+              onChange={e => setSelectedSupervisorFilter(e.target.value)}
+              className="text-xs bg-white border border-slate-200 rounded-xl px-2.5 py-1 font-semibold text-slate-700 outline-none cursor-pointer shadow-2xs"
+            >
+              <option value="all">Všichni vedoucí</option>
+              <option value="unassigned">⚠️ Bez vedoucího</option>
+              {supervisorsList.map(s => (
+                <option key={s.id} value={s.id}>
+                  Tým: {s.name}
+                </option>
+              ))}
+            </select>
+          )}
+
+          <span className="text-xs text-slate-500 font-black bg-white px-3 py-1 rounded-lg border border-slate-200 shadow-2xs">
+            {selectedMonth}
+          </span>
+        </div>
       </div>
 
       <div className="overflow-x-auto">
@@ -115,7 +195,18 @@ const TeamOverview: React.FC<TeamOverviewProps> = ({
                           )}
                         </div>
                         <div>
-                          <div className="font-bold text-slate-900 text-sm">{e.name}</div>
+                          <div className="font-bold text-slate-900 text-sm flex items-center gap-1.5 flex-wrap">
+                            <span>{e.name}</span>
+                            {(() => {
+                              const roleObj = roles.find(r => r.id === e.customRoleId);
+                              if (!roleObj) return null;
+                              return (
+                                <span className={`text-[9px] font-bold px-1.5 py-0.2 rounded border ${roleObj.badgeColor || 'bg-slate-100 text-slate-700 border-slate-300'}`}>
+                                  {roleObj.name}
+                                </span>
+                              );
+                            })()}
+                          </div>
                           <div className="text-[11px] text-slate-400">{e.email || 'Bez e-mailu'}</div>
                         </div>
                       </div>

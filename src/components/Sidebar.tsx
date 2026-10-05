@@ -1,5 +1,6 @@
-import React from 'react';
+import React, { useMemo } from 'react';
 import { Employee, formatDepartment } from '../types';
+import { getStoredRoles } from '../services/roleService';
 
 interface SidebarProps {
   activeTab: string;
@@ -22,6 +23,11 @@ const Sidebar: React.FC<SidebarProps> = ({
   version, 
   isConnected
 }) => {
+  const roleName = useMemo(() => {
+    const roles = getStoredRoles();
+    const matched = roles.find(r => r.id === currentUser.customRoleId);
+    return matched?.name || currentUser.role;
+  }, [currentUser.customRoleId, currentUser.role]);
   return (
     <div className="hidden md:flex flex-col w-64 bg-slate-900 text-white h-screen sticky top-0 shrink-0 shadow-xl print:hidden select-none">
       {/* Hlavička s logem Kabel */}
@@ -112,7 +118,7 @@ const Sidebar: React.FC<SidebarProps> = ({
           <div className="flex-1 min-w-0">
             <div className="text-xs font-bold text-slate-100 truncate">{currentUser.name}</div>
             <div className="text-[10px] text-slate-400 truncate flex items-center gap-1">
-              <span>{currentUser.role}</span>
+              <span>{roleName}</span>
               {currentUser.department && <span>• {formatDepartment(currentUser.department)}</span>}
             </div>
           </div>
