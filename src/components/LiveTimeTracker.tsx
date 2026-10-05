@@ -497,16 +497,19 @@ const LiveTimeTracker: React.FC<LiveTimeTrackerProps> = ({
     return Math.max(0, diff);
   }, [activeSession, now]);
 
-  const liveCalculatedHours = useMemo(() => {
-    if (!activeSession) return 0;
+  const { liveHours, liveBreak } = useMemo(() => {
+    if (!activeSession) return { liveHours: 0, liveBreak: 0 };
     const currentTimeStr = formatHHMM();
-    return calculateSessionHours(
-        activeSession.startTimeStr,
-        currentTimeStr,
-        activeSession.activityType,
-        activeSession.hasLunchDeduction ?? deductLunch ? null : 0
-      ).hours;
+    const result = calculateSessionHours(
+      activeSession.startTimeStr,
+      currentTimeStr,
+      activeSession.activityType,
+      activeSession.hasLunchDeduction ?? deductLunch ? null : 0
+    );
+    return { liveHours: result.hours, liveBreak: result.appliedBreak };
   }, [activeSession, now, deductLunch]);
+  
+  const liveCalculatedHours = liveHours;
 
   // Vybraná zakázka pro detail
   const currentSelectedJob = useMemo(() => {
@@ -834,6 +837,7 @@ const LiveTimeTracker: React.FC<LiveTimeTrackerProps> = ({
                   <span className="text-xs text-slate-300">Doba úseku:</span>
                   <span className="text-sm font-black text-amber-300 font-mono">
                     {liveCalculatedHours.toFixed(1)} h
+                    {liveBreak > 0 && <span className="ml-2 text-[10px] bg-slate-800/50 text-amber-200 px-1.5 py-0.5 rounded border border-amber-500/30">-{liveBreak} min (oběd)</span>}
                   </span>
                 </div>
               </div>
