@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useMemo, useRef } from 'react';
+﻿import React, { useState, useEffect, useMemo, useRef } from 'react';
 import { TimeEntry, WorkType, Employee, Job } from '../types';
 import { v4 as uuidv4 } from 'uuid';
 
@@ -23,7 +23,7 @@ interface ActiveSession {
   dateStr: string;
   note?: string;
   hasLunchDeduction?: boolean;
-  previousEntryId?: string; // ID předchozího záznamu pro plynulou synchronizaci časů
+  previousEntryId?: string; // ID pĹ™edchozĂ­ho zĂˇznamu pro plynulou synchronizaci ÄŤasĹŻ
 }
 
 const getStorageKey = (userId: string) => `kabel_live_tracker_${userId}`;
@@ -44,7 +44,7 @@ const formatSecondsToHMS = (totalSeconds: number): string => {
   return `${String(hours).padStart(2, '0')}:${String(minutes).padStart(2, '0')}:${String(seconds).padStart(2, '0')}`;
 };
 
-// V�po�et �ist�ch hodin s automatick�m ode�tem 30 min ob�da po 4,5 hodin� pr�ce
+// Výpočet čistých hodin s automatickým odečtem 30 min oběda po 4,5 hodině práce
 export const calculateSessionHours = (
   start: string,
   end: string,
@@ -100,7 +100,7 @@ const LiveTimeTracker: React.FC<LiveTimeTrackerProps> = ({
   const [toastMessage, setToastMessage] = useState<string | null>(null);
   const toastTimeoutRef = useRef<NodeJS.Timeout | null>(null);
 
-  // Editace již uloženého záznamu v seznamu
+  // Editace jiĹľ uloĹľenĂ©ho zĂˇznamu v seznamu
   const [editingEntry, setEditingEntry] = useState<TimeEntry | null>(null);
   const [editStartTime, setEditStartTime] = useState<string>('');
   const [editEndTime, setEditEndTime] = useState<string>('');
@@ -109,7 +109,7 @@ const LiveTimeTracker: React.FC<LiveTimeTrackerProps> = ({
   const [editDesc, setEditDesc] = useState<string>('');
   const [editSyncAdjacent, setEditSyncAdjacent] = useState<boolean>(true);
 
-  // Načíst aktivní relaci z localStorage pro konkrétního uživatele
+  // NaÄŤĂ­st aktivnĂ­ relaci z localStorage pro konkrĂ©tnĂ­ho uĹľivatele
   useEffect(() => {
     if (!currentUserId) return;
     try {
@@ -128,7 +128,7 @@ const LiveTimeTracker: React.FC<LiveTimeTrackerProps> = ({
     }
   }, [currentUserId]);
 
-  // Výchozí zakázka podle střediska nebo první aktivní
+  // VĂ˝chozĂ­ zakĂˇzka podle stĹ™ediska nebo prvnĂ­ aktivnĂ­
   useEffect(() => {
     if (selectedJobId || !jobs || jobs.length === 0) return;
     let defaultJob = '';
@@ -142,7 +142,7 @@ const LiveTimeTracker: React.FC<LiveTimeTrackerProps> = ({
     setSelectedJobId(defaultJob);
   }, [targetUser, jobs, selectedJobId]);
 
-  // Běžící sekundy
+  // BÄ›ĹľĂ­cĂ­ sekundy
   useEffect(() => {
     const timer = setInterval(() => {
       setNow(Date.now());
@@ -158,7 +158,7 @@ const LiveTimeTracker: React.FC<LiveTimeTrackerProps> = ({
     }, 5500);
   };
 
-  // Uložení relace do localStorage
+  // UloĹľenĂ­ relace do localStorage
   const saveSession = (session: ActiveSession | null) => {
     setActiveSession(session);
     if (!currentUserId) return;
@@ -169,7 +169,7 @@ const LiveTimeTracker: React.FC<LiveTimeTrackerProps> = ({
     }
   };
 
-  // 1. ZAHÁJENÍ AKTIVITY (Jízda, Práce, Lékař)
+  // 1. ZAHĂJENĂŤ AKTIVITY (JĂ­zda, PrĂˇce, LĂ©kaĹ™)
   const handleStartActivity = (type: WorkType, customJobId?: string) => {
     const jobToUse = customJobId || selectedJobId || jobs[0]?.id || '';
     const nowTimeStr = formatHHMM();
@@ -192,17 +192,17 @@ const LiveTimeTracker: React.FC<LiveTimeTrackerProps> = ({
       try { navigator.vibrate(40); } catch {}
     }
 
-    const jobName = jobs.find(j => j.id === jobToUse)?.name || 'Zakázka';
+    const jobName = jobs.find(j => j.id === jobToUse)?.name || 'ZakĂˇzka';
     if (type === WorkType.DRIVE) {
-      showToast(`🚗 Jízda zahájena v ${nowTimeStr} (${jobName})`);
+      showToast(`đźš— JĂ­zda zahĂˇjena v ${nowTimeStr} (${jobName})`);
     } else if (type === WorkType.REGULAR) {
-      showToast(`🔨 Práce zahájena v ${nowTimeStr} (${jobName})`);
+      showToast(`đź”¨ PrĂˇce zahĂˇjena v ${nowTimeStr} (${jobName})`);
     } else {
-      showToast(`⏱️ Záznam zahájen: ${type} v ${nowTimeStr}`);
+      showToast(`âŹ±ď¸Ź ZĂˇznam zahĂˇjen: ${type} v ${nowTimeStr}`);
     }
   };
 
-  // 2. DOKONČENÍ AKTIVNÍ RELACE A PŘEPNUTÍ NA DALŠÍ KROK S UCHOVÁNÍM VAZBY
+  // 2. DOKONÄŚENĂŤ AKTIVNĂŤ RELACE A PĹEPNUTĂŤ NA DALĹ ĂŤ KROK S UCHOVĂNĂŤM VAZBY
   const handleFinishCurrentSession = async (
     nextActivityType: WorkType | null,
     nextJobId?: string
@@ -213,7 +213,7 @@ const LiveTimeTracker: React.FC<LiveTimeTrackerProps> = ({
     const startTimeStr = activeSession.startTimeStr;
     const finalJobId = activeSession.jobId || selectedJobId || jobs[0]?.id || '';
     const jobObj = jobs.find(j => j.id === finalJobId);
-    const jobLabel = jobObj ? `${jobObj.code} ${jobObj.name}` : 'Zakázka';
+    const jobLabel = jobObj ? `${jobObj.code} ${jobObj.name}` : 'ZakĂˇzka';
 
     const { hours, appliedBreak } = calculateSessionHours(
       startTimeStr,
@@ -222,13 +222,13 @@ const LiveTimeTracker: React.FC<LiveTimeTrackerProps> = ({
       activeSession.hasLunchDeduction ?? deductLunch ? (deductLunch ? null : 0) : 0 // TODO fix
     );
 
-    // Vytvoření unikátního TimeEntry záznamu
+    // VytvoĹ™enĂ­ unikĂˇtnĂ­ho TimeEntry zĂˇznamu
     const newEntryId = uuidv4();
     let defaultDesc = '';
     if (activeSession.activityType === WorkType.DRIVE) {
-      defaultDesc = `Jízda: ${jobLabel}`;
+      defaultDesc = `JĂ­zda: ${jobLabel}`;
     } else if (activeSession.activityType === WorkType.REGULAR) {
-      defaultDesc = `Práce: ${jobLabel}`;
+      defaultDesc = `PrĂˇce: ${jobLabel}`;
     } else {
       defaultDesc = activeSession.activityType;
     }
@@ -247,14 +247,14 @@ const LiveTimeTracker: React.FC<LiveTimeTrackerProps> = ({
         lunchTime: appliedBreak > 0 ? `Automaticky ${appliedBreak} min` : undefined
     };
 
-    // Uložit nově dokončený záznam do systému
+    // UloĹľit novÄ› dokonÄŤenĂ˝ zĂˇznam do systĂ©mu
     await onAddEntry(entryToSave);
 
     if (navigator.vibrate) {
       try { navigator.vibrate([40, 60, 40]); } catch {}
     }
 
-    // Pokud následuje další krok (např. Jízda -> Práce, nebo Práce -> Jízda)
+    // Pokud nĂˇsleduje dalĹˇĂ­ krok (napĹ™. JĂ­zda -> PrĂˇce, nebo PrĂˇce -> JĂ­zda)
     if (nextActivityType) {
       const targetJob = nextJobId || finalJobId;
       const nextSession: ActiveSession = {
@@ -262,57 +262,57 @@ const LiveTimeTracker: React.FC<LiveTimeTrackerProps> = ({
         jobId: targetJob,
         activityType: nextActivityType,
         startTimestamp: Date.now(),
-        startTimeStr: endTimeStr, // Nová aktivita plynule navazuje přesně na konec předchozí!
+        startTimeStr: endTimeStr, // NovĂˇ aktivita plynule navazuje pĹ™esnÄ› na konec pĹ™edchozĂ­!
         dateStr: getTodayDateStr(),
         note: '',
         hasLunchDeduction: deductLunch,
-        previousEntryId: newEntryId // PŘÍMÁ VAZBA NA PRÁVĚ ULOŽENÝ ZÁZNAM!
+        previousEntryId: newEntryId // PĹĂŤMĂ VAZBA NA PRĂVÄš ULOĹ˝ENĂť ZĂZNAM!
       };
       saveSession(nextSession);
       setSelectedJobId(targetJob);
       setSessionNote('');
 
       if (activeSession.activityType === WorkType.DRIVE && nextActivityType === WorkType.REGULAR) {
-        showToast(`✅ Jízda uložena (${startTimeStr} – ${endTimeStr}, ${hours} h) → 🔨 Práce na místě zahájena v ${endTimeStr}`);
+        showToast(`âś… JĂ­zda uloĹľena (${startTimeStr} â€“ ${endTimeStr}, ${hours} h) â†’ đź”¨ PrĂˇce na mĂ­stÄ› zahĂˇjena v ${endTimeStr}`);
       } else if (activeSession.activityType === WorkType.REGULAR && nextActivityType === WorkType.DRIVE) {
-        showToast(`✅ Práce uložena (${startTimeStr} – ${endTimeStr}, ${hours} h) → 🚗 Jízda zahájena v ${endTimeStr}`);
+        showToast(`âś… PrĂˇce uloĹľena (${startTimeStr} â€“ ${endTimeStr}, ${hours} h) â†’ đźš— JĂ­zda zahĂˇjena v ${endTimeStr}`);
       } else {
-        showToast(`✅ Záznam uložen (${startTimeStr} – ${endTimeStr}, ${hours} h) → Zahájeno: ${nextActivityType} v ${endTimeStr}`);
+        showToast(`âś… ZĂˇznam uloĹľen (${startTimeStr} â€“ ${endTimeStr}, ${hours} h) â†’ ZahĂˇjeno: ${nextActivityType} v ${endTimeStr}`);
       }
     } else {
-      // Úplný konec směny / jízdy
+      // ĂšplnĂ˝ konec smÄ›ny / jĂ­zdy
       saveSession(null);
       setSessionNote('');
-      showToast(`🏁 Záznam úspěšně ukončen a uložen: ${hours} h (${startTimeStr} – ${endTimeStr})`);
+      showToast(`đźŹ ZĂˇznam ĂşspÄ›ĹˇnÄ› ukonÄŤen a uloĹľen: ${hours} h (${startTimeStr} â€“ ${endTimeStr})`);
     }
   };
 
-  // Zrušení bez uložení
+  // ZruĹˇenĂ­ bez uloĹľenĂ­
   const handleCancelSession = () => {
-    if (window.confirm('Opravdu chcete zrušit běžící záznam bez uložení?')) {
+    if (window.confirm('Opravdu chcete zruĹˇit bÄ›ĹľĂ­cĂ­ zĂˇznam bez uloĹľenĂ­?')) {
       saveSession(null);
       setSessionNote('');
       setIsEditingStartTime(false);
-      showToast('⚠️ Běžící záznam byl zrušen bez uložení.');
+      showToast('âš ď¸Ź BÄ›ĹľĂ­cĂ­ zĂˇznam byl zruĹˇen bez uloĹľenĂ­.');
     }
   };
 
-  // 3. ÚPRAVA ČASU ZAČÁTKU S AUTOMATICKOU SYNCHRONIZACÍ PŘEDCHOZÍHO ZÁZNAMU!
+  // 3. ĂšPRAVA ÄŚASU ZAÄŚĂTKU S AUTOMATICKOU SYNCHRONIZACĂŤ PĹEDCHOZĂŤHO ZĂZNAMU!
   const handleApplyCustomStartTime = async (newTime: string) => {
     if (!activeSession) return;
     if (!newTime || !newTime.includes(':')) {
-      alert('Zadejte platný čas ve formátu HH:MM (např. 06:30)');
+      alert('Zadejte platnĂ˝ ÄŤas ve formĂˇtu HH:MM (napĹ™. 06:30)');
       return;
     }
     const [h, m] = newTime.split(':').map(Number);
     if (isNaN(h) || isNaN(m) || h < 0 || h > 23 || m < 0 || m > 59) {
-      alert('Neplatný čas');
+      alert('NeplatnĂ˝ ÄŤas');
       return;
     }
     const formatted = `${String(h).padStart(2, '0')}:${String(m).padStart(2, '0')}`;
     const oldStartTime = activeSession.startTimeStr;
 
-    // Vypočíst nový startTimestamp pro běžící stopky
+    // VypoÄŤĂ­st novĂ˝ startTimestamp pro bÄ›ĹľĂ­cĂ­ stopky
     const startDate = new Date();
     startDate.setHours(h, m, 0, 0);
 
@@ -324,34 +324,34 @@ const LiveTimeTracker: React.FC<LiveTimeTrackerProps> = ({
     saveSession(updated);
     setIsEditingStartTime(false);
 
-    // KONTROLA A AUTOMATICKÁ AKTUALIZACE KONCE PŘEDCHOZÍHO ZÁZNAMU
+    // KONTROLA A AUTOMATICKĂ AKTUALIZACE KONCE PĹEDCHOZĂŤHO ZĂZNAMU
     const todayStr = getTodayDateStr();
     const sortedToday = todayEntries
       .filter(e => e.date.split('T')[0] === todayStr)
       .sort((a, b) => (a.startTime || '').localeCompare(b.startTime || ''));
 
-    // 1. Zkusíme najít předchozí záznam podle vazby previousEntryId
+    // 1. ZkusĂ­me najĂ­t pĹ™edchozĂ­ zĂˇznam podle vazby previousEntryId
     let prevEntry = activeSession.previousEntryId 
       ? todayEntries.find(e => e.id === activeSession.previousEntryId)
       : undefined;
 
-    // 2. Pokud ID chybí (např. po obnovení ze staré relace), vyhledáme záznam s endTime === oldStartTime
+    // 2. Pokud ID chybĂ­ (napĹ™. po obnovenĂ­ ze starĂ© relace), vyhledĂˇme zĂˇznam s endTime === oldStartTime
     if (!prevEntry && sortedToday.length > 0) {
       prevEntry = sortedToday.find(e => e.endTime === oldStartTime);
       if (!prevEntry) {
-        // Fallback: poslední záznam dne
+        // Fallback: poslednĂ­ zĂˇznam dne
         prevEntry = sortedToday[sortedToday.length - 1];
       }
     }
 
     if (prevEntry && onUpdateEntry) {
-      // Kontrola logiky: nový čas konce by neměl být před začátkem předchozího záznamu
+      // Kontrola logiky: novĂ˝ ÄŤas konce by nemÄ›l bĂ˝t pĹ™ed zaÄŤĂˇtkem pĹ™edchozĂ­ho zĂˇznamu
       if (prevEntry.startTime) {
         const [psh, psm] = prevEntry.startTime.split(':').map(Number);
         const prevStartMinutes = psh * 60 + psm;
         const newMinutes = h * 60 + m;
         if (newMinutes < prevStartMinutes) {
-          alert(`Upozornění: Čas ${formatted} je dřívější než začátek předchozího záznamu (${prevEntry.startTime}).`);
+          alert(`UpozornÄ›nĂ­: ÄŚas ${formatted} je dĹ™Ă­vÄ›jĹˇĂ­ neĹľ zaÄŤĂˇtek pĹ™edchozĂ­ho zĂˇznamu (${prevEntry.startTime}).`);
         }
       }
 
@@ -370,9 +370,9 @@ const LiveTimeTracker: React.FC<LiveTimeTrackerProps> = ({
 
       await onUpdateEntry(updatedPrevEntry);
 
-      showToast(`⏱️ Čas začátku ${activeSession.activityType === WorkType.DRIVE ? 'jízdy' : 'práce'} upraven na ${formatted} • Konec předchozí ${prevEntry.type === WorkType.DRIVE ? 'jízdy' : 'práce'} automaticky upraven na ${formatted} (${prevNewHours.toFixed(1)} h)`);
+      showToast(`âŹ±ď¸Ź ÄŚas zaÄŤĂˇtku ${activeSession.activityType === WorkType.DRIVE ? 'jĂ­zdy' : 'prĂˇce'} upraven na ${formatted} â€˘ Konec pĹ™edchozĂ­ ${prevEntry.type === WorkType.DRIVE ? 'jĂ­zdy' : 'prĂˇce'} automaticky upraven na ${formatted} (${prevNewHours.toFixed(1)} h)`);
     } else {
-      showToast(`⏱️ Čas zahájení upraven na ${formatted}`);
+      showToast(`âŹ±ď¸Ź ÄŚas zahĂˇjenĂ­ upraven na ${formatted}`);
     }
   };
 
@@ -388,7 +388,7 @@ const LiveTimeTracker: React.FC<LiveTimeTrackerProps> = ({
     handleApplyCustomStartTime(formatted);
   };
 
-  // 4. RYCHLÁ EDITACE JEDNOTLIVÝCH ZÁZNAMŮ V DNEŠNÍM PŘEHLEDU S PROPOJENÍM
+  // 4. RYCHLĂ EDITACE JEDNOTLIVĂťCH ZĂZNAMĹ® V DNEĹ NĂŤM PĹEHLEDU S PROPOJENĂŤM
   const handleOpenEditEntry = (entry: TimeEntry) => {
     setEditingEntry(entry);
     setEditStartTime(entry.startTime || '06:30');
@@ -403,7 +403,7 @@ const LiveTimeTracker: React.FC<LiveTimeTrackerProps> = ({
     if (!editingEntry || !onUpdateEntry) return;
 
     if (!editStartTime || !editEndTime) {
-      alert('Vyplňte čas začátku i konce.');
+      alert('VyplĹte ÄŤas zaÄŤĂˇtku i konce.');
       return;
     }
 
@@ -429,16 +429,16 @@ const LiveTimeTracker: React.FC<LiveTimeTrackerProps> = ({
 
     await onUpdateEntry(updatedCurrent);
 
-    // Pokud je zapnuta synchronizace navazujících časů
+    // Pokud je zapnuta synchronizace navazujĂ­cĂ­ch ÄŤasĹŻ
     if (editSyncAdjacent) {
       const todayStr = getTodayDateStr();
       const sortedToday = todayEntries
         .filter(e => e.date.split('T')[0] === todayStr && e.id !== editingEntry.id)
         .sort((a, b) => (a.startTime || '').localeCompare(b.startTime || ''));
 
-      // A) Změna endTime -> ovlivní navazující záznam nebo aktivní relaci
+      // A) ZmÄ›na endTime -> ovlivnĂ­ navazujĂ­cĂ­ zĂˇznam nebo aktivnĂ­ relaci
       if (editEndTime !== oldEnd) {
-        // Hledáme záznam, který začínal v čase oldEnd
+        // HledĂˇme zĂˇznam, kterĂ˝ zaÄŤĂ­nal v ÄŤase oldEnd
         const nextEntry = sortedToday.find(e => e.startTime === oldEnd);
         if (nextEntry && nextEntry.endTime) {
           const { hours: nextNewHours } = calculateSessionHours(
@@ -454,7 +454,7 @@ const LiveTimeTracker: React.FC<LiveTimeTrackerProps> = ({
           });
         }
 
-        // Pokud v čase oldEnd začínala právě běžící relace:
+        // Pokud v ÄŤase oldEnd zaÄŤĂ­nala prĂˇvÄ› bÄ›ĹľĂ­cĂ­ relace:
         if (activeSession && (activeSession.startTimeStr === oldEnd || activeSession.previousEntryId === editingEntry.id)) {
           const [nh, nm] = editEndTime.split(':').map(Number);
           const startDate = new Date();
@@ -467,7 +467,7 @@ const LiveTimeTracker: React.FC<LiveTimeTrackerProps> = ({
         }
       }
 
-      // B) Změna startTime -> ovlivní předchozí záznam
+      // B) ZmÄ›na startTime -> ovlivnĂ­ pĹ™edchozĂ­ zĂˇznam
       if (editStartTime !== oldStart) {
         const prevEntry = sortedToday.find(e => e.endTime === oldStart);
         if (prevEntry && prevEntry.startTime) {
@@ -487,10 +487,10 @@ const LiveTimeTracker: React.FC<LiveTimeTrackerProps> = ({
     }
 
     setEditingEntry(null);
-    showToast(`✅ Záznam (${editType}) upraven na ${editStartTime} – ${editEndTime} (${newHours} h)${editSyncAdjacent ? ' a navazující časy synchronizovány' : ''}.`);
+    showToast(`âś… ZĂˇznam (${editType}) upraven na ${editStartTime} â€“ ${editEndTime} (${newHours} h)${editSyncAdjacent ? ' a navazujĂ­cĂ­ ÄŤasy synchronizovĂˇny' : ''}.`);
   };
 
-  // Výpočty pro aktivní relaci
+  // VĂ˝poÄŤty pro aktivnĂ­ relaci
   const elapsedSeconds = useMemo(() => {
     if (!activeSession) return 0;
     const diff = Math.floor((now - activeSession.startTimestamp) / 1000);
@@ -508,13 +508,13 @@ const LiveTimeTracker: React.FC<LiveTimeTrackerProps> = ({
       ).hours;
   }, [activeSession, now, deductLunch]);
 
-  // Vybraná zakázka pro detail
+  // VybranĂˇ zakĂˇzka pro detail
   const currentSelectedJob = useMemo(() => {
     const id = activeSession?.jobId || selectedJobId;
     return jobs.find(j => j.id === id);
   }, [jobs, activeSession, selectedJobId]);
 
-  // Dnešní záznamy – souhrn
+  // DneĹˇnĂ­ zĂˇznamy â€“ souhrn
   const todaySummary = useMemo(() => {
     const todayStr = getTodayDateStr();
     const list = todayEntries
@@ -540,7 +540,7 @@ const LiveTimeTracker: React.FC<LiveTimeTrackerProps> = ({
       {toastMessage && (
         <div className="bg-slate-900 text-white text-xs font-semibold px-4 py-2.5 flex items-center justify-between border-b border-slate-700 animate-fadeIn">
           <div className="flex items-center gap-2">
-            <span className="text-emerald-400">●</span>
+            <span className="text-emerald-400">â—Ź</span>
             <span>{toastMessage}</span>
           </div>
           <button 
@@ -548,30 +548,30 @@ const LiveTimeTracker: React.FC<LiveTimeTrackerProps> = ({
             onClick={() => setToastMessage(null)}
             className="text-slate-400 hover:text-white ml-2 text-sm"
           >
-            ✕
+            âś•
           </button>
         </div>
       )}
 
-      {/* HLAVNÍ SEKCE: AKTIVNÍ STOPKY NEBO VÝBĚR PRO SPUŠTĚNÍ */}
+      {/* HLAVNĂŤ SEKCE: AKTIVNĂŤ STOPKY NEBO VĂťBÄšR PRO SPUĹ TÄšNĂŤ */}
       <div className="p-4 sm:p-5">
         {!activeSession ? (
-          /* ================= STAV: KLID / PŘIPRAVENO K SPUŠTĚNÍ ================= */
+          /* ================= STAV: KLID / PĹIPRAVENO K SPUĹ TÄšNĂŤ ================= */
           <div className="space-y-4">
             <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 border-b border-slate-100 pb-3">
               <div className="flex items-center gap-2.5">
                 <span className="w-8 h-8 rounded-xl bg-indigo-100 text-indigo-700 flex items-center justify-center text-lg font-bold shadow-2xs">
-                  ⏱️
+                  âŹ±ď¸Ź
                 </span>
                 <div>
                   <h3 className="font-black text-slate-900 text-sm sm:text-base flex items-center gap-2">
-                    <span>Živý záznamník docházky a jízdy</span>
+                    <span>Ĺ˝ivĂ˝ zĂˇznamnĂ­k dochĂˇzky a jĂ­zdy</span>
                     <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-emerald-100 text-emerald-800">
-                      Na jedno kliknutí
+                      Na jedno kliknutĂ­
                     </span>
                   </h3>
                   <p className="text-xs text-slate-500">
-                    Aktuální čas: <strong className="text-slate-800 font-mono">{formatHHMM()}</strong> • Ráno klikněte na Jízdu, po dojezdu na Práci
+                    AktuĂˇlnĂ­ ÄŤas: <strong className="text-slate-800 font-mono">{formatHHMM()}</strong> â€˘ RĂˇno kliknÄ›te na JĂ­zdu, po dojezdu na PrĂˇci
                   </p>
                 </div>
               </div>
@@ -582,16 +582,16 @@ const LiveTimeTracker: React.FC<LiveTimeTrackerProps> = ({
                   onClick={onOpenManualEditor}
                   className="text-xs font-bold text-slate-500 hover:text-indigo-600 self-start sm:self-auto flex items-center gap-1 transition-colors"
                 >
-                  <span>✏️ Zadat den zpětně</span>
+                  <span>âśŹď¸Ź Zadat den zpÄ›tnÄ›</span>
                 </button>
               )}
             </div>
 
-            {/* Volba zakázky */}
+            {/* Volba zakĂˇzky */}
             <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 pt-1">
               <div className="sm:col-span-2">
                 <label className="block text-[11px] font-bold uppercase tracking-wider text-slate-600 mb-1">
-                  1. Vyberte zakázku / středisko:
+                  1. Vyberte zakĂˇzku / stĹ™edisko:
                 </label>
                 <div className="relative">
                   <select
@@ -601,7 +601,7 @@ const LiveTimeTracker: React.FC<LiveTimeTrackerProps> = ({
                   >
                     {jobs.filter(j => j.isActive).map(j => (
                       <option key={j.id} value={j.id}>
-                        {j.code} – {j.name}
+                        {j.code} â€“ {j.name}
                       </option>
                     ))}
                   </select>
@@ -610,11 +610,11 @@ const LiveTimeTracker: React.FC<LiveTimeTrackerProps> = ({
 
               <div>
                 <label className="block text-[11px] font-bold uppercase tracking-wider text-slate-600 mb-1">
-                  Poznámka (volitelné):
+                  PoznĂˇmka (volitelnĂ©):
                 </label>
                 <input
                   type="text"
-                  placeholder="např. Výjezd montáž, hala B..."
+                  placeholder="napĹ™. VĂ˝jezd montĂˇĹľ, hala B..."
                   value={sessionNote}
                   onChange={(e) => setSessionNote(e.target.value)}
                   className="w-full bg-slate-50 border border-slate-300 hover:border-indigo-400 focus:border-indigo-600 focus:bg-white focus:ring-2 focus:ring-indigo-100 rounded-xl px-3.5 py-2.5 text-xs font-semibold text-slate-800 transition-all shadow-2xs"
@@ -622,78 +622,78 @@ const LiveTimeTracker: React.FC<LiveTimeTrackerProps> = ({
               </div>
             </div>
 
-            {/* HLAVNÍ SPOUŠTĚCÍ TLAČÍTKA ("NA RÁNĚ") */}
+            {/* HLAVNĂŤ SPOUĹ TÄšCĂŤ TLAÄŚĂŤTKA ("NA RĂNÄš") */}
             <div>
               <p className="text-[11px] font-bold uppercase tracking-wider text-slate-500 mb-2">
-                2. Vyberte činnost pro zahájení:
+                2. Vyberte ÄŤinnost pro zahĂˇjenĂ­:
               </p>
               <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
-                {/* 1. JÍZDA - hlavní akce */}
+                {/* 1. JĂŤZDA - hlavnĂ­ akce */}
                 <button
                   type="button"
                   onClick={() => handleStartActivity(WorkType.DRIVE)}
                   className="p-4 rounded-xl border-2 border-cyan-500 bg-gradient-to-br from-cyan-500 to-blue-600 text-white font-black text-sm flex flex-col items-center justify-center gap-1.5 shadow-md hover:shadow-lg hover:scale-[1.02] active:scale-[0.98] transition-all group"
                 >
                   <div className="flex items-center gap-2 text-base">
-                    <span className="text-xl group-hover:scale-125 transition-transform">🚗</span>
-                    <span className="text-base tracking-wide">Zahájit JÍZDU</span>
+                    <span className="text-xl group-hover:scale-125 transition-transform">đźš—</span>
+                    <span className="text-base tracking-wide">ZahĂˇjit JĂŤZDU</span>
                   </div>
                   <span className="text-[11px] text-cyan-100 font-medium">
-                    Začne měřit čas jízdy na zakázku
+                    ZaÄŤne mÄ›Ĺ™it ÄŤas jĂ­zdy na zakĂˇzku
                   </span>
                 </button>
 
-                {/* 2. PRÁCE - druhá hlavní akce */}
+                {/* 2. PRĂCE - druhĂˇ hlavnĂ­ akce */}
                 <button
                   type="button"
                   onClick={() => handleStartActivity(WorkType.REGULAR)}
                   className="p-4 rounded-xl border-2 border-emerald-500 bg-gradient-to-br from-emerald-600 to-teal-700 text-white font-black text-sm flex flex-col items-center justify-center gap-1.5 shadow-md hover:shadow-lg hover:scale-[1.02] active:scale-[0.98] transition-all group"
                 >
                   <div className="flex items-center gap-2 text-base">
-                    <span className="text-xl group-hover:scale-125 transition-transform">🔨</span>
-                    <span className="text-base tracking-wide">Zahájit PRÁCI</span>
+                    <span className="text-xl group-hover:scale-125 transition-transform">đź”¨</span>
+                    <span className="text-base tracking-wide">ZahĂˇjit PRĂCI</span>
                   </div>
                   <span className="text-[11px] text-emerald-100 font-medium">
-                    Práce na zakázce (odpracovaná doba)
+                    PrĂˇce na zakĂˇzce (odpracovanĂˇ doba)
                   </span>
                 </button>
 
-                {/* 3. LÉKAŘ */}
+                {/* 3. LĂ‰KAĹ */}
                 <button
                   type="button"
                   onClick={() => handleStartActivity(WorkType.DOCTOR)}
                   className="p-3.5 rounded-xl border border-indigo-200 bg-indigo-50/70 hover:bg-indigo-100/90 text-indigo-900 font-bold text-xs flex flex-col items-center justify-center gap-1 transition-all group shadow-2xs"
                 >
                   <div className="flex items-center gap-1.5">
-                    <span className="text-base group-hover:scale-110 transition-transform">🩺</span>
-                    <span>Návštěva lékaře</span>
+                    <span className="text-base group-hover:scale-110 transition-transform">đź©ş</span>
+                    <span>NĂˇvĹˇtÄ›va lĂ©kaĹ™e</span>
                   </div>
                   <span className="text-[10px] text-indigo-600 font-normal">
-                    Překážka v práci (lékař)
+                    PĹ™ekĂˇĹľka v prĂˇci (lĂ©kaĹ™)
                   </span>
                 </button>
 
-                {/* 4. SLUŽEBNÍ CESTA */}
+                {/* 4. SLUĹ˝EBNĂŤ CESTA */}
                 <button
                   type="button"
                   onClick={() => handleStartActivity(WorkType.BUSINESS_TRIP)}
                   className="p-3.5 rounded-xl border border-slate-200 bg-slate-50 hover:bg-slate-100 text-slate-800 font-bold text-xs flex flex-col items-center justify-center gap-1 transition-all group shadow-2xs"
                 >
                   <div className="flex items-center gap-1.5">
-                    <span className="text-base group-hover:scale-110 transition-transform">💼</span>
-                    <span>Služební cesta</span>
+                    <span className="text-base group-hover:scale-110 transition-transform">đź’Ľ</span>
+                    <span>SluĹľebnĂ­ cesta</span>
                   </div>
                   <span className="text-[10px] text-slate-500 font-normal">
-                    Jednání / výjezd mimo firmu
+                    JednĂˇnĂ­ / vĂ˝jezd mimo firmu
                   </span>
                 </button>
               </div>
             </div>
           </div>
         ) : (
-          /* ================= STAV: AKTIVNÍ PROBÍHAJÍCÍ ZÁZNAM ================= */
+          /* ================= STAV: AKTIVNĂŤ PROBĂŤHAJĂŤCĂŤ ZĂZNAM ================= */
           <div className="space-y-4">
-            {/* HORNÍ LIŠTA AKTIVNÍHO STAVU S PULZUJÍCÍM INDIKÁTOREM */}
+            {/* HORNĂŤ LIĹ TA AKTIVNĂŤHO STAVU S PULZUJĂŤCĂŤM INDIKĂTOREM */}
             <div className={`p-4 rounded-xl border-2 flex flex-col md:flex-row md:items-center justify-between gap-4 ${
               activeSession.activityType === WorkType.DRIVE 
                 ? 'bg-gradient-to-r from-cyan-950 via-slate-900 to-cyan-950 text-white border-cyan-400 shadow-lg' 
@@ -701,7 +701,7 @@ const LiveTimeTracker: React.FC<LiveTimeTrackerProps> = ({
                   ? 'bg-gradient-to-r from-emerald-950 via-slate-900 to-teal-950 text-white border-emerald-400 shadow-lg'
                   : 'bg-gradient-to-r from-indigo-950 via-slate-900 to-indigo-950 text-white border-indigo-400 shadow-lg'
             }`}>
-              {/* Levé info o činnosti */}
+              {/* LevĂ© info o ÄŤinnosti */}
               <div className="space-y-1">
                 <div className="flex items-center gap-2">
                   <span className="relative flex h-3 w-3">
@@ -718,25 +718,25 @@ const LiveTimeTracker: React.FC<LiveTimeTrackerProps> = ({
                       ? 'bg-cyan-500/20 text-cyan-300 border border-cyan-500/40'
                       : 'bg-emerald-500/20 text-emerald-300 border border-emerald-500/40'
                   }`}>
-                    {activeSession.activityType === WorkType.DRIVE ? '🚗 Probíhá Jízda' : `🔨 Probíhá: ${activeSession.activityType}`}
+                    {activeSession.activityType === WorkType.DRIVE ? 'đźš— ProbĂ­hĂˇ JĂ­zda' : `đź”¨ ProbĂ­hĂˇ: ${activeSession.activityType}`}
                   </span>
 
                   {activeSession.activityType === WorkType.DRIVE && (
                     <span className="text-[10px] text-cyan-200/80 font-medium">
-                      (eviduje se mimo pracovní fond)
+                      (eviduje se mimo pracovnĂ­ fond)
                     </span>
                   )}
                 </div>
 
                 <div className="flex items-baseline gap-2 pt-1">
                   <h4 className="text-base sm:text-lg font-black text-white">
-                    {currentSelectedJob ? `${currentSelectedJob.code} – ${currentSelectedJob.name}` : 'Bez přiřazené zakázky'}
+                    {currentSelectedJob ? `${currentSelectedJob.code} â€“ ${currentSelectedJob.name}` : 'Bez pĹ™iĹ™azenĂ© zakĂˇzky'}
                   </h4>
                 </div>
 
                 <div className="flex flex-wrap items-center gap-x-4 gap-y-1 text-xs text-slate-300 pt-0.5">
                   <div className="flex items-center gap-1.5">
-                    <span className="text-slate-400">Začátek:</span>
+                    <span className="text-slate-400">ZaÄŤĂˇtek:</span>
                     <strong className="text-white font-mono text-sm bg-white/10 px-2 py-0.5 rounded">
                       {activeSession.startTimeStr}
                     </strong>
@@ -748,24 +748,24 @@ const LiveTimeTracker: React.FC<LiveTimeTrackerProps> = ({
                       }}
                       className="text-[11px] text-cyan-300 hover:text-white underline ml-1 font-bold"
                     >
-                      {isEditingStartTime ? '✕ Zavřít' : '✏️ Upravit čas'}
+                      {isEditingStartTime ? 'âś• ZavĹ™Ă­t' : 'âśŹď¸Ź Upravit ÄŤas'}
                     </button>
                   </div>
 
                   {activeSession.note && (
                     <div className="text-slate-300 italic text-[11px]">
-                      „{activeSession.note}“
+                      â€ž{activeSession.note}â€ś
                     </div>
                   )}
                 </div>
 
-                {/* Rychlá oprava času startu se synchronizací předchozího kroku */}
+                {/* RychlĂˇ oprava ÄŤasu startu se synchronizacĂ­ pĹ™edchozĂ­ho kroku */}
                 {isEditingStartTime && (
                   <div className="bg-slate-800/95 p-3.5 rounded-xl border border-slate-700 mt-2.5 space-y-2.5 max-w-lg shadow-xl">
                     <div className="text-[11px] font-bold text-slate-200 flex items-center justify-between">
                       <span className="flex items-center gap-1.5">
-                        <span>⏱️</span>
-                        <span>Změna času začátku (automaticky upraví i konec předchozího kroku):</span>
+                        <span>âŹ±ď¸Ź</span>
+                        <span>ZmÄ›na ÄŤasu zaÄŤĂˇtku (automaticky upravĂ­ i konec pĹ™edchozĂ­ho kroku):</span>
                       </span>
                     </div>
                     <div className="flex items-center gap-2">
@@ -784,7 +784,7 @@ const LiveTimeTracker: React.FC<LiveTimeTrackerProps> = ({
                       </button>
                     </div>
                     <div className="flex flex-wrap items-center gap-1.5 pt-1 border-t border-slate-700/60">
-                      <span className="text-[10px] text-slate-400 font-semibold">Rychlý posun:</span>
+                      <span className="text-[10px] text-slate-400 font-semibold">RychlĂ˝ posun:</span>
                       <button
                         type="button"
                         onClick={() => handleAdjustStartMinutes(-5)}
@@ -825,13 +825,13 @@ const LiveTimeTracker: React.FC<LiveTimeTrackerProps> = ({
                 )}
               </div>
 
-              {/* Pravý blok: Velký digitální časoměřič */}
+              {/* PravĂ˝ blok: VelkĂ˝ digitĂˇlnĂ­ ÄŤasomÄ›Ĺ™iÄŤ */}
               <div className="flex md:flex-col items-center md:items-end justify-between border-t md:border-t-0 border-slate-700/60 pt-3 md:pt-0">
                 <div className="font-mono text-3xl sm:text-4xl font-black text-white tracking-wider tabular-nums drop-shadow-xs">
                   {formatSecondsToHMS(elapsedSeconds)}
                 </div>
                 <div className="flex items-center gap-1.5 mt-1">
-                  <span className="text-xs text-slate-300">Doba úseku:</span>
+                  <span className="text-xs text-slate-300">Doba Ăşseku:</span>
                   <span className="text-sm font-black text-amber-300 font-mono">
                     {liveCalculatedHours.toFixed(1)} h
                   </span>
@@ -839,25 +839,25 @@ const LiveTimeTracker: React.FC<LiveTimeTrackerProps> = ({
               </div>
             </div>
 
-            {/* PŘEPÍNACÍ AKCE NA JEDNO KLIKNUTÍ (PODLE AKTUÁLNÍHO STAVU) */}
+            {/* PĹEPĂŤNACĂŤ AKCE NA JEDNO KLIKNUTĂŤ (PODLE AKTUĂLNĂŤHO STAVU) */}
             <div className="space-y-2">
               <p className="text-[11px] font-bold uppercase tracking-wider text-slate-500">
-                Přejít na další krok:
+                PĹ™ejĂ­t na dalĹˇĂ­ krok:
               </p>
 
               {activeSession.activityType === WorkType.DRIVE ? (
-                /* === PŘEPÍNAČE PŘI JÍZDĚ: 1. Příjezd na místo / Práce, 2. Konec jízdy === */
+                /* === PĹEPĂŤNAÄŚE PĹI JĂŤZDÄš: 1. PĹ™Ă­jezd na mĂ­sto / PrĂˇce, 2. Konec jĂ­zdy === */
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                   <button
                     type="button"
                     onClick={() => handleFinishCurrentSession(WorkType.REGULAR)}
                     className="p-4 rounded-xl border-2 border-emerald-500 bg-gradient-to-r from-emerald-600 to-teal-700 text-white font-black text-base flex items-center justify-center gap-3 shadow-lg hover:shadow-xl hover:scale-[1.01] active:scale-[0.99] transition-all group"
                   >
-                    <span className="text-2xl group-hover:scale-125 transition-transform">🔨</span>
+                    <span className="text-2xl group-hover:scale-125 transition-transform">đź”¨</span>
                     <div className="text-left">
-                      <div className="text-base font-black">Příjezd na místo → Zahájit PRÁCI</div>
+                      <div className="text-base font-black">PĹ™Ă­jezd na mĂ­sto â†’ ZahĂˇjit PRĂCI</div>
                       <div className="text-xs text-emerald-100 font-normal">
-                        Ukončí jízdu ({liveCalculatedHours.toFixed(1)}h) a začne počítat pracovní dobu
+                        UkonÄŤĂ­ jĂ­zdu ({liveCalculatedHours.toFixed(1)}h) a zaÄŤne poÄŤĂ­tat pracovnĂ­ dobu
                       </div>
                     </div>
                   </button>
@@ -867,28 +867,28 @@ const LiveTimeTracker: React.FC<LiveTimeTrackerProps> = ({
                     onClick={() => handleFinishCurrentSession(null)}
                     className="p-4 rounded-xl border border-slate-300 hover:border-slate-400 bg-slate-100 hover:bg-slate-200 text-slate-800 font-black text-sm flex items-center justify-center gap-2.5 transition-all shadow-xs"
                   >
-                    <span className="text-xl">🏁</span>
+                    <span className="text-xl">đźŹ</span>
                     <div className="text-left">
-                      <div className="text-sm font-black">Ukončit jízdu (Konec cesty)</div>
+                      <div className="text-sm font-black">UkonÄŤit jĂ­zdu (Konec cesty)</div>
                       <div className="text-[11px] text-slate-500 font-normal">
-                        Návrat na firmu / domů bez navazující práce
+                        NĂˇvrat na firmu / domĹŻ bez navazujĂ­cĂ­ prĂˇce
                       </div>
                     </div>
                   </button>
                 </div>
               ) : (
-                /* === PŘEPÍNAČE PŘI PRÁCI: 1. Konec práce / Jízda, 2. Konec směny === */
+                /* === PĹEPĂŤNAÄŚE PĹI PRĂCI: 1. Konec prĂˇce / JĂ­zda, 2. Konec smÄ›ny === */
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                   <button
                     type="button"
                     onClick={() => handleFinishCurrentSession(WorkType.DRIVE)}
                     className="p-4 rounded-xl border-2 border-cyan-500 bg-gradient-to-r from-cyan-600 to-blue-700 text-white font-black text-base flex items-center justify-center gap-3 shadow-lg hover:shadow-xl hover:scale-[1.01] active:scale-[0.99] transition-all group"
                   >
-                    <span className="text-2xl group-hover:scale-125 transition-transform">🚗</span>
+                    <span className="text-2xl group-hover:scale-125 transition-transform">đźš—</span>
                     <div className="text-left">
-                      <div className="text-base font-black">Konec práce → Zahájit JÍZDU</div>
+                      <div className="text-base font-black">Konec prĂˇce â†’ ZahĂˇjit JĂŤZDU</div>
                       <div className="text-xs text-cyan-100 font-normal">
-                        Ukončí práci ({liveCalculatedHours.toFixed(1)}h) a začne měřit jízdu (odjezd)
+                        UkonÄŤĂ­ prĂˇci ({liveCalculatedHours.toFixed(1)}h) a zaÄŤne mÄ›Ĺ™it jĂ­zdu (odjezd)
                       </div>
                     </div>
                   </button>
@@ -898,30 +898,30 @@ const LiveTimeTracker: React.FC<LiveTimeTrackerProps> = ({
                     onClick={() => handleFinishCurrentSession(null)}
                     className="p-4 rounded-xl border border-slate-300 hover:border-slate-400 bg-slate-100 hover:bg-slate-200 text-slate-800 font-black text-sm flex items-center justify-center gap-2.5 transition-all shadow-xs"
                   >
-                    <span className="text-xl">🏁</span>
+                    <span className="text-xl">đźŹ</span>
                     <div className="text-left">
-                      <div className="text-sm font-black">Konec směny (Ukončit práci)</div>
+                      <div className="text-sm font-black">Konec smÄ›ny (UkonÄŤit prĂˇci)</div>
                       <div className="text-[11px] text-slate-500 font-normal">
-                        Uloží {liveCalculatedHours.toFixed(1)} h a uzavře denní měření
+                        UloĹľĂ­ {liveCalculatedHours.toFixed(1)} h a uzavĹ™e dennĂ­ mÄ›Ĺ™enĂ­
                       </div>
                     </div>
                   </button>
                 </div>
               )}
 
-              {/* DOPLŇKOVÉ PŘEPÍNAČE: Změna zakázky během dne, lékař, zrušení */}
+              {/* DOPLĹ‡KOVĂ‰ PĹEPĂŤNAÄŚE: ZmÄ›na zakĂˇzky bÄ›hem dne, lĂ©kaĹ™, zruĹˇenĂ­ */}
               <div className="flex flex-wrap items-center justify-between gap-2 pt-2 border-t border-slate-100 text-xs text-slate-600">
                 <div className="flex flex-wrap items-center gap-2">
-                  <span className="font-bold text-[11px] text-slate-400">Přepnout v průběhu dne:</span>
+                  <span className="font-bold text-[11px] text-slate-400">PĹ™epnout v prĹŻbÄ›hu dne:</span>
                   
-                  {/* Přejezd na jinou zakázku */}
+                  {/* PĹ™ejezd na jinou zakĂˇzku */}
                   <div className="inline-flex items-center gap-1 bg-slate-50 border border-slate-200 rounded-lg p-1">
-                    <span className="text-[10px] font-bold text-slate-500 px-1">Přejezd na zakázku:</span>
+                    <span className="text-[10px] font-bold text-slate-500 px-1">PĹ™ejezd na zakĂˇzku:</span>
                     <select
                       value={activeSession.jobId}
                       onChange={(e) => {
                         const newJobId = e.target.value;
-                        if (window.confirm('Chcete ukončit stávající úsek a začít jízdu na novou zakázku?')) {
+                        if (window.confirm('Chcete ukonÄŤit stĂˇvajĂ­cĂ­ Ăşsek a zaÄŤĂ­t jĂ­zdu na novou zakĂˇzku?')) {
                           handleFinishCurrentSession(WorkType.DRIVE, newJobId);
                         }
                       }}
@@ -935,18 +935,18 @@ const LiveTimeTracker: React.FC<LiveTimeTrackerProps> = ({
                     </select>
                   </div>
 
-                  {/* Návštěva lékaře */}
+                  {/* NĂˇvĹˇtÄ›va lĂ©kaĹ™e */}
                   {activeSession.activityType !== WorkType.DOCTOR && (
                     <button
                       type="button"
                       onClick={() => {
-                        if (window.confirm('Chcete uložit dosavadní práci a zahájit návštěvu lékaře?')) {
+                        if (window.confirm('Chcete uloĹľit dosavadnĂ­ prĂˇci a zahĂˇjit nĂˇvĹˇtÄ›vu lĂ©kaĹ™e?')) {
                           handleFinishCurrentSession(WorkType.DOCTOR);
                         }
                       }}
                       className="bg-indigo-50 hover:bg-indigo-100 text-indigo-700 border border-indigo-200 font-bold px-2.5 py-1 rounded-lg transition-colors flex items-center gap-1"
                     >
-                      <span>🩺 Odchod k lékaři</span>
+                      <span>đź©ş Odchod k lĂ©kaĹ™i</span>
                     </button>
                   )}
                 </div>
@@ -956,7 +956,7 @@ const LiveTimeTracker: React.FC<LiveTimeTrackerProps> = ({
                   onClick={handleCancelSession}
                   className="text-rose-600 hover:text-rose-800 hover:bg-rose-50 font-bold px-2 py-1 rounded transition-colors text-[11px]"
                 >
-                  ✕ Zrušit stopky bez uložení
+                  âś• ZruĹˇit stopky bez uloĹľenĂ­
                 </button>
               </div>
             </div>
@@ -964,26 +964,26 @@ const LiveTimeTracker: React.FC<LiveTimeTrackerProps> = ({
         )}
       </div>
 
-      {/* DNEŠNÍ ULOŽENÉ ZÁZNAMY S MOŽNOSTÍ EDITACE A SYNCHRONIZACE */}
+      {/* DNEĹ NĂŤ ULOĹ˝ENĂ‰ ZĂZNAMY S MOĹ˝NOSTĂŤ EDITACE A SYNCHRONIZACE */}
       <div className="bg-slate-50 border-t border-slate-200 p-4 sm:px-5">
         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 mb-2.5">
           <div className="flex items-center gap-2">
             <span className="text-xs font-black uppercase tracking-wider text-slate-700">
-              📅 Dnešní záznamy ({new Date().toLocaleDateString('cs-CZ')})
+              đź“… DneĹˇnĂ­ zĂˇznamy ({new Date().toLocaleDateString('cs-CZ')})
             </span>
             <span className="text-[11px] font-bold text-slate-400">
-              • {todaySummary.totalCount} {todaySummary.totalCount === 1 ? 'záznam' : todaySummary.totalCount >= 2 && todaySummary.totalCount <= 4 ? 'záznamy' : 'záznamů'}
+              â€˘ {todaySummary.totalCount} {todaySummary.totalCount === 1 ? 'zĂˇznam' : todaySummary.totalCount >= 2 && todaySummary.totalCount <= 4 ? 'zĂˇznamy' : 'zĂˇznamĹŻ'}
             </span>
           </div>
 
           <div className="flex items-center gap-3 text-xs font-black">
             <div className="bg-white px-2.5 py-1 rounded-lg border border-slate-200 shadow-2xs">
-              <span className="text-slate-500 font-normal">Odpracováno: </span>
+              <span className="text-slate-500 font-normal">OdpracovĂˇno: </span>
               <span className="text-slate-900">{todaySummary.workHours.toFixed(1)} h</span>
             </div>
             {todaySummary.driveHours > 0 && (
               <div className="bg-cyan-50 px-2.5 py-1 rounded-lg border border-cyan-200 text-cyan-900 shadow-2xs">
-                <span className="text-cyan-700 font-normal">🚗 Jízda: </span>
+                <span className="text-cyan-700 font-normal">đźš— JĂ­zda: </span>
                 <span>{todaySummary.driveHours.toFixed(1)} h</span>
               </div>
             )}
@@ -992,7 +992,7 @@ const LiveTimeTracker: React.FC<LiveTimeTrackerProps> = ({
 
         {todaySummary.entries.length === 0 ? (
           <p className="text-xs text-slate-400 italic py-1">
-            Zatím dnes nebyl uložen žádný záznam. Ráno klikněte na „Zahájit Jízdu“ nebo „Zahájit Práci“.
+            ZatĂ­m dnes nebyl uloĹľen ĹľĂˇdnĂ˝ zĂˇznam. RĂˇno kliknÄ›te na â€žZahĂˇjit JĂ­zduâ€ś nebo â€žZahĂˇjit PrĂˇciâ€ś.
           </p>
         ) : (
           <div className="space-y-1.5 max-h-56 overflow-y-auto pr-1">
@@ -1011,7 +1011,7 @@ const LiveTimeTracker: React.FC<LiveTimeTrackerProps> = ({
                 >
                   <div className="flex items-center gap-2.5 min-w-0">
                     <span className="text-base shrink-0">
-                      {isDrive ? '🚗' : entry.type === WorkType.DOCTOR ? '🩺' : '🔨'}
+                      {isDrive ? 'đźš—' : entry.type === WorkType.DOCTOR ? 'đź©ş' : 'đź”¨'}
                     </span>
 
                     <div className="min-w-0">
@@ -1026,7 +1026,7 @@ const LiveTimeTracker: React.FC<LiveTimeTrackerProps> = ({
                         )}
                         {entry.startTime && entry.endTime && (
                           <span className="text-[11px] font-mono text-slate-600 font-bold bg-white/70 px-1.5 py-0.5 rounded border border-slate-200/60">
-                            {entry.startTime} – {entry.endTime}
+                            {entry.startTime} â€“ {entry.endTime}
                           </span>
                         )}
                       </div>
@@ -1043,15 +1043,15 @@ const LiveTimeTracker: React.FC<LiveTimeTrackerProps> = ({
                       {entry.hours.toFixed(1)} h
                     </span>
 
-                    {/* Tlačítko pro úpravu času záznamu */}
+                    {/* TlaÄŤĂ­tko pro Ăşpravu ÄŤasu zĂˇznamu */}
                     {onUpdateEntry && (
                       <button
                         type="button"
                         onClick={() => handleOpenEditEntry(entry)}
                         className="text-indigo-600 hover:text-indigo-800 p-1 rounded hover:bg-indigo-50 transition-colors text-xs font-bold"
-                        title="Upravit časy záznamu"
+                        title="Upravit ÄŤasy zĂˇznamu"
                       >
-                        ✏️
+                        âśŹď¸Ź
                       </button>
                     )}
 
@@ -1059,14 +1059,14 @@ const LiveTimeTracker: React.FC<LiveTimeTrackerProps> = ({
                       <button
                         type="button"
                         onClick={() => {
-                          if (window.confirm(`Smazat tento záznam (${entry.type}, ${entry.hours}h)?`)) {
+                          if (window.confirm(`Smazat tento zĂˇznam (${entry.type}, ${entry.hours}h)?`)) {
                             onDeleteEntry(entry.id);
                           }
                         }}
                         className="text-slate-400 hover:text-rose-600 p-1 rounded hover:bg-slate-100 transition-colors"
-                        title="Smazat záznam"
+                        title="Smazat zĂˇznam"
                       >
-                        🗑️
+                        đź—‘ď¸Ź
                       </button>
                     )}
                   </div>
@@ -1077,13 +1077,13 @@ const LiveTimeTracker: React.FC<LiveTimeTrackerProps> = ({
         )}
       </div>
 
-      {/* MODÁL PRO RYCHLOU EDITACI ZÁZNAMU A SYNCHRONIZACI ČASŮ */}
+      {/* MODĂL PRO RYCHLOU EDITACI ZĂZNAMU A SYNCHRONIZACI ÄŚASĹ® */}
       {editingEntry && (
         <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-xs z-50 flex items-center justify-center p-4">
           <div className="bg-white rounded-2xl shadow-2xl border border-slate-200 w-full max-w-md p-5 space-y-4 animate-fadeIn">
             <div className="flex items-center justify-between border-b border-slate-100 pb-3">
               <h4 className="font-black text-slate-900 text-sm flex items-center gap-2">
-                <span>✏️ Úprava záznamu:</span>
+                <span>âśŹď¸Ź Ăšprava zĂˇznamu:</span>
                 <span className="text-xs font-bold text-indigo-700 bg-indigo-50 px-2 py-0.5 rounded">
                   {editingEntry.type}
                 </span>
@@ -1093,16 +1093,16 @@ const LiveTimeTracker: React.FC<LiveTimeTrackerProps> = ({
                 onClick={() => setEditingEntry(null)}
                 className="text-slate-400 hover:text-slate-600 font-bold"
               >
-                ✕
+                âś•
               </button>
             </div>
 
             <div className="space-y-3">
-              {/* Časy od – do */}
+              {/* ÄŚasy od â€“ do */}
               <div className="grid grid-cols-2 gap-3">
                 <div>
                   <label className="block text-[11px] font-bold uppercase tracking-wider text-slate-600 mb-1">
-                    Čas od:
+                    ÄŚas od:
                   </label>
                   <input
                     type="time"
@@ -1113,7 +1113,7 @@ const LiveTimeTracker: React.FC<LiveTimeTrackerProps> = ({
                 </div>
                 <div>
                   <label className="block text-[11px] font-bold uppercase tracking-wider text-slate-600 mb-1">
-                    Čas do:
+                    ÄŚas do:
                   </label>
                   <input
                     type="time"
@@ -1124,28 +1124,28 @@ const LiveTimeTracker: React.FC<LiveTimeTrackerProps> = ({
                 </div>
               </div>
 
-              {/* Typ činnosti */}
+              {/* Typ ÄŤinnosti */}
               <div>
                 <label className="block text-[11px] font-bold uppercase tracking-wider text-slate-600 mb-1">
-                  Typ činnosti:
+                  Typ ÄŤinnosti:
                 </label>
                 <select
                   value={editType}
                   onChange={(e) => setEditType(e.target.value as WorkType)}
                   className="w-full bg-slate-50 border border-slate-300 rounded-xl px-3 py-2 text-xs font-bold text-slate-800"
                 >
-                  <option value={WorkType.DRIVE}>🚗 Jízda (mimo fond)</option>
-                  <option value={WorkType.REGULAR}>🔨 Běžná práce</option>
-                  <option value={WorkType.DOCTOR}>🩺 Lékař</option>
-                  <option value={WorkType.BUSINESS_TRIP}>💼 Služební cesta</option>
-                  <option value={WorkType.OVERTIME}>⚡ Přesčas</option>
+                  <option value={WorkType.DRIVE}>đźš— JĂ­zda (mimo fond)</option>
+                  <option value={WorkType.REGULAR}>đź”¨ BÄ›ĹľnĂˇ prĂˇce</option>
+                  <option value={WorkType.DOCTOR}>đź©ş LĂ©kaĹ™</option>
+                  <option value={WorkType.BUSINESS_TRIP}>đź’Ľ SluĹľebnĂ­ cesta</option>
+                  <option value={WorkType.OVERTIME}>âšˇ PĹ™esÄŤas</option>
                 </select>
               </div>
 
-              {/* Zakázka */}
+              {/* ZakĂˇzka */}
               <div>
                 <label className="block text-[11px] font-bold uppercase tracking-wider text-slate-600 mb-1">
-                  Zakázka:
+                  ZakĂˇzka:
                 </label>
                 <select
                   value={editJobId}
@@ -1154,27 +1154,27 @@ const LiveTimeTracker: React.FC<LiveTimeTrackerProps> = ({
                 >
                   {jobs.map(j => (
                     <option key={j.id} value={j.id}>
-                      {j.code} – {j.name}
+                      {j.code} â€“ {j.name}
                     </option>
                   ))}
                 </select>
               </div>
 
-              {/* Poznámka */}
+              {/* PoznĂˇmka */}
               <div>
                 <label className="block text-[11px] font-bold uppercase tracking-wider text-slate-600 mb-1">
-                  Popis / Poznámka:
+                  Popis / PoznĂˇmka:
                 </label>
                 <input
                   type="text"
                   value={editDesc}
                   onChange={(e) => setEditDesc(e.target.value)}
                   className="w-full bg-slate-50 border border-slate-300 rounded-xl px-3 py-2 text-xs text-slate-800"
-                  placeholder="např. Jízda na montáž..."
+                  placeholder="napĹ™. JĂ­zda na montĂˇĹľ..."
                 />
               </div>
 
-              {/* Volba automatické synchronizace */}
+              {/* Volba automatickĂ© synchronizace */}
               <div className="bg-indigo-50/70 p-3 rounded-xl border border-indigo-100 flex items-start gap-2.5">
                 <input
                   type="checkbox"
@@ -1184,7 +1184,7 @@ const LiveTimeTracker: React.FC<LiveTimeTrackerProps> = ({
                   className="mt-0.5 rounded text-indigo-600 focus:ring-indigo-500 cursor-pointer"
                 />
                 <label htmlFor="syncAdjacent" className="text-xs text-indigo-950 font-medium cursor-pointer">
-                  <strong>Plynulá návaznost:</strong> Automaticky přizpůsobit navazující čas sousedního úseku nebo běžících stopek, aby časy přesně seděly.
+                  <strong>PlynulĂˇ nĂˇvaznost:</strong> Automaticky pĹ™izpĹŻsobit navazujĂ­cĂ­ ÄŤas sousednĂ­ho Ăşseku nebo bÄ›ĹľĂ­cĂ­ch stopek, aby ÄŤasy pĹ™esnÄ› sedÄ›ly.
                 </label>
               </div>
             </div>
@@ -1195,14 +1195,14 @@ const LiveTimeTracker: React.FC<LiveTimeTrackerProps> = ({
                 onClick={() => setEditingEntry(null)}
                 className="px-4 py-2 rounded-xl text-xs font-bold text-slate-600 hover:bg-slate-100 transition-colors"
               >
-                Zrušit
+                ZruĹˇit
               </button>
               <button
                 type="button"
                 onClick={handleSaveEditedEntry}
                 className="px-4 py-2 bg-indigo-600 hover:bg-indigo-500 text-white rounded-xl text-xs font-black shadow-xs transition-colors"
               >
-                Uložit změny
+                UloĹľit zmÄ›ny
               </button>
             </div>
           </div>
