@@ -1043,9 +1043,16 @@ const LiveTimeTracker: React.FC<LiveTimeTrackerProps> = ({
                   </div>
 
                   <div className="flex items-center gap-2 shrink-0 ml-2">
-                    <span className={`font-black text-sm ${isDrive ? 'text-cyan-800' : 'text-slate-900'}`}>
-                      {entry.hours.toFixed(1)} h
-                    </span>
+                    <div className="flex flex-col items-end">
+                      <span className={`font-black text-sm ${isDrive ? 'text-cyan-800' : 'text-slate-900'}`}>
+                        {entry.hours.toFixed(1)} h
+                      </span>
+                      {(entry.breakMinutes || 0) > 0 && (
+                        <span className="text-[9px] text-amber-600 bg-amber-50 px-1 rounded border border-amber-200 mt-0.5">
+                          -{entry.breakMinutes} min oběd
+                        </span>
+                      )}
+                    </div>
 
                     {/* Tlačítko pro úpravu času záznamu */}
                     {onUpdateEntry && (

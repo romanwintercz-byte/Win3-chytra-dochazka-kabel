@@ -42,9 +42,7 @@ const adjustTime = (timeStr: string, deltaMinutes: number): string => {
 const calculateRowNetHours = (
   start: string, 
   end: string, 
-  hasLunch: boolean, 
-  lunchStart: string = '11:00', 
-  lunchEnd: string = '11:30'
+  breakMinutes: number
 ): number => {
   if (!start || !end) return 0;
   const [sh, sm] = start.split(':').map(Number);
@@ -56,19 +54,7 @@ const calculateRowNetHours = (
   if (endMinutes < startMinutes) endMinutes += 24 * 60;
   let diff = endMinutes - startMinutes;
 
-  if (hasLunch && lunchStart && lunchEnd) {
-    const [lsh, lsm] = lunchStart.split(':').map(Number);
-    const [leh, lem] = lunchEnd.split(':').map(Number);
-    if (!isNaN(lsh) && !isNaN(lsm) && !isNaN(leh) && !isNaN(lem)) {
-      const lStartM = lsh * 60 + lsm;
-      const lEndM = leh * 60 + lem;
-      const overlapStart = Math.max(startMinutes, lStartM);
-      const overlapEnd = Math.min(endMinutes, lEndM);
-      if (overlapEnd > overlapStart) {
-        diff -= (overlapEnd - overlapStart);
-      }
-    }
-  }
+  diff -= breakMinutes;
 
   return Math.max(0, Math.round((diff / 60) * 10) / 10);
 };
@@ -76,9 +62,7 @@ const calculateRowNetHours = (
 const getTimeWhenHoursReached = (
   start: string,
   targetHours: number,
-  hasLunch: boolean,
-  lunchStart: string = '11:00',
-  lunchEnd: string = '11:30'
+  breakMinutes: number
 ): string => {
   if (!start || targetHours <= 0) return start || '06:30';
   const [sh, sm] = start.split(':').map(Number);
@@ -87,38 +71,22 @@ const getTimeWhenHoursReached = (
   const startMinutes = sh * 60 + sm;
   const targetMinutes = Math.round(targetHours * 60);
 
-  if (!hasLunch || !lunchStart || !lunchEnd) {
-    const endMinutes = Math.min(23 * 60 + 59, startMinutes + targetMinutes);
-    const eh = Math.floor(endMinutes / 60);
-    const em = endMinutes % 60;
-    return `${String(eh).padStart(2, '0')}:${String(em).padStart(2, '0')}`;
-  }
-
-  const [lsh, lsm] = lunchStart.split(':').map(Number);
-  const [leh, lem] = lunchEnd.split(':').map(Number);
-  const lStartM = lsh * 60 + lsm;
-  const lEndM = leh * 60 + lem;
-
-  let endMinutes = startMinutes;
-
-  if (startMinutes >= lEndM) {
-    endMinutes = startMinutes + targetMinutes;
-  } else if (startMinutes >= lStartM) {
-    endMinutes = lEndM + targetMinutes;
-  } else {
-    const beforeLunch = lStartM - startMinutes;
-    if (beforeLunch >= targetMinutes) {
-      endMinutes = startMinutes + targetMinutes;
-    } else {
-      const remainingMinutes = targetMinutes - beforeLunch;
-      endMinutes = lEndM + remainingMinutes;
-    }
-  }
-
-  endMinutes = Math.min(23 * 60 + 59, Math.max(0, endMinutes));
+  const endMinutes = Math.min(23 * 60 + 59, startMinutes + targetMinutes + breakMinutes);
   const eh = Math.floor(endMinutes / 60);
   const em = endMinutes % 60;
   return `${String(eh).padStart(2, '0')}:${String(em).padStart(2, '0')}`;
+};
+
+export const getAppliedBreak = (start: string, end: string, isWork: boolean, overrideMinutes: number | null) => {
+  if (!isWork) return 0;
+  if (overrideMinutes !== null) return overrideMinutes;
+  const [sh, sm] = start.split(':').map(Number);
+  const [eh, em] = end.split(':').map(Number);
+  if (isNaN(sh) || isNaN(sm) || isNaN(eh) || isNaN(em)) return 0;
+  let smins = sh * 60 + sm;
+  let emins = eh * 60 + em;
+  if (emins < smins) emins += 24 * 60;
+  return (emins - smins > 270) ? 30 : 0;
 };
 
 const EntryFormModal: React.FC<EntryFormModalProps> = ({ 
@@ -136,9 +104,7 @@ const EntryFormModal: React.FC<EntryFormModalProps> = ({
   const [skipWeekends, setSkipWeekends] = useState(true);
   
   const [hasWorkHours, setHasWorkHours] = useState(true);
-  const [lunchBreak, setLunchBreak] = useState(true);
-  const [lunchStart, setLunchStart] = useState('11:00');
-  const [lunchEnd, setLunchEnd] = useState('11:30');
+  const [breakMinutes, setBreakMinutes] = useState<number | null>(null);
 
   const [rows, setRows] = useState<EntryRow[]>([]);
 
@@ -159,14 +125,7 @@ const EntryFormModal: React.FC<EntryFormModalProps> = ({
         const firstWithTime = initialEntries.find(e => e.startTime);
         if (firstWithTime?.startTime && firstWithTime?.endTime) {
           setHasWorkHours(true);
-          setLunchBreak((firstWithTime.breakMinutes ?? 30) > 0);
-          if (firstWithTime.lunchTime && firstWithTime.lunchTime.includes('–')) {
-            const [ls, le] = firstWithTime.lunchTime.split('–').map(s => s.trim());
-            if (ls && le) {
-              setLunchStart(ls);
-              setLunchEnd(le);
-            }
-          }
+          setBreakMinutes(firstWithTime.breakMinutes ?? null);
         } else {
           const isAbsence = initialEntries.every(e => 
             e.type !== WorkType.REGULAR && e.type !== WorkType.OVERTIME
@@ -192,9 +151,7 @@ const EntryFormModal: React.FC<EntryFormModalProps> = ({
         setMode('single');
         setDate(todayStr);
         setHasWorkHours(true);
-        setLunchBreak(true);
-        setLunchStart('11:00');
-        setLunchEnd('11:30');
+        setBreakMinutes(null);
         setRows([{
           id: uuidv4(),
           project: getDefaultJobId(),
