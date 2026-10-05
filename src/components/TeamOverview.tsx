@@ -96,8 +96,8 @@ const TeamOverview: React.FC<TeamOverviewProps> = ({
 
   return (
     <div className="bg-white rounded-2xl border border-slate-200 shadow-xs overflow-hidden mb-8">
-      <div className="p-4 sm:px-6 bg-slate-50 border-b border-slate-200 flex flex-col sm:flex-row justify-between sm:items-center gap-3">
-        <div className="flex items-center gap-2">
+      <div className="p-4 sm:px-6 bg-slate-50 border-b border-slate-200">
+        <div className="flex items-center gap-2 mb-4 sm:mb-0 sm:float-left">
           <span className="text-lg">👥</span>
           <div>
             <h3 className="font-extrabold text-sm text-slate-900">Týmový přehled zaměstnanců firmy Kabel</h3>
@@ -105,18 +105,18 @@ const TeamOverview: React.FC<TeamOverviewProps> = ({
           </div>
         </div>
 
-        <div className="flex flex-col sm:flex-row flex-wrap items-stretch sm:items-center gap-2 mt-3 sm:mt-0 w-full sm:w-auto">
+        <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-end gap-3 sm:gap-2 clear-both">
           {/* Přepínač Můj tým vs Všichni (pokud má přihlášený uživatel podřízené) */}
           {mySubordinates.length > 0 && (
-            <div className="flex items-center bg-white p-0.5 rounded-xl border border-slate-200 shadow-2xs text-xs font-bold w-full sm:w-auto">
+            <div className="grid grid-cols-2 sm:flex sm:items-center bg-white p-1 sm:p-0.5 rounded-xl border border-slate-300 shadow-sm text-xs font-bold w-full sm:w-auto">
               <button
                 type="button"
                 onClick={() => {
                   setFilterMode('my_team');
                   setSelectedSupervisorFilter('all');
                 }}
-                className={`flex-1 sm:flex-none px-2.5 py-1.5 rounded-lg transition-all cursor-pointer text-center ${
-                  filterMode === 'my_team' ? 'bg-indigo-600 text-white' : 'text-slate-600 hover:text-slate-900'
+                className={`px-3 py-2 sm:py-1.5 rounded-lg transition-all cursor-pointer text-center ${
+                  filterMode === 'my_team' ? 'bg-indigo-600 text-white shadow-sm' : 'text-slate-700 hover:bg-slate-100'
                 }`}
               >
                 Můj tým ({mySubordinates.length})
@@ -124,8 +124,8 @@ const TeamOverview: React.FC<TeamOverviewProps> = ({
               <button
                 type="button"
                 onClick={() => setFilterMode('all')}
-                className={`flex-1 sm:flex-none px-2.5 py-1.5 rounded-lg transition-all cursor-pointer text-center ${
-                  filterMode === 'all' ? 'bg-indigo-600 text-white' : 'text-slate-600 hover:text-slate-900'
+                className={`px-3 py-2 sm:py-1.5 rounded-lg transition-all cursor-pointer text-center ${
+                  filterMode === 'all' ? 'bg-indigo-600 text-white shadow-sm' : 'text-slate-700 hover:bg-slate-100'
                 }`}
               >
                 Celá firma
@@ -135,19 +135,21 @@ const TeamOverview: React.FC<TeamOverviewProps> = ({
 
           {/* Filtr podle vedoucího */}
           {filterMode === 'all' && supervisorsList.length > 0 && (
-            <select
-              value={selectedSupervisorFilter}
-              onChange={e => setSelectedSupervisorFilter(e.target.value)}
-              className="w-full sm:w-auto text-xs bg-white border border-slate-200 rounded-xl px-3 py-1.5 font-semibold text-slate-700 outline-none cursor-pointer shadow-2xs appearance-auto"
-            >
-              <option value="all">Všichni vedoucí</option>
-              <option value="unassigned">⚠️ Bez vedoucího</option>
-              {supervisorsList.map(s => (
-                <option key={s.id} value={s.id}>
-                  Tým: {s.name}
-                </option>
-              ))}
-            </select>
+            <div className="w-full sm:w-auto">
+              <select
+                value={selectedSupervisorFilter}
+                onChange={e => setSelectedSupervisorFilter(e.target.value)}
+                className="w-full sm:w-auto text-sm sm:text-xs bg-white border border-slate-300 rounded-xl px-4 py-2 sm:py-1.5 font-bold text-slate-800 outline-none cursor-pointer shadow-sm appearance-auto focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500"
+              >
+                <option value="all">Všichni vedoucí (Celá firma)</option>
+                <option value="unassigned">⚠️ Bez vedoucího</option>
+                {supervisorsList.map(s => (
+                  <option key={s.id} value={s.id}>
+                    Tým: {s.name}
+                  </option>
+                ))}
+              </select>
+            </div>
           )}
 
           <span className="hidden sm:inline-block text-xs text-slate-500 font-black bg-white px-3 py-1.5 rounded-xl border border-slate-200 shadow-2xs">
