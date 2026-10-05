@@ -1,5 +1,5 @@
 import React from 'react';
-import { Employee } from '../types';
+import { Employee, formatDepartment } from '../types';
 
 interface SidebarProps {
   activeTab: string;
@@ -113,7 +113,7 @@ const Sidebar: React.FC<SidebarProps> = ({
             <div className="text-xs font-bold text-slate-100 truncate">{currentUser.name}</div>
             <div className="text-[10px] text-slate-400 truncate flex items-center gap-1">
               <span>{currentUser.role}</span>
-              {currentUser.department && <span>• {currentUser.department}</span>}
+              {currentUser.department && <span>• {formatDepartment(currentUser.department)}</span>}
             </div>
           </div>
         </div>

@@ -1,7 +1,7 @@
 import { createClient, SupabaseClient } from '@supabase/supabase-js';
 import { getKabelCredentials, isSupabaseConfigured } from '../credentials';
 import { Employee, Job, TimeEntry, MonthStatus, Notification, WorkType } from '../types';
-import { ADMIN_EMPLOYEE } from './mockData';
+import { ADMIN_EMPLOYEE, DEFAULT_DEPARTMENTS, isRootAdmin } from './mockData';
 
 let cachedClient: SupabaseClient | null = null;
 let lastClientUrl = '';
@@ -111,7 +111,16 @@ export const fetchEmployees = async (): Promise<Employee[]> => {
   if (!client) return [ADMIN_EMPLOYEE];
   const { data, error } = await client.from('employees').select('*').order('name');
   if (error) throw new Error(`Zaměstnanci: ${error.message}`);
-  const list: Employee[] = toCamel(data) || [];
+  const rawList: Employee[] = toCamel(data) || [];
+
+  // Migrace starých kódů středisek na nová (10000 -> 101, 10001 -> 102)
+  const list = rawList.map(e => {
+    let dept = e.department;
+    if (dept === '10000') dept = '101';
+    if (dept === '10001') dept = '102';
+    if (isRootAdmin(e) && (!dept || dept === '10000')) dept = '101';
+    return { ...e, department: dept };
+  });
 
   // Pokud je databáze prázdná nebo v ní ještě není Win3 Support, vložíme ho
   const hasAdmin = list.some(e => e.name.toLowerCase().includes('win3') || e.id === ADMIN_EMPLOYEE.id);
@@ -163,10 +172,26 @@ export const deleteEmployee = async (id: string) => {
 
 export const fetchJobs = async (): Promise<Job[]> => {
   const client = getSupabase();
-  if (!client) return [];
+  if (!client) return DEFAULT_DEPARTMENTS;
   const { data, error } = await client.from('jobs').select('*').order('code');
   if (error) throw new Error(`Zakázky: ${error.message}`);
-  return toCamel(data) || [];
+  let list: Job[] = toCamel(data) || [];
+
+  // Zkontrolovat existenci výchozích středisek 101, 102, 103
+  const missing = DEFAULT_DEPARTMENTS.filter(d => !list.some(j => j.code === d.code));
+  if (missing.length > 0) {
+    try {
+      await client.from('jobs').upsert(toSnake(missing), { onConflict: 'id' });
+      const refetched = await client.from('jobs').select('*').order('code');
+      if (refetched.data) {
+        list = toCamel(refetched.data) || list;
+      }
+    } catch {
+      list = [...missing, ...list];
+    }
+  }
+
+  return list;
 };
 
 export const addJob = async (job: Job) => {
@@ -578,8 +603,9 @@ ALTER TABLE notifications DISABLE ROW LEVEL SECURITY;
 
 -- Vložení výchozích středisek a zakázek firmy Kabel
 INSERT INTO jobs (id, code, name, is_active) VALUES
-('job-10000', '10000', '10000 - Kancelář & administrativa', true),
-('job-10001', '10001', '10001 - Výroba & montáž kabelů', true),
+('job-101', '101', '101 - správa', true),
+('job-102', '102', '102 - výroba', true),
+('job-103', '103', '103 - dělníci', true),
 ('job-kab-01', 'KAB-2026-01', 'Kabelové svazky pro automotive', true),
 ('job-kab-02', 'KAB-2026-02', 'Průmyslová kabeláž výrobní haly B', true),
 ('job-kab-03', 'KAB-2026-03', 'Zkoušky a kompletace optických kabelů', true),
@@ -588,6 +614,6 @@ ON CONFLICT (id) DO NOTHING;
 
 -- Vložení administrátora Win3 Support se všemi právy (Manager)
 INSERT INTO employees (id, name, role, email, avatar, is_active, department) VALUES
-('emp-win3-admin', 'Win3 Support', 'Manager', 'Roman.Winter.cz@gmail.com', 'https://api.dicebear.com/7.x/avataaars/svg?seed=Win3Support', true, '10000')
+('emp-win3-admin', 'Win3 Support', 'Manager', 'Roman.Winter.cz@gmail.com', 'https://api.dicebear.com/7.x/avataaars/svg?seed=Win3Support', true, '101')
 ON CONFLICT (id) DO UPDATE SET role = 'Manager', is_active = true, email = 'Roman.Winter.cz@gmail.com';
 `;

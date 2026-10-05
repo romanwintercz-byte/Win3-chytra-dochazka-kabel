@@ -211,7 +211,15 @@ const EntryFormModal: React.FC<EntryFormModalProps> = ({
   const isWeekendDay = useMemo(() => isDateWeekend(date), [date]);
 
   const totalHours = useMemo(() => {
-    return rows.reduce((sum, row) => sum + (parseFloat(row.hours) || 0), 0);
+    return rows
+      .filter(r => r.type !== WorkType.DRIVE)
+      .reduce((sum, row) => sum + (parseFloat(row.hours) || 0), 0);
+  }, [rows]);
+
+  const totalDriveHours = useMemo(() => {
+    return rows
+      .filter(r => r.type === WorkType.DRIVE)
+      .reduce((sum, row) => sum + (parseFloat(row.hours) || 0), 0);
   }, [rows]);
 
   const analyzedRows = useMemo(() => {
@@ -220,6 +228,22 @@ const EntryFormModal: React.FC<EntryFormModalProps> = ({
 
     return rows.map((r) => {
       const hours = parseFloat(r.hours) || 0;
+
+      // Jízda se nezapočítává do pracovní doby ani přesčasů
+      if (r.type === WorkType.DRIVE) {
+        let net = hours;
+        if (hasWorkHours && r.startTime && r.endTime) {
+          net = calculateRowNetHours(r.startTime, r.endTime, false);
+        }
+        return {
+          row: r,
+          netHours: net,
+          regHours: 0,
+          otHours: 0,
+          hasOvertimeSplit: false,
+          isPureOvertime: false
+        };
+      }
 
       if (r.type !== WorkType.REGULAR && r.type !== WorkType.OVERTIME) {
         accumulatedRegular += hours;
@@ -328,9 +352,12 @@ const EntryFormModal: React.FC<EntryFormModalProps> = ({
     let regular = 0;
     let overtime = 0;
     let absence = 0;
+    let drive = 0;
 
     for (const a of analyzedRows) {
-      if (a.row.type !== WorkType.REGULAR && a.row.type !== WorkType.OVERTIME) {
+      if (a.row.type === WorkType.DRIVE) {
+        drive += a.netHours;
+      } else if (a.row.type !== WorkType.REGULAR && a.row.type !== WorkType.OVERTIME) {
         absence += a.netHours;
       } else {
         regular += a.regHours;
@@ -342,6 +369,7 @@ const EntryFormModal: React.FC<EntryFormModalProps> = ({
       regular: Math.round(regular * 10) / 10,
       overtime: Math.round(overtime * 10) / 10,
       absence: Math.round(absence * 10) / 10,
+      drive: Math.round(drive * 10) / 10,
       total: Math.round((regular + overtime + absence) * 10) / 10
     };
   }, [analyzedRows]);
@@ -505,8 +533,10 @@ const EntryFormModal: React.FC<EntryFormModalProps> = ({
   };
 
   const handleAddMissingHours = (type: WorkType, defaultDesc: string) => {
-    const currentTotal = rows.reduce((sum, row) => sum + (parseFloat(row.hours) || 0), 0);
-    const missing = Math.max(0, 8 - currentTotal);
+    const currentWorkingTotal = rows
+      .filter(r => r.type !== WorkType.DRIVE)
+      .reduce((sum, row) => sum + (parseFloat(row.hours) || 0), 0);
+    const missing = Math.max(0, 8 - currentWorkingTotal);
     if (missing <= 0) return;
     
     const lastRow = rows[rows.length - 1];
@@ -1055,6 +1085,12 @@ const EntryFormModal: React.FC<EntryFormModalProps> = ({
                             <option key={t} value={t}>{t}</option>
                           ))}
                         </select>
+                        {row.type === WorkType.DRIVE && (
+                          <div className="mt-1 text-[11px] text-cyan-800 bg-cyan-50 border border-cyan-200 rounded-lg px-2.5 py-1 font-medium flex items-center gap-1.5">
+                            <span>🚗</span>
+                            <span>Jízda se eviduje samostatně a nezapočítává se do pracovní doby.</span>
+                          </div>
+                        )}
                       </div>
                     </div>
 
@@ -1131,6 +1167,11 @@ const EntryFormModal: React.FC<EntryFormModalProps> = ({
                   {breakdown.overtime > 0 && (
                     <span className="text-xs font-bold text-orange-800 bg-orange-100/80 border border-orange-200 px-2 py-0.5 rounded">
                       Přesčas: +{breakdown.overtime.toFixed(1)}h
+                    </span>
+                  )}
+                  {breakdown.drive > 0 && (
+                    <span className="text-xs font-bold text-cyan-800 bg-cyan-50 border border-cyan-200 px-2 py-0.5 rounded">
+                      🚗 Jízda: {breakdown.drive.toFixed(1)}h (mimo prac. dobu)
                     </span>
                   )}
                   {hasWorkHours && lunchBreak && (

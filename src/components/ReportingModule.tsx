@@ -1,5 +1,5 @@
 import React, { useMemo, useState } from 'react';
-import { TimeEntry, Employee, Job, WorkType, MonthStatus, TimesheetStatus } from '../types';
+import { TimeEntry, Employee, Job, WorkType, MonthStatus, TimesheetStatus, formatDepartment } from '../types';
 import { getHolidayName } from '../services/holidayService';
 
 interface ReportingModuleProps {
@@ -68,8 +68,9 @@ const ReportingModule: React.FC<ReportingModuleProps> = ({
         doctor: dayEntries.filter(e => e.type === WorkType.DOCTOR).reduce((s, e) => s + e.hours, 0),
         vacation: dayEntries.filter(e => e.type === WorkType.VACATION).reduce((s, e) => s + e.hours, 0),
         sick: dayEntries.filter(e => e.type === WorkType.SICK_DAY).reduce((s, e) => s + e.hours, 0),
-        other: dayEntries.filter(e => ![WorkType.REGULAR, WorkType.OVERTIME, WorkType.DOCTOR, WorkType.VACATION, WorkType.SICK_DAY].includes(e.type)).reduce((s, e) => s + e.hours, 0),
-        total: dayEntries.reduce((s, e) => s + e.hours, 0),
+        drive: dayEntries.filter(e => e.type === WorkType.DRIVE).reduce((s, e) => s + e.hours, 0),
+        other: dayEntries.filter(e => ![WorkType.REGULAR, WorkType.OVERTIME, WorkType.DOCTOR, WorkType.VACATION, WorkType.SICK_DAY, WorkType.DRIVE].includes(e.type)).reduce((s, e) => s + e.hours, 0),
+        total: dayEntries.filter(e => e.type !== WorkType.DRIVE).reduce((s, e) => s + e.hours, 0),
         projects: Array.from(new Set(dayEntries.filter(e => e.project && e.project !== '').map(e => getProjectName(e.project)))).join(', '),
         timeRanges,
         lunchText,
@@ -82,6 +83,7 @@ const ReportingModule: React.FC<ReportingModuleProps> = ({
           if (proj) parts.push(proj);
           if (e.type === WorkType.OVERTIME) parts.push('(přesčas)');
           if (e.type === WorkType.COMPENSATORY_LEAVE) parts.push('(náhradní volno)');
+          if (e.type === WorkType.DRIVE) parts.push('(jízda - mimo prac. dobu)');
           if (e.description) parts.push(`"${e.description}"`);
           if (e.hours > 0) parts.push(`(${e.hours}h)`);
           return parts.join(' ');
@@ -97,8 +99,9 @@ const ReportingModule: React.FC<ReportingModuleProps> = ({
     }
 
     const fund = workingDays * 8;
-    const totalHours = filteredEntries.reduce((sum, e) => sum + e.hours, 0);
-    return { fund, totalHours, days, diff: totalHours - fund };
+    const totalHours = filteredEntries.filter(e => e.type !== WorkType.DRIVE).reduce((sum, e) => sum + e.hours, 0);
+    const totalDriveHours = filteredEntries.filter(e => e.type === WorkType.DRIVE).reduce((sum, e) => sum + e.hours, 0);
+    return { fund, totalHours, totalDriveHours, days, diff: totalHours - fund };
   }, [year, month, filteredEntries, jobs]);
 
   const typeSummary = useMemo(() => {
@@ -193,7 +196,7 @@ const ReportingModule: React.FC<ReportingModuleProps> = ({
               <h1 className="text-xl font-black text-slate-900 uppercase">Měsíční výkaz práce</h1>
             </div>
             <p className="text-sm font-bold text-slate-800 mt-0.5">{employee?.name}</p>
-            <p className="text-xs text-slate-500">{employee?.department === '10000' ? 'Středisko: 10000 Kancelář' : employee?.department === '10001' ? 'Středisko: 10001 Výroba kabelů' : ''}</p>
+            <p className="text-xs text-slate-500">{employee?.department ? `Středisko: ${formatDepartment(employee.department)}` : ''}</p>
           </div>
           <div className="text-right">
             <p className="text-xl font-black text-slate-900">{monthStr}</p>
@@ -201,8 +204,8 @@ const ReportingModule: React.FC<ReportingModuleProps> = ({
           </div>
         </div>
 
-        {/* 4 hlavní statistické karty */}
-        <div className="grid grid-cols-4 gap-3 mb-4">
+        {/* 4 hlavní statistické karty + jízda pokud existuje */}
+        <div className={`grid ${monthStats.totalDriveHours > 0 ? 'grid-cols-2 sm:grid-cols-5' : 'grid-cols-2 sm:grid-cols-4'} gap-3 mb-4`}>
           <div className="border-l-4 border-indigo-600 pl-2.5 py-0.5">
             <p className="text-[9px] font-black text-slate-400 uppercase tracking-tighter">Celkem odpracováno</p>
             <p className="text-xl font-black text-slate-900">{monthStats.totalHours.toFixed(1)} h</p>
@@ -221,6 +224,12 @@ const ReportingModule: React.FC<ReportingModuleProps> = ({
               {monthStats.diff > 0 ? '+' : ''}{monthStats.diff.toFixed(1)} h
             </p>
           </div>
+          {monthStats.totalDriveHours > 0 && (
+            <div className="border-l-4 border-cyan-500 pl-2.5 py-0.5 col-span-2 sm:col-span-1 bg-cyan-50/40 rounded-r-lg">
+              <p className="text-[9px] font-black text-cyan-800 uppercase tracking-tighter">Jízda (mimo fond)</p>
+              <p className="text-xl font-black text-cyan-700">{monthStats.totalDriveHours.toFixed(1)} h</p>
+            </div>
+          )}
         </div>
 
         {/* Tabulka zakázek */}
@@ -277,6 +286,7 @@ const ReportingModule: React.FC<ReportingModuleProps> = ({
                         <th className="p-1 text-center w-6">LÉK.</th>
                         <th className="p-1 text-center w-6">DOV.</th>
                         <th className="p-1 text-center w-6">NEM.</th>
+                        <th className="p-1 text-center w-6 text-cyan-300">JÍZ.</th>
                         <th className="p-1 text-center w-6">OST.</th>
                         <th className="p-1 text-right w-8">SUM</th>
                       </tr>
@@ -295,6 +305,7 @@ const ReportingModule: React.FC<ReportingModuleProps> = ({
                           <td className={`p-1 text-center ${day.doctor > 0 ? 'font-bold text-indigo-600' : 'text-slate-300'}`}>{day.doctor || '-'}</td>
                           <td className={`p-1 text-center ${day.vacation > 0 ? 'font-bold text-emerald-600' : 'text-slate-300'}`}>{day.vacation || '-'}</td>
                           <td className={`p-1 text-center ${day.sick > 0 ? 'font-bold text-rose-600' : 'text-slate-300'}`}>{day.sick || '-'}</td>
+                          <td className={`p-1 text-center ${day.drive > 0 ? 'font-bold text-cyan-700' : 'text-slate-300'}`}>{day.drive || '-'}</td>
                           <td className={`p-1 text-center ${day.other > 0 ? 'font-bold text-slate-600' : 'text-slate-300'}`}>{day.other || '-'}</td>
                           <td className={`p-1 text-right font-black ${day.total > 0 ? 'text-slate-900' : 'text-slate-300'}`}>
                             {day.total > 0 ? `${day.total.toFixed(1)}` : '-'}
@@ -317,6 +328,7 @@ const ReportingModule: React.FC<ReportingModuleProps> = ({
                         <th className="p-1 text-center w-6">LÉK.</th>
                         <th className="p-1 text-center w-6">DOV.</th>
                         <th className="p-1 text-center w-6">NEM.</th>
+                        <th className="p-1 text-center w-6 text-cyan-300">JÍZ.</th>
                         <th className="p-1 text-center w-6">OST.</th>
                         <th className="p-1 text-right w-8">SUM</th>
                       </tr>
@@ -335,6 +347,7 @@ const ReportingModule: React.FC<ReportingModuleProps> = ({
                           <td className={`p-1 text-center ${day.doctor > 0 ? 'font-bold text-indigo-600' : 'text-slate-300'}`}>{day.doctor || '-'}</td>
                           <td className={`p-1 text-center ${day.vacation > 0 ? 'font-bold text-emerald-600' : 'text-slate-300'}`}>{day.vacation || '-'}</td>
                           <td className={`p-1 text-center ${day.sick > 0 ? 'font-bold text-rose-600' : 'text-slate-300'}`}>{day.sick || '-'}</td>
+                          <td className={`p-1 text-center ${day.drive > 0 ? 'font-bold text-cyan-700' : 'text-slate-300'}`}>{day.drive || '-'}</td>
                           <td className={`p-1 text-center ${day.other > 0 ? 'font-bold text-slate-600' : 'text-slate-300'}`}>{day.other || '-'}</td>
                           <td className={`p-1 text-right font-black ${day.total > 0 ? 'text-slate-900' : 'text-slate-300'}`}>
                             {day.total > 0 ? `${day.total.toFixed(1)}` : '-'}
@@ -359,6 +372,7 @@ const ReportingModule: React.FC<ReportingModuleProps> = ({
                       <th className="p-1.5 text-center w-8">LÉK.</th>
                       <th className="p-1.5 text-center w-8">DOV.</th>
                       <th className="p-1.5 text-center w-8">NEM.</th>
+                      <th className="p-1.5 text-center w-8 text-cyan-300">JÍZDA</th>
                       <th className="p-1.5 text-center w-8">OST.</th>
                       <th className="p-1.5 text-right w-10">CELK.</th>
                     </tr>
@@ -401,6 +415,7 @@ const ReportingModule: React.FC<ReportingModuleProps> = ({
                         <td className={`p-1.5 text-center align-top ${day.doctor > 0 ? 'font-bold text-indigo-600' : 'text-slate-300'}`}>{day.doctor || '-'}</td>
                         <td className={`p-1.5 text-center align-top ${day.vacation > 0 ? 'font-bold text-emerald-600' : 'text-slate-300'}`}>{day.vacation || '-'}</td>
                         <td className={`p-1.5 text-center align-top ${day.sick > 0 ? 'font-bold text-rose-600' : 'text-slate-300'}`}>{day.sick || '-'}</td>
+                        <td className={`p-1.5 text-center align-top ${day.drive > 0 ? 'font-bold text-cyan-700' : 'text-slate-300'}`}>{day.drive || '-'}</td>
                         <td className={`p-1.5 text-center align-top ${day.other > 0 ? 'font-bold text-slate-600' : 'text-slate-300'}`}>{day.other || '-'}</td>
                         <td className={`p-1.5 text-right font-black align-top ${day.total > 0 ? 'text-slate-900' : 'text-slate-300'}`}>
                           {day.total > 0 ? `${day.total.toFixed(1)}` : '-'}
@@ -416,15 +431,16 @@ const ReportingModule: React.FC<ReportingModuleProps> = ({
           {/* Souhrnná patička */}
           <div className="bg-slate-100 p-2 mt-2 border-y-2 border-slate-300 font-black text-[9px] flex flex-wrap justify-between items-center gap-2">
             <span className="uppercase tracking-wider text-slate-600">Součty měsíce:</span>
-            <div className="flex gap-4">
+            <div className="flex flex-wrap gap-4">
               <span>Běžná práce: <strong>{(typeSummary[WorkType.REGULAR] || 0).toFixed(1)} h</strong></span>
               <span className="text-orange-700">Přesčas: <strong>{(typeSummary[WorkType.OVERTIME] || 0).toFixed(1)} h</strong></span>
               <span className="text-indigo-700">Lékař: <strong>{(typeSummary[WorkType.DOCTOR] || 0).toFixed(1)} h</strong></span>
               <span className="text-emerald-700">Dovolená: <strong>{(typeSummary[WorkType.VACATION] || 0).toFixed(1)} h</strong></span>
               <span className="text-rose-700">Nemoc: <strong>{(typeSummary[WorkType.SICK_DAY] || 0).toFixed(1)} h</strong></span>
+              <span className="text-cyan-800">Jízda (mimo prac. dobu): <strong>{(typeSummary[WorkType.DRIVE] || 0).toFixed(1)} h</strong></span>
             </div>
-            <div className="text-indigo-900 text-xs">
-              CELKEM: <strong className="text-sm">{monthStats.totalHours.toFixed(1)} h</strong>
+            <div className="text-indigo-900 text-xs flex items-center gap-2">
+              <span>ODPRACOVÁNO: <strong className="text-sm">{monthStats.totalHours.toFixed(1)} h</strong></span>
             </div>
           </div>
         </div>

@@ -39,8 +39,18 @@ const HelpSystem: React.FC = () => {
 
           <div className="flex-1 overflow-y-auto py-3 space-y-3.5 text-xs text-slate-600 pr-1">
             <div className="bg-slate-50 p-3 rounded-xl border border-slate-100">
-              <strong className="text-slate-900 block mb-1">Jak zadat směnu?</strong>
-              V sekci <em>Přehled</em> klikněte na <strong>Editor</strong>. Zadejte čas příchodu a odchodu (např. 06:30 – 15:00) a vyberte kabelovou zakázku.
+              <strong className="text-slate-900 block mb-1">Jak funguje živý záznamník (Jízda / Práce)?</strong>
+              Přímo v horní části přehledu máte stopky „na ráně“. Ráno zvolte zakázku a klikněte na <strong>Zahájit Jízdu</strong>. Po příjezdu na místo klikněte na <strong>Práce</strong> (automaticky se ukončí jízda a začne měřit práce). Po směně klikněte na <strong>Jízda</strong> a po dojezdu na <strong>Konec jízdy</strong>.
+            </div>
+
+            <div className="bg-slate-50 p-3 rounded-xl border border-slate-100">
+              <strong className="text-slate-900 block mb-1">Počítá se jízda do pracovní doby?</strong>
+              Jízda se eviduje samostatně s přesnými časy i zakázkou, ale nezapočítává se do fondu pracovní doby. Ve výkazech i přehledech je přehledně vyčíslena.
+            </div>
+
+            <div className="bg-slate-50 p-3 rounded-xl border border-slate-100">
+              <strong className="text-slate-900 block mb-1">Jak zadat směnu ručně zpětně?</strong>
+              V sekci <em>Přehled</em> klikněte na <strong>Editor</strong>. Zadejte čas příchodu a odchodu (např. 06:30 – 15:00) a vyberte zakázku.
             </div>
 
             <div className="bg-slate-50 p-3 rounded-xl border border-slate-100">

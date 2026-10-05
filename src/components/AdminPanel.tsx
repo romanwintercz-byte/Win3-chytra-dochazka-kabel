@@ -1,5 +1,5 @@
 import React, { useState, useRef } from 'react';
-import { Employee, Job } from '../types';
+import { Employee, Job, formatDepartment, DEPARTMENT_OPTIONS } from '../types';
 import { v4 as uuidv4 } from 'uuid';
 import { getFullBackup, restoreBackup } from '../services/supabase';
 import { isRootAdmin } from '../services/mockData';
@@ -36,7 +36,7 @@ const AdminPanel: React.FC<AdminPanelProps> = ({
   const [newEmpRole, setNewEmpRole] = useState<'Manager' | 'Zaměstnanec'>('Zaměstnanec');
   const [newEmpPin, setNewEmpPin] = useState('');
   const [showPinField, setShowPinField] = useState(false);
-  const [newEmpDepartment, setNewEmpDepartment] = useState<'10000' | '10001' | string>('10001');
+  const [newEmpDepartment, setNewEmpDepartment] = useState<'101' | '102' | '103' | string>('102');
   
   // Bezpečnostní ověření PINem pro administrátora Win3 Support
   const [isVerifyingAdminPin, setIsVerifyingAdminPin] = useState(false);
@@ -143,7 +143,7 @@ const AdminPanel: React.FC<AdminPanelProps> = ({
     setNewEmpEmail('');
     setNewEmpRole('Zaměstnanec');
     setNewEmpPin('');
-    setNewEmpDepartment('10001');
+    setNewEmpDepartment('102');
   };
 
   const startEditingEmp = (emp: Employee) => {
@@ -153,7 +153,7 @@ const AdminPanel: React.FC<AdminPanelProps> = ({
     setNewEmpRole(emp.role);
     // Nikdy nevypisujeme existující PIN v čistém textu
     setNewEmpPin('');
-    setNewEmpDepartment(emp.department || '10001');
+    setNewEmpDepartment(emp.department || '102');
   };
 
   const handleEditEmpClick = (emp: Employee) => {
@@ -182,7 +182,7 @@ const AdminPanel: React.FC<AdminPanelProps> = ({
     setNewEmpEmail('');
     setNewEmpRole('Zaměstnanec');
     setNewEmpPin('');
-    setNewEmpDepartment('10001');
+    setNewEmpDepartment('102');
   };
 
   const handleAddJobSubmit = (e: React.FormEvent) => {
@@ -342,8 +342,9 @@ const AdminPanel: React.FC<AdminPanelProps> = ({
                   onChange={e => setNewEmpDepartment(e.target.value)}
                   className="w-full h-10 px-3 bg-white border border-slate-300 rounded-xl text-xs font-semibold text-slate-800 outline-none"
                 >
-                  <option value="10001">10001 - Výroba a montáž kabelů</option>
-                  <option value="10000">10000 - Kancelář a administrativa</option>
+                  {DEPARTMENT_OPTIONS.map(opt => (
+                    <option key={opt.code} value={opt.code}>{opt.name}</option>
+                  ))}
                   <option value="">Bez střediska</option>
                 </select>
               </div>
@@ -388,7 +389,7 @@ const AdminPanel: React.FC<AdminPanelProps> = ({
                           {e.pinCode && <span title="Chráněno PIN kódem" className="text-xs">🔒</span>}
                         </div>
                         <div className="text-[11px] text-slate-500 mt-0.5">
-                          <span className="font-medium text-slate-700">{e.role}</span> • {e.department === '10000' ? 'Kancelář' : e.department === '10001' ? 'Výroba' : e.department || 'Bez střediska'}
+                          <span className="font-medium text-slate-700">{e.role}</span> • {formatDepartment(e.department)}
                           {e.email && <span className="hidden sm:inline text-slate-400 font-normal"> • {e.email}</span>}
                         </div>
                       </div>
@@ -471,7 +472,7 @@ const AdminPanel: React.FC<AdminPanelProps> = ({
               
               <input 
                 type="text" 
-                placeholder="Kód zakázky (např. KAB-2026-05 nebo 10001)" 
+                placeholder="Kód zakázky (např. KAB-2026-05 nebo 102)" 
                 value={newJobCode} 
                 onChange={e => setNewJobCode(e.target.value)}
                 className="w-full h-10 px-3 bg-white border border-slate-300 rounded-xl text-xs font-mono font-bold text-slate-900 outline-none focus:ring-2 focus:ring-indigo-500 uppercase"

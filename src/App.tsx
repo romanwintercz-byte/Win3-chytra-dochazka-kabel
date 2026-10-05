@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useMemo, useCallback } from 'react';
 import Sidebar from './components/Sidebar';
+import LiveTimeTracker from './components/LiveTimeTracker';
 import SmartInput from './components/SmartInput';
 import TimesheetTable from './components/TimesheetTable';
 import Dashboard from './components/Dashboard';
@@ -205,6 +206,27 @@ const App: React.FC = () => {
     });
     
     setEditingEntries([]);
+  };
+
+  const handleAddLiveEntry = async (entry: TimeEntry) => {
+    if (isLocked) return;
+    db.saveLocalTimeMeta([entry]);
+
+    if (!useDemoData) {
+      try {
+        await db.addTimeEntriesBulk([entry]);
+      } catch (e: any) {
+        alert(`Chyba při ukládání záznamu: ${e.message}`);
+        return;
+      }
+    }
+
+    setEntries(prev => [...prev, entry]);
+
+    const entryMonth = entry.date.slice(0, 7);
+    if (entryMonth && entryMonth !== selectedMonth) {
+      setSelectedMonth(entryMonth);
+    }
   };
 
   const handleDeleteEntry = async (id: string) => {
@@ -491,11 +513,36 @@ const App: React.FC = () => {
               />
             )}
 
+            {/* Živý záznamník docházky a jízdy (Stopky dne na ráně) */}
+            {!isLocked && (
+              <LiveTimeTracker 
+                currentUserId={String(targetUserId)}
+                targetUser={targetUser}
+                jobs={jobs}
+                todayEntries={entries.filter(e => String(e.employeeId) === String(targetUserId))}
+                onAddEntry={handleAddLiveEntry}
+                onDeleteEntry={handleDeleteEntry}
+                onOpenManualEditor={() => {
+                  setEditingEntries([]);
+                  setIsEntryModalOpen(true);
+                }}
+                isLocked={isLocked}
+              />
+            )}
+
             {/* Rychlé akce / Odemčený zápis */}
             {!isLocked ? (
               <SmartInput 
-                onEntriesAdded={(newE) => {
-                  if (!useDemoData) db.addTimeEntriesBulk(newE);
+                onEntriesAdded={async (newE) => {
+                  db.saveLocalTimeMeta(newE);
+                  if (!useDemoData) {
+                    try {
+                      await db.addTimeEntriesBulk(newE);
+                    } catch (e: any) {
+                      alert(`Chyba při ukládání: ${e.message}`);
+                      return;
+                    }
+                  }
                   setEntries(prev => [...prev, ...newE]);
                 }} 
                 currentUserId={String(targetUserId)} 

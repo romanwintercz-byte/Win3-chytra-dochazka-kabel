@@ -25,16 +25,21 @@ export const ADMIN_EMPLOYEE: Employee = {
   role: 'Manager',
   avatar: 'https://api.dicebear.com/7.x/avataaars/svg?seed=Win3Support',
   isActive: true,
-  department: '10000'
+  department: '101'
 };
 
 export const MOCK_EMPLOYEES: Employee[] = [
   ADMIN_EMPLOYEE
 ];
 
+export const DEFAULT_DEPARTMENTS: Job[] = [
+  { id: 'job-101', code: '101', name: '101 - správa', isActive: true },
+  { id: 'job-102', code: '102', name: '102 - výroba', isActive: true },
+  { id: 'job-103', code: '103', name: '103 - dělníci', isActive: true }
+];
+
 export const MOCK_JOBS: Job[] = [
-  { id: 'job-10000', code: '10000', name: '10000 - Kancelář & administrativa', isActive: true },
-  { id: 'job-10001', code: '10001', name: '10001 - Výroba & montáž kabelů', isActive: true },
+  ...DEFAULT_DEPARTMENTS,
   { id: 'job-kab-01', code: 'KAB-2026-01', name: 'Kabelové svazky pro automotive', isActive: true },
   { id: 'job-kab-02', code: 'KAB-2026-02', name: 'Průmyslová kabeláž výrobní haly B', isActive: true },
   { id: 'job-kab-03', code: 'KAB-2026-03', name: 'Zkoušky a kompletace optických kabelů', isActive: true },

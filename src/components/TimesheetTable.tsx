@@ -26,6 +26,7 @@ const TimesheetTable: React.FC<TimesheetTableProps> = ({ entries, onDelete, onEd
       [WorkType.SICK_DAY]: 'bg-rose-100 text-rose-800 border-rose-200',
       [WorkType.OVERTIME]: 'bg-orange-100 text-orange-800 border-orange-200 font-black',
       [WorkType.COMPENSATORY_LEAVE]: 'bg-teal-100 text-teal-800 border-teal-200',
+      [WorkType.DRIVE]: 'bg-cyan-100 text-cyan-800 border-cyan-300 font-bold',
     };
     return (
       <span className={`text-[10px] px-2 py-0.5 rounded-md font-bold uppercase border ${colors[type] || 'bg-slate-100 text-slate-600 border-slate-200'}`}>
@@ -52,9 +53,12 @@ const TimesheetTable: React.FC<TimesheetTableProps> = ({ entries, onDelete, onEd
               const dateOnly = e.date ? e.date.split('T')[0] : '';
               const isFirstInDay = idx === 0 || (sorted[idx - 1].date ? sorted[idx - 1].date.split('T')[0] !== dateOnly : false);
               
-              // Výpočet součtu pro celý den
-              const dayTotal = isFirstInDay 
-                ? sorted.filter(entry => (entry.date ? entry.date.split('T')[0] === dateOnly : false)).reduce((sum, entry) => sum + entry.hours, 0)
+              // Výpočet součtu pro celý den (práce vs jízda mimo fond)
+              const dayWorkTotal = isFirstInDay 
+                ? sorted.filter(entry => (entry.date ? entry.date.split('T')[0] === dateOnly : false) && entry.type !== WorkType.DRIVE).reduce((sum, entry) => sum + entry.hours, 0)
+                : 0;
+              const dayDriveTotal = isFirstInDay
+                ? sorted.filter(entry => (entry.date ? entry.date.split('T')[0] === dateOnly : false) && entry.type === WorkType.DRIVE).reduce((sum, entry) => sum + entry.hours, 0)
                 : 0;
 
               const dateParts = dateOnly.split('-').map(Number);
@@ -94,8 +98,13 @@ const TimesheetTable: React.FC<TimesheetTableProps> = ({ entries, onDelete, onEd
                             <span>🍽️ Oběd: {e.breakMinutes}m</span>
                           </div>
                         ) : null}
-                        <div className="text-[10px] font-black text-indigo-600 mt-1 uppercase">
-                          Suma dne: {dayTotal.toFixed(1)} h
+                        <div className="text-[10px] font-black text-indigo-600 mt-1 uppercase flex items-center flex-wrap gap-1">
+                          <span>Práce: {dayWorkTotal.toFixed(1)} h</span>
+                          {dayDriveTotal > 0 && (
+                            <span className="text-cyan-700 bg-cyan-50 px-1 py-0.2 rounded border border-cyan-200 lowercase">
+                              +{dayDriveTotal.toFixed(1)}h jízda
+                            </span>
+                          )}
                         </div>
                       </div>
                     ) : (
@@ -124,7 +133,10 @@ const TimesheetTable: React.FC<TimesheetTableProps> = ({ entries, onDelete, onEd
                   </td>
 
                   <td className="px-4 py-3.5 text-right font-black text-slate-900 text-base">
-                    {e.hours.toFixed(1)} h
+                    <div>{e.hours.toFixed(1)} h</div>
+                    {e.type === WorkType.DRIVE && (
+                      <div className="text-[10px] font-bold text-cyan-700 tracking-tight">mimo prac. dobu</div>
+                    )}
                   </td>
 
                   {!isLocked && (

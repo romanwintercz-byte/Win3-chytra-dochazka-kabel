@@ -28,7 +28,8 @@ const Dashboard: React.FC<DashboardProps> = ({ entries, selectedMonth }) => {
     }
 
     const fundHours = workingDays * 8;
-    const totalHours = entries.reduce((acc, curr) => acc + (curr.hours || 0), 0);
+    const totalHours = entries.filter(e => e.type !== WorkType.DRIVE).reduce((acc, curr) => acc + (curr.hours || 0), 0);
+    const driveHours = entries.filter(e => e.type === WorkType.DRIVE).reduce((acc, curr) => acc + (curr.hours || 0), 0);
     const regularHours = entries.filter(e => e.type === WorkType.REGULAR).reduce((acc, curr) => acc + curr.hours, 0);
     const overtimeHours = entries.filter(e => e.type === WorkType.OVERTIME).reduce((acc, curr) => acc + curr.hours, 0);
     const doctorHours = entries.filter(e => e.type === WorkType.DOCTOR).reduce((acc, curr) => acc + curr.hours, 0);
@@ -45,6 +46,7 @@ const Dashboard: React.FC<DashboardProps> = ({ entries, selectedMonth }) => {
     return {
       fundHours,
       totalHours: Math.round(totalHours * 10) / 10,
+      driveHours: Math.round(driveHours * 10) / 10,
       regularHours: Math.round(regularHours * 10) / 10,
       overtimeHours: Math.round(overtimeHours * 10) / 10,
       doctorHours: Math.round(doctorHours * 10) / 10,
@@ -109,7 +111,7 @@ const Dashboard: React.FC<DashboardProps> = ({ entries, selectedMonth }) => {
       </div>
 
       {/* Statistické karty */}
-      <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 pt-1">
+      <div className={`grid grid-cols-2 ${stats.driveHours > 0 ? 'sm:grid-cols-3 lg:grid-cols-5' : 'sm:grid-cols-4'} gap-3 pt-1`}>
         <div className="bg-slate-50 p-3 rounded-xl border border-slate-200/80">
           <p className="text-[10px] font-black uppercase tracking-wider text-slate-400">Běžná práce</p>
           <p className="text-lg font-black text-slate-900 mt-0.5">{stats.regularHours.toFixed(1)} h</p>
@@ -129,6 +131,16 @@ const Dashboard: React.FC<DashboardProps> = ({ entries, selectedMonth }) => {
           <p className="text-[10px] font-black uppercase tracking-wider text-emerald-700">Dovolená</p>
           <p className="text-lg font-black text-emerald-800 mt-0.5">{stats.vacationHours.toFixed(1)} h</p>
         </div>
+
+        {stats.driveHours > 0 && (
+          <div className="bg-cyan-50/80 p-3 rounded-xl border border-cyan-200 col-span-2 sm:col-span-1">
+            <p className="text-[10px] font-black uppercase tracking-wider text-cyan-800 flex items-center justify-between">
+              <span>Jízda</span>
+              <span className="text-[9px] font-bold text-cyan-600 lowercase">(mimo fond)</span>
+            </p>
+            <p className="text-lg font-black text-cyan-900 mt-0.5">{stats.driveHours.toFixed(1)} h</p>
+          </div>
+        )}
       </div>
     </div>
   );

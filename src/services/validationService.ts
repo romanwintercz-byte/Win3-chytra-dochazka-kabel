@@ -1,4 +1,4 @@
-import { TimeEntry, ValidationIssue } from '../types';
+import { TimeEntry, ValidationIssue, WorkType, isWorkingTime } from '../types';
 import { getHolidayName } from './holidayService';
 
 export const validateMonth = (entries: TimeEntry[], yearStr: string, monthStr: string): ValidationIssue[] => {
@@ -15,12 +15,18 @@ export const validateMonth = (entries: TimeEntry[], yearStr: string, monthStr: s
     const isWeekend = dateObj.getDay() === 0 || dateObj.getDay() === 6;
     const holiday = getHolidayName(dateStr);
     
-    // Sčítáme všechny hodiny za daný den (robustní matching)
+    // Záznamy za daný den
     const dayEntries = entries.filter(e => e.date && e.date.split('T')[0] === dateStr);
-    const totalHours = dayEntries.reduce((sum, e) => sum + e.hours, 0);
+    const workingHours = dayEntries
+      .filter(e => isWorkingTime(e.type))
+      .reduce((sum, e) => sum + e.hours, 0);
+    const driveHours = dayEntries
+      .filter(e => e.type === WorkType.DRIVE)
+      .reduce((sum, e) => sum + e.hours, 0);
+    const totalEntriesCount = dayEntries.length;
 
     // Chyba: Pracovní den v minulosti bez jakéhokoliv záznamu
-    if (!isWeekend && !holiday && totalHours === 0) {
+    if (!isWeekend && !holiday && totalEntriesCount === 0) {
       if (dateObj < now) {
         issues.push({ 
           date: dateStr, 
@@ -32,22 +38,23 @@ export const validateMonth = (entries: TimeEntry[], yearStr: string, monthStr: s
       continue;
     }
 
-    // Varování: Málo hodin celkem (práce + lékař atd.)
-    if (!isWeekend && !holiday && totalHours > 0 && totalHours < 8) {
+    // Varování: Málo odpracovaných hodin (standard 8h)
+    // Jízda se nepočítá do pracovní doby
+    if (!isWeekend && !holiday && workingHours > 0 && workingHours < 8) {
       issues.push({ 
         date: dateStr, 
         severity: 'warning', 
-        message: `Nízký součet dne: ${totalHours}h (standard 8h).`, 
+        message: `Nízký součet odpracované doby: ${workingHours}h (standard 8h).${driveHours > 0 ? ` (+${driveHours}h jízda mimo prac. dobu)` : ''}`, 
         type: 'LOW_HOURS' 
       });
     }
 
-    // Varování: Příliš mnoho hodin
-    if (totalHours > 12) {
+    // Varování: Příliš mnoho odpracovaných hodin
+    if (workingHours > 12) {
       issues.push({ 
         date: dateStr, 
         severity: 'warning', 
-        message: `Vysoký denní součet: ${totalHours}h. Prověřte limity ZP.`, 
+        message: `Vysoký denní součet odpracované doby: ${workingHours}h. Prověřte limity ZP.`, 
         type: 'HIGH_HOURS' 
       });
     }

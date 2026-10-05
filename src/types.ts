@@ -1,6 +1,7 @@
 export enum WorkType {
   REGULAR = 'Běžná práce',
   OVERTIME = 'Přesčas',
+  DRIVE = 'Jízda',
   VACATION = 'Dovolená',
   SICK_DAY = 'Nemocenská',
   HOLIDAY = 'Svátek',
@@ -12,6 +13,10 @@ export enum WorkType {
   OTHER_OBSTACLE = 'Jiná překážka',
   SIXTY_PERCENT = '60%'
 }
+
+export const isWorkingTime = (type: WorkType | string): boolean => {
+  return type !== WorkType.DRIVE && type !== 'Jízda';
+};
 
 export enum TimesheetStatus {
   DRAFT = 'DRAFT',
@@ -28,8 +33,22 @@ export interface Employee {
   avatar: string;
   isActive: boolean;
   pinCode?: string;
-  department?: '10000' | '10001' | string;
+  department?: '101' | '102' | '103' | string;
 }
+
+export const DEPARTMENT_OPTIONS = [
+  { code: '101', name: '101 - správa' },
+  { code: '102', name: '102 - výroba' },
+  { code: '103', name: '103 - dělníci' }
+] as const;
+
+export const formatDepartment = (dept?: string): string => {
+  if (!dept) return 'Bez střediska';
+  if (dept === '101' || dept === '10000') return '101 - správa';
+  if (dept === '102' || dept === '10001') return '102 - výroba';
+  if (dept === '103') return '103 - dělníci';
+  return dept;
+};
 
 export interface Job {
   id: string;

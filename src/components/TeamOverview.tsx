@@ -1,5 +1,5 @@
 import React from 'react';
-import { Employee, TimeEntry, MonthStatus, TimesheetStatus } from '../types';
+import { Employee, TimeEntry, MonthStatus, TimesheetStatus, formatDepartment, WorkType } from '../types';
 
 interface TeamOverviewProps {
   employees: Employee[];
@@ -49,7 +49,13 @@ const TeamOverview: React.FC<TeamOverviewProps> = ({
 
   const getEmpMonthlyHours = (empId: string) => {
     return allEntries
-      .filter(e => String(e.employeeId) === String(empId) && e.date.startsWith(selectedMonth))
+      .filter(e => String(e.employeeId) === String(empId) && e.date.startsWith(selectedMonth) && e.type !== WorkType.DRIVE)
+      .reduce((sum, e) => sum + (e.hours || 0), 0);
+  };
+
+  const getEmpDriveHours = (empId: string) => {
+    return allEntries
+      .filter(e => String(e.employeeId) === String(empId) && e.date.startsWith(selectedMonth) && e.type === WorkType.DRIVE)
       .reduce((sum, e) => sum + (e.hours || 0), 0);
   };
 
@@ -91,6 +97,7 @@ const TeamOverview: React.FC<TeamOverviewProps> = ({
             ) : (
               activeEmployees.map(e => {
                 const hours = getEmpMonthlyHours(e.id);
+                const driveHours = getEmpDriveHours(e.id);
                 const hasPendingApproval = statuses.find(s => String(s.employeeId) === String(e.id) && s.month === selectedMonth)?.status === TimesheetStatus.SUBMITTED;
 
                 return (
@@ -116,7 +123,7 @@ const TeamOverview: React.FC<TeamOverviewProps> = ({
 
                     <td className="py-3 px-4 text-center">
                       <span className="text-[11px] font-mono font-bold px-2 py-0.5 rounded bg-slate-100 text-slate-700">
-                        {e.department === '10000' ? '10000 Kancelář' : e.department === '10001' ? '10001 Výroba' : e.department || '-'}
+                        {formatDepartment(e.department)}
                       </span>
                     </td>
 
@@ -128,6 +135,11 @@ const TeamOverview: React.FC<TeamOverviewProps> = ({
                       <span className="font-black text-slate-900 text-sm">
                         {hours.toFixed(1)} h
                       </span>
+                      {driveHours > 0 && (
+                        <div className="text-[10px] font-bold text-cyan-700 whitespace-nowrap">
+                          🚗 {driveHours.toFixed(1)} h jízda
+                        </div>
+                      )}
                     </td>
 
                     <td className="py-3 px-4 sm:px-6 text-right">
