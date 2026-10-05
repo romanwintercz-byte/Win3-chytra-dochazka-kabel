@@ -105,17 +105,17 @@ const TeamOverview: React.FC<TeamOverviewProps> = ({
           </div>
         </div>
 
-        <div className="flex flex-wrap items-center gap-2">
+        <div className="flex flex-col sm:flex-row flex-wrap items-stretch sm:items-center gap-2 mt-3 sm:mt-0 w-full sm:w-auto">
           {/* Přepínač Můj tým vs Všichni (pokud má přihlášený uživatel podřízené) */}
           {mySubordinates.length > 0 && (
-            <div className="flex items-center bg-white p-0.5 rounded-xl border border-slate-200 shadow-2xs text-xs font-bold">
+            <div className="flex items-center bg-white p-0.5 rounded-xl border border-slate-200 shadow-2xs text-xs font-bold w-full sm:w-auto">
               <button
                 type="button"
                 onClick={() => {
                   setFilterMode('my_team');
                   setSelectedSupervisorFilter('all');
                 }}
-                className={`px-2.5 py-1 rounded-lg transition-all cursor-pointer ${
+                className={`flex-1 sm:flex-none px-2.5 py-1.5 rounded-lg transition-all cursor-pointer text-center ${
                   filterMode === 'my_team' ? 'bg-indigo-600 text-white' : 'text-slate-600 hover:text-slate-900'
                 }`}
               >
@@ -124,7 +124,7 @@ const TeamOverview: React.FC<TeamOverviewProps> = ({
               <button
                 type="button"
                 onClick={() => setFilterMode('all')}
-                className={`px-2.5 py-1 rounded-lg transition-all cursor-pointer ${
+                className={`flex-1 sm:flex-none px-2.5 py-1.5 rounded-lg transition-all cursor-pointer text-center ${
                   filterMode === 'all' ? 'bg-indigo-600 text-white' : 'text-slate-600 hover:text-slate-900'
                 }`}
               >
@@ -138,7 +138,7 @@ const TeamOverview: React.FC<TeamOverviewProps> = ({
             <select
               value={selectedSupervisorFilter}
               onChange={e => setSelectedSupervisorFilter(e.target.value)}
-              className="text-xs bg-white border border-slate-200 rounded-xl px-2.5 py-1 font-semibold text-slate-700 outline-none cursor-pointer shadow-2xs"
+              className="w-full sm:w-auto text-xs bg-white border border-slate-200 rounded-xl px-3 py-1.5 font-semibold text-slate-700 outline-none cursor-pointer shadow-2xs appearance-auto"
             >
               <option value="all">Všichni vedoucí</option>
               <option value="unassigned">⚠️ Bez vedoucího</option>
@@ -150,7 +150,7 @@ const TeamOverview: React.FC<TeamOverviewProps> = ({
             </select>
           )}
 
-          <span className="text-xs text-slate-500 font-black bg-white px-3 py-1 rounded-lg border border-slate-200 shadow-2xs">
+          <span className="hidden sm:inline-block text-xs text-slate-500 font-black bg-white px-3 py-1.5 rounded-xl border border-slate-200 shadow-2xs">
             {selectedMonth}
           </span>
         </div>
