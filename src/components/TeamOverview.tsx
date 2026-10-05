@@ -68,13 +68,13 @@ const TeamOverview: React.FC<TeamOverviewProps> = ({
 
   // Všichni vedoucí k filtrování
   const supervisorsList = useMemo(() => {
-    return employees.filter(e => e.isActive && employees.some(sub => sub.supervisorId === e.id));
+    return employees.filter(e => e.isActive && employees.some(sub => sub.supervisorId && String(sub.supervisorId) === String(e.id)));
   }, [employees]);
 
   // Podřízení přihlášeného uživatele (pokud je vedoucí/mistr)
   const mySubordinates = useMemo(() => {
     if (!currentUser) return [];
-    return employees.filter(e => e.isActive && e.supervisorId === currentUser.id);
+    return employees.filter(e => e.isActive && e.supervisorId && String(e.supervisorId) === String(currentUser.id));
   }, [employees, currentUser]);
 
   const activeEmployees = useMemo(() => {
@@ -82,13 +82,13 @@ const TeamOverview: React.FC<TeamOverviewProps> = ({
       .filter(e => e.isActive && e.role !== 'Manager')
       .filter(e => {
         if (filterMode === 'my_team' && currentUser) {
-          return e.supervisorId === currentUser.id;
+          return e.supervisorId && String(e.supervisorId) === String(currentUser.id);
         }
         if (selectedSupervisorFilter !== 'all') {
           if (selectedSupervisorFilter === 'unassigned') {
             return !e.supervisorId;
           }
-          return e.supervisorId === selectedSupervisorFilter;
+          return e.supervisorId && String(e.supervisorId) === String(selectedSupervisorFilter);
         }
         return true;
       });
