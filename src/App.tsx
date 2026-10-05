@@ -229,6 +229,22 @@ const App: React.FC = () => {
     }
   };
 
+  const handleUpdateEntry = async (updatedEntry: TimeEntry) => {
+    if (isLocked) return;
+    db.saveLocalTimeMeta([updatedEntry]);
+
+    if (!useDemoData) {
+      try {
+        await db.updateTimeEntry(updatedEntry);
+      } catch (e: any) {
+        alert(`Chyba při aktualizaci záznamu: ${e.message}`);
+        return;
+      }
+    }
+
+    setEntries(prev => prev.map(e => e.id === updatedEntry.id ? updatedEntry : e));
+  };
+
   const handleDeleteEntry = async (id: string) => {
     if (isLocked) return;
     if (!useDemoData) {
@@ -521,6 +537,7 @@ const App: React.FC = () => {
                 jobs={jobs}
                 todayEntries={entries.filter(e => String(e.employeeId) === String(targetUserId))}
                 onAddEntry={handleAddLiveEntry}
+                onUpdateEntry={handleUpdateEntry}
                 onDeleteEntry={handleDeleteEntry}
                 onOpenManualEditor={() => {
                   setEditingEntries([]);

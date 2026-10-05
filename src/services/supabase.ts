@@ -418,6 +418,29 @@ export const deleteTimeEntry = async (id: string) => {
   if (error) throw error;
 };
 
+export const updateTimeEntry = async (entry: TimeEntry) => {
+  saveLocalTimeMeta([entry]);
+  const client = getSupabase();
+  if (!client) return;
+  
+  const encodedAttachment = encodeTimeMetaToAttachment(entry);
+  const snake = toSnake({
+    ...entry,
+    attachmentUrl: encodedAttachment
+  });
+
+  const { error } = await client.from('time_entries').update(snake).eq('id', entry.id);
+  if (error) {
+    if (error.message?.includes('start_time') || error.message?.includes('lunch_time') || error.message?.includes('column') || error.code === 'PGRST204' || (error as any).code === '42703') {
+      const { start_time, end_time, break_minutes, lunch_time, ...rest } = snake;
+      const { error: fallbackErr } = await client.from('time_entries').update(rest).eq('id', entry.id);
+      if (fallbackErr) throw fallbackErr;
+      return;
+    }
+    throw error;
+  }
+};
+
 export const fetchMonthlyReports = async (month: string): Promise<MonthStatus[]> => {
   const client = getSupabase();
   if (!client) return [];
