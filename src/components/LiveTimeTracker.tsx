@@ -359,7 +359,7 @@ const LiveTimeTracker: React.FC<LiveTimeTrackerProps> = ({
           prevEntry.startTime || formatted,
           formatted,
           prevEntry.type,
-          prevEntry.breakMinutes || 0
+          null
         );
 
       const updatedPrevEntry: TimeEntry = {
@@ -414,7 +414,7 @@ const LiveTimeTracker: React.FC<LiveTimeTrackerProps> = ({
         editStartTime,
         editEndTime,
         editType,
-        editingEntry.breakMinutes != null ? editingEntry.breakMinutes : null
+        null
       );
 
     const updatedCurrent: TimeEntry = {
@@ -445,7 +445,7 @@ const LiveTimeTracker: React.FC<LiveTimeTrackerProps> = ({
               editEndTime,
               nextEntry.endTime,
               nextEntry.type,
-              nextEntry.breakMinutes || 0
+              null
             );
           await onUpdateEntry({
             ...nextEntry,
@@ -475,7 +475,7 @@ const LiveTimeTracker: React.FC<LiveTimeTrackerProps> = ({
               prevEntry.startTime,
               editStartTime,
               prevEntry.type,
-              prevEntry.breakMinutes || 0
+              null
             );
           await onUpdateEntry({
             ...prevEntry,
@@ -1213,3 +1213,4 @@ const LiveTimeTracker: React.FC<LiveTimeTrackerProps> = ({
 };
 
 export default LiveTimeTracker;
+
