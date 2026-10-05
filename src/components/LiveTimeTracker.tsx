@@ -44,17 +44,17 @@ const formatSecondsToHMS = (totalSeconds: number): string => {
   return `${String(hours).padStart(2, '0')}:${String(minutes).padStart(2, '0')}:${String(seconds).padStart(2, '0')}`;
 };
 
-// Výpočet čistých hodin s možným odečtem oběda (11:00 - 11:30)
+// V�po�et �ist�ch hodin s automatick�m ode�tem 30 min ob�da po 4,5 hodin� pr�ce
 export const calculateSessionHours = (
   start: string,
   end: string,
   activityType: WorkType,
-  deductLunch: boolean = true
-): number => {
-  if (!start || !end) return 0.1;
+  breakMinutesOverride: number | null = null
+): { hours: number, appliedBreak: number } => {
+  if (!start || !end) return { hours: 0.1, appliedBreak: 0 };
   const [sh, sm] = start.split(':').map(Number);
   const [eh, em] = end.split(':').map(Number);
-  if (isNaN(sh) || isNaN(sm) || isNaN(eh) || isNaN(em)) return 0.1;
+  if (isNaN(sh) || isNaN(sm) || isNaN(eh) || isNaN(em)) return { hours: 0.1, appliedBreak: 0 };
 
   let startMinutes = sh * 60 + sm;
   let endMinutes = eh * 60 + em;
@@ -62,20 +62,21 @@ export const calculateSessionHours = (
     endMinutes += 24 * 60;
   }
   let diff = endMinutes - startMinutes;
+  let appliedBreak = 0;
 
-  // Jízda nemá odečet oběda. Pro běžnou práci odečítáme oběd pokud je zapnutý a protíná 11:00-11:30
-  if (activityType === WorkType.REGULAR && deductLunch) {
-    const lStart = 11 * 60;
-    const lEnd = 11 * 60 + 30;
-    const overlapStart = Math.max(startMinutes, lStart);
-    const overlapEnd = Math.min(endMinutes, lEnd);
-    if (overlapEnd > overlapStart) {
-      diff -= (overlapEnd - overlapStart);
+  if (activityType === WorkType.REGULAR) {
+    if (breakMinutesOverride !== null) {
+      appliedBreak = breakMinutesOverride;
+    } else {
+      if (diff > 270) {
+        appliedBreak = 30;
+      }
     }
+    diff -= appliedBreak;
   }
 
   const hours = Math.round((diff / 60) * 10) / 10;
-  return Math.max(0.1, hours);
+  return { hours: Math.max(0.1, hours), appliedBreak };
 };
 
 const LiveTimeTracker: React.FC<LiveTimeTrackerProps> = ({
@@ -214,11 +215,11 @@ const LiveTimeTracker: React.FC<LiveTimeTrackerProps> = ({
     const jobObj = jobs.find(j => j.id === finalJobId);
     const jobLabel = jobObj ? `${jobObj.code} ${jobObj.name}` : 'Zakázka';
 
-    const hours = calculateSessionHours(
+    const { hours, appliedBreak } = calculateSessionHours(
       startTimeStr,
       endTimeStr,
       activeSession.activityType,
-      activeSession.hasLunchDeduction ?? deductLunch
+      activeSession.hasLunchDeduction ?? deductLunch ? (deductLunch ? null : 0) : 0 // TODO fix
     );
 
     // Vytvoření unikátního TimeEntry záznamu
@@ -242,8 +243,8 @@ const LiveTimeTracker: React.FC<LiveTimeTrackerProps> = ({
       type: activeSession.activityType,
       startTime: startTimeStr,
       endTime: endTimeStr,
-      breakMinutes: (activeSession.activityType === WorkType.REGULAR && activeSession.hasLunchDeduction) ? 30 : 0,
-      lunchTime: (activeSession.activityType === WorkType.REGULAR && activeSession.hasLunchDeduction) ? '11:00 – 11:30' : undefined
+      breakMinutes: appliedBreak,
+        lunchTime: appliedBreak > 0 ? `Automaticky ${appliedBreak} min` : undefined
     };
 
     // Uložit nově dokončený záznam do systému
@@ -354,12 +355,12 @@ const LiveTimeTracker: React.FC<LiveTimeTrackerProps> = ({
         }
       }
 
-      const prevNewHours = calculateSessionHours(
-        prevEntry.startTime || formatted,
-        formatted,
-        prevEntry.type,
-        (prevEntry.breakMinutes || 0) > 0
-      );
+      const { hours: prevNewHours } = calculateSessionHours(
+          prevEntry.startTime || formatted,
+          formatted,
+          prevEntry.type,
+          prevEntry.breakMinutes || 0
+        );
 
       const updatedPrevEntry: TimeEntry = {
         ...prevEntry,
@@ -409,12 +410,12 @@ const LiveTimeTracker: React.FC<LiveTimeTrackerProps> = ({
     const oldStart = editingEntry.startTime;
     const oldEnd = editingEntry.endTime;
 
-    const newHours = calculateSessionHours(
-      editStartTime,
-      editEndTime,
-      editType,
-      editingEntry.breakMinutes ? editingEntry.breakMinutes > 0 : true
-    );
+    const { hours: newHours } = calculateSessionHours(
+        editStartTime,
+        editEndTime,
+        editType,
+        editingEntry.breakMinutes != null ? editingEntry.breakMinutes : null
+      );
 
     const updatedCurrent: TimeEntry = {
       ...editingEntry,
@@ -440,12 +441,12 @@ const LiveTimeTracker: React.FC<LiveTimeTrackerProps> = ({
         // Hledáme záznam, který začínal v čase oldEnd
         const nextEntry = sortedToday.find(e => e.startTime === oldEnd);
         if (nextEntry && nextEntry.endTime) {
-          const nextNewHours = calculateSessionHours(
-            editEndTime,
-            nextEntry.endTime,
-            nextEntry.type,
-            (nextEntry.breakMinutes || 0) > 0
-          );
+          const { hours: nextNewHours } = calculateSessionHours(
+              editEndTime,
+              nextEntry.endTime,
+              nextEntry.type,
+              nextEntry.breakMinutes || 0
+            );
           await onUpdateEntry({
             ...nextEntry,
             startTime: editEndTime,
@@ -470,12 +471,12 @@ const LiveTimeTracker: React.FC<LiveTimeTrackerProps> = ({
       if (editStartTime !== oldStart) {
         const prevEntry = sortedToday.find(e => e.endTime === oldStart);
         if (prevEntry && prevEntry.startTime) {
-          const prevNewHours = calculateSessionHours(
-            prevEntry.startTime,
-            editStartTime,
-            prevEntry.type,
-            (prevEntry.breakMinutes || 0) > 0
-          );
+          const { hours: prevNewHours } = calculateSessionHours(
+              prevEntry.startTime,
+              editStartTime,
+              prevEntry.type,
+              prevEntry.breakMinutes || 0
+            );
           await onUpdateEntry({
             ...prevEntry,
             endTime: editStartTime,
@@ -500,11 +501,11 @@ const LiveTimeTracker: React.FC<LiveTimeTrackerProps> = ({
     if (!activeSession) return 0;
     const currentTimeStr = formatHHMM();
     return calculateSessionHours(
-      activeSession.startTimeStr,
-      currentTimeStr,
-      activeSession.activityType,
-      activeSession.hasLunchDeduction ?? deductLunch
-    );
+        activeSession.startTimeStr,
+        currentTimeStr,
+        activeSession.activityType,
+        activeSession.hasLunchDeduction ?? deductLunch ? null : 0
+      ).hours;
   }, [activeSession, now, deductLunch]);
 
   // Vybraná zakázka pro detail
@@ -1212,3 +1213,8 @@ const LiveTimeTracker: React.FC<LiveTimeTrackerProps> = ({
 };
 
 export default LiveTimeTracker;
+
+
+
+
+
