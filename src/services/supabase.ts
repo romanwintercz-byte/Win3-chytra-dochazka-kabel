@@ -106,20 +106,68 @@ export const checkConnection = async () => {
   }
 };
 
+export const KABEL_LOCAL_EMPLOYEE_META_KEY = 'kabel_employee_hierarchy_meta_v1';
+
+export const getLocalEmployeeMeta = (): Record<string, Partial<Employee>> => {
+  if (typeof window === 'undefined' || !window.localStorage) return {};
+  try {
+    const raw = localStorage.getItem(KABEL_LOCAL_EMPLOYEE_META_KEY);
+    return raw ? JSON.parse(raw) : {};
+  } catch {
+    return {};
+  }
+};
+
+export const saveLocalEmployeeMeta = (id: string, meta: Partial<Employee>) => {
+  if (typeof window === 'undefined' || !window.localStorage) return;
+  try {
+    const current = getLocalEmployeeMeta();
+    current[id] = { ...current[id], ...meta };
+    localStorage.setItem(KABEL_LOCAL_EMPLOYEE_META_KEY, JSON.stringify(current));
+  } catch {}
+};
+
+export const removeLocalEmployeeMeta = (id: string) => {
+  if (typeof window === 'undefined' || !window.localStorage) return;
+  try {
+    const current = getLocalEmployeeMeta();
+    delete current[id];
+    localStorage.setItem(KABEL_LOCAL_EMPLOYEE_META_KEY, JSON.stringify(current));
+  } catch {}
+};
+
 export const fetchEmployees = async (): Promise<Employee[]> => {
   const client = getSupabase();
-  if (!client) return [ADMIN_EMPLOYEE];
+  const localMeta = getLocalEmployeeMeta();
+
+  if (!client) {
+    const meta = localMeta[ADMIN_EMPLOYEE.id] || {};
+    return [{
+      ...ADMIN_EMPLOYEE,
+      supervisorId: ADMIN_EMPLOYEE.supervisorId || meta.supervisorId,
+      customRoleId: ADMIN_EMPLOYEE.customRoleId || meta.customRoleId,
+      pinCode: ADMIN_EMPLOYEE.pinCode || meta.pinCode
+    }];
+  }
+
   const { data, error } = await client.from('employees').select('*').order('name');
   if (error) throw new Error(`Zaměstnanci: ${error.message}`);
   const rawList: Employee[] = toCamel(data) || [];
 
-  // Migrace starých kódů středisek na nová (10000 -> 101, 10001 -> 102)
+  // Migrace starých kódů středisek a sloučení s lokálními metadaty (např. supervisorId, customRoleId)
   const list = rawList.map(e => {
     let dept = e.department;
     if (dept === '10000') dept = '101';
     if (dept === '10001') dept = '102';
     if (isRootAdmin(e) && (!dept || dept === '10000')) dept = '101';
-    return { ...e, department: dept };
+    const meta = localMeta[e.id] || {};
+    return { 
+      ...e, 
+      department: dept,
+      supervisorId: e.supervisorId || meta.supervisorId,
+      customRoleId: e.customRoleId || meta.customRoleId,
+      pinCode: e.pinCode || meta.pinCode
+    };
   });
 
   // Pokud je databáze prázdná nebo v ní ještě není Win3 Support, vložíme ho
@@ -137,17 +185,93 @@ export const fetchEmployees = async (): Promise<Employee[]> => {
 };
 
 export const addEmployee = async (emp: Employee) => {
+  saveLocalEmployeeMeta(emp.id, {
+    supervisorId: emp.supervisorId,
+    customRoleId: emp.customRoleId,
+    pinCode: emp.pinCode
+  });
+
   const client = getSupabase();
   if (!client) return;
-  const { error } = await client.from('employees').insert([toSnake(emp)]);
-  if (error) throw error;
+
+  try {
+    const { error } = await client.from('employees').insert([toSnake(emp)]);
+    if (!error) return;
+    if (error.message?.includes('column') || error.code === '42703') {
+      const baseEmp = {
+        id: emp.id,
+        name: emp.name,
+        email: emp.email,
+        role: emp.role,
+        avatar: emp.avatar,
+        is_active: emp.isActive,
+        department: emp.department
+      };
+      const { error: fallbackError } = await client.from('employees').insert([baseEmp]);
+      if (fallbackError) throw fallbackError;
+      return;
+    }
+    throw error;
+  } catch (err: any) {
+    if (err.message?.includes('column') || err.code === '42703') {
+      const baseEmp = {
+        id: emp.id,
+        name: emp.name,
+        email: emp.email,
+        role: emp.role,
+        avatar: emp.avatar,
+        is_active: emp.isActive,
+        department: emp.department
+      };
+      await client.from('employees').insert([baseEmp]);
+      return;
+    }
+    throw err;
+  }
 };
 
 export const updateEmployee = async (emp: Employee) => {
+  saveLocalEmployeeMeta(emp.id, {
+    supervisorId: emp.supervisorId,
+    customRoleId: emp.customRoleId,
+    pinCode: emp.pinCode
+  });
+
   const client = getSupabase();
   if (!client) return;
-  const { error } = await client.from('employees').update(toSnake(emp)).eq('id', emp.id);
-  if (error) throw error;
+
+  try {
+    const { error } = await client.from('employees').update(toSnake(emp)).eq('id', emp.id);
+    if (!error) return;
+    if (error.message?.includes('column') || error.code === '42703') {
+      const baseEmp = {
+        name: emp.name,
+        email: emp.email,
+        role: emp.role,
+        avatar: emp.avatar,
+        is_active: emp.isActive,
+        department: emp.department
+      };
+      const { error: fallbackError } = await client.from('employees').update(baseEmp).eq('id', emp.id);
+      if (fallbackError) throw fallbackError;
+      return;
+    }
+    throw error;
+  } catch (err: any) {
+    if (err.message?.includes('column') || err.code === '42703') {
+      const baseEmp = {
+        name: emp.name,
+        email: emp.email,
+        role: emp.role,
+        avatar: emp.avatar,
+        is_active: emp.isActive,
+        department: emp.department
+      };
+      await client.from('employees').update(baseEmp).eq('id', emp.id);
+      return;
+    }
+    throw err;
+  }
 };
 
 export const updateEmployeeStatus = async (id: string, isActive: boolean) => {
@@ -161,6 +285,7 @@ export const updateEmployeeStatus = async (id: string, isActive: boolean) => {
 };
 
 export const deleteEmployee = async (id: string) => {
+  removeLocalEmployeeMeta(id);
   const client = getSupabase();
   if (!client) return;
   if (id === ADMIN_EMPLOYEE.id) {
@@ -173,9 +298,19 @@ export const deleteEmployee = async (id: string) => {
 export const fetchJobs = async (): Promise<Job[]> => {
   const client = getSupabase();
   if (!client) return DEFAULT_DEPARTMENTS;
+
+  // Vyčistit případné staré demo zakázky z databáze
+  const DEMO_JOB_IDS = ['job-kab-01', 'job-kab-02', 'job-kab-03', 'job-kab-04'];
+  try {
+    await client.from('jobs').delete().in('id', DEMO_JOB_IDS);
+  } catch {}
+
   const { data, error } = await client.from('jobs').select('*').order('code');
   if (error) throw new Error(`Zakázky: ${error.message}`);
   let list: Job[] = toCamel(data) || [];
+
+  // Vyřadit demo zakázky i z lokálního seznamu
+  list = list.filter(j => !DEMO_JOB_IDS.includes(j.id) && !j.code.startsWith('KAB-2026-') && j.code !== 'KAB-SRV');
 
   // Zkontrolovat existenci výchozích středisek 101, 102, 103
   const missing = DEFAULT_DEPARTMENTS.filter(d => !list.some(j => j.code === d.code));
@@ -191,7 +326,7 @@ export const fetchJobs = async (): Promise<Job[]> => {
     }
   }
 
-  return list;
+  return list.filter(j => !DEMO_JOB_IDS.includes(j.id) && !j.code.startsWith('KAB-2026-') && j.code !== 'KAB-SRV');
 };
 
 export const addJob = async (job: Job) => {
@@ -503,21 +638,30 @@ export const getFullBackup = async () => {
     client.from('notifications').select('*')
   ]);
   
-  return toCamel({
-    company: 'Kabel',
-    exportedAt: new Date().toISOString(),
-    employees: emp.data || [],
-    jobs: job.data || [],
-    time_entries: time.data || [],
-    month_status: status.data || [],
-    notifications: notifs.data || []
-  });
+  return {
+    ...toCamel({
+      company: 'Kabel',
+      exportedAt: new Date().toISOString(),
+      employees: emp.data || [],
+      jobs: job.data || [],
+      time_entries: time.data || [],
+      month_status: status.data || [],
+      notifications: notifs.data || []
+    }),
+    employeeMeta: getLocalEmployeeMeta()
+  };
 };
 
 export const restoreBackup = async (backup: any) => {
   const client = getSupabase();
   if (!client) throw new Error('Supabase klient není připojen.');
   
+  if (backup.employeeMeta && typeof window !== 'undefined' && window.localStorage) {
+    try {
+      localStorage.setItem(KABEL_LOCAL_EMPLOYEE_META_KEY, JSON.stringify(backup.employeeMeta));
+    } catch {}
+  }
+
   // Smazání stávajících dat
   await client.from('notifications').delete().neq('id', '00000000-0000-0000-0000-000000000000');
   await client.from('month_status').delete().neq('month', '0000-00');
@@ -526,7 +670,17 @@ export const restoreBackup = async (backup: any) => {
   await client.from('jobs').delete().neq('id', '00000000-0000-0000-0000-000000000000');
 
   // Vložení ze zálohy
-  if (backup.employees?.length) await client.from('employees').insert(toSnake(backup.employees));
+  if (backup.employees?.length) {
+    const empsSnake = toSnake(backup.employees);
+    const { error: empErr } = await client.from('employees').insert(empsSnake);
+    if (empErr) {
+      const fallbackEmps = empsSnake.map((item: any) => {
+        const { supervisor_id, custom_role_id, ...rest } = item;
+        return rest;
+      });
+      await client.from('employees').insert(fallbackEmps);
+    }
+  }
   if (backup.jobs?.length) await client.from('jobs').insert(toSnake(backup.jobs));
   if (backup.time_entries?.length) {
     const timeEntriesSnake = toSnake(backup.time_entries);
@@ -565,7 +719,9 @@ CREATE TABLE employees (
     avatar TEXT,
     is_active BOOLEAN NOT NULL DEFAULT true,
     pin_code TEXT,
-    department TEXT
+    department TEXT,
+    supervisor_id TEXT,
+    custom_role_id TEXT
 );
 
 -- 2. Tabulka zakázek / projektů
@@ -624,15 +780,11 @@ ALTER TABLE time_entries DISABLE ROW LEVEL SECURITY;
 ALTER TABLE month_status DISABLE ROW LEVEL SECURITY;
 ALTER TABLE notifications DISABLE ROW LEVEL SECURITY;
 
--- Vložení výchozích středisek a zakázek firmy Kabel
+-- Vložení výchozích středisek firmy Kabel
 INSERT INTO jobs (id, code, name, is_active) VALUES
 ('job-101', '101', '101 - správa', true),
 ('job-102', '102', '102 - výroba', true),
-('job-103', '103', '103 - dělníci', true),
-('job-kab-01', 'KAB-2026-01', 'Kabelové svazky pro automotive', true),
-('job-kab-02', 'KAB-2026-02', 'Průmyslová kabeláž výrobní haly B', true),
-('job-kab-03', 'KAB-2026-03', 'Zkoušky a kompletace optických kabelů', true),
-('job-kab-04', 'KAB-SRV', 'Servisní a revizní výjezdy', true)
+('job-103', '103', '103 - dělníci', true)
 ON CONFLICT (id) DO NOTHING;
 
 -- Vložení administrátora Win3 Support se všemi právy (Manager)

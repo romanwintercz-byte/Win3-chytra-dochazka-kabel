@@ -517,7 +517,7 @@ const App: React.FC = () => {
               isReviewing={!!reviewingUserId}
             />
             
-            {/* Týmový přehled pro manažera (Lucie) */}
+            {/* Týmový přehled pro manažera */}
             {isManagerMode && !reviewingUserId && (
               <TeamOverview 
                 employees={employees.length > 0 ? employees : MOCK_EMPLOYEES} 
@@ -525,6 +525,7 @@ const App: React.FC = () => {
                 selectedMonth={selectedMonth} 
                 onInspect={setReviewingUserId} 
                 currentUserRole={currentUser.role}
+                currentUser={currentUser}
                 statuses={monthStatuses}
               />
             )}
@@ -577,7 +578,7 @@ const App: React.FC = () => {
                 <div>
                   <h3 className="font-extrabold text-amber-900 text-sm">Měsíční docházka je uzamčena</h3>
                   <p className="text-xs text-amber-800 mt-0.5">
-                    Záznamy jsou ve stavu <strong>{currentMonthStatus.status}</strong>. Pro změny po uzavření kontaktujte mzdovou účetní Lucii.
+                    Záznamy jsou ve stavu <strong>{currentMonthStatus.status}</strong>. Pro změny po uzavření kontaktujte vedení firmy.
                   </p>
                 </div>
               </div>

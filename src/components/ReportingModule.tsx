@@ -451,7 +451,7 @@ const ReportingModule: React.FC<ReportingModuleProps> = ({
             <p className="text-[9px] font-bold text-slate-500 uppercase">Podpis zaměstnance (potvrzení správnosti)</p>
           </div>
           <div className="flex-1 border-t border-slate-400 pt-1.5 text-right">
-            <p className="text-[9px] font-bold text-slate-500 uppercase">Schválil za firmu Kabel (Lucie Novotná)</p>
+            <p className="text-[9px] font-bold text-slate-500 uppercase">Schválil za firmu Kabel (vedení / správa)</p>
             {monthStatus?.status === TimesheetStatus.APPROVED && (
               <p className="text-[10px] font-black text-emerald-700 mt-1">✓ ELEKTRONICKY SCHVÁLENO V SYSTÉMU</p>
             )}

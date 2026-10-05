@@ -21,7 +21,7 @@ const ApprovalWorkflow: React.FC<ApprovalWorkflowProps> = ({
     switch (s) {
       case TimesheetStatus.SUBMITTED:
         return { 
-          label: 'ČEKÁ NA SCHVÁLENÍ LUCIÍ', 
+          label: 'ČEKÁ NA SCHVÁLENÍ', 
           color: 'bg-amber-100 text-amber-900 border-amber-300', 
           icon: '⏳',
           desc: 'Výkaz byl odeslán ke schválení. Záznamy jsou pro zaměstnance uzamčeny.'
@@ -77,7 +77,7 @@ const ApprovalWorkflow: React.FC<ApprovalWorkflowProps> = ({
             <p className="text-xs text-slate-500 mt-0.5">{config.desc}</p>
             {status.managerComment && (
               <p className="text-xs text-rose-700 mt-1 font-semibold bg-rose-50 px-2.5 py-1 rounded-md border border-rose-100">
-                💬 Poznámka Lucie: „{status.managerComment}“
+                💬 Poznámka vedení: „{status.managerComment}“
               </p>
             )}
             {status.approvedAt && (
@@ -98,7 +98,7 @@ const ApprovalWorkflow: React.FC<ApprovalWorkflowProps> = ({
               className="flex-1 md:flex-none h-11 px-6 bg-indigo-600 hover:bg-indigo-700 active:bg-indigo-800 text-white rounded-xl font-bold text-xs uppercase tracking-wider shadow-md shadow-indigo-200 transition-all flex items-center justify-center gap-2"
             >
               <span>📨</span>
-              <span>{isManagerMode ? "Uzavřít měsíc" : "Odeslat Lucii ke schválení"}</span>
+              <span>{isManagerMode ? "Uzavřít měsíc" : "Odeslat ke schválení"}</span>
             </button>
           )}
 
@@ -113,7 +113,7 @@ const ApprovalWorkflow: React.FC<ApprovalWorkflowProps> = ({
             </button>
           )}
 
-          {/* Akce pro Lucii (manažera) během kontroly konkrétního zaměstnance */}
+          {/* Akce pro manažera během kontroly konkrétního zaměstnance */}
           {isReviewing && status.status === TimesheetStatus.SUBMITTED && (
             <>
               <button 

@@ -64,8 +64,8 @@ const HelpSystem: React.FC = () => {
             </div>
 
             <div className="bg-slate-50 p-3 rounded-xl border border-slate-100">
-              <strong className="text-slate-900 block mb-1">Schválení docházky Lucii:</strong>
-              Na konci měsíce klikněte na <strong>Odeslat Lucii ke schválení</strong>. Pro zaměstnance se docházka uzamkne a Lucie ji zkontroluje.
+              <strong className="text-slate-900 block mb-1">Schválení docházky:</strong>
+              Na konci měsíce klikněte na <strong>Odeslat ke schválení</strong>. Pro zaměstnance se docházka uzamkne a vedení firmy ji zkontroluje.
             </div>
 
             {/* AI Asistent box */}

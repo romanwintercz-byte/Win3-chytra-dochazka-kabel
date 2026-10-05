@@ -207,7 +207,22 @@ const TeamOverview: React.FC<TeamOverviewProps> = ({
                               );
                             })()}
                           </div>
-                          <div className="text-[11px] text-slate-400">{e.email || 'Bez e-mailu'}</div>
+                          <div className="flex items-center gap-1.5 mt-0.5 text-[11px] flex-wrap">
+                            <span className="text-slate-400">{e.email || 'Bez e-mailu'}</span>
+                            {(() => {
+                              const supervisor = e.supervisorId ? employees.find(s => s.id === e.supervisorId) : null;
+                              if (!supervisor) return null;
+                              return (
+                                <>
+                                  <span className="text-slate-300">•</span>
+                                  <span className="text-emerald-800 bg-emerald-50 border border-emerald-200 px-1.5 py-0.2 rounded text-[10px] font-bold inline-flex items-center gap-1">
+                                    <span>👔</span>
+                                    <span>Vedoucí: {supervisor.name}</span>
+                                  </span>
+                                </>
+                              );
+                            })()}
+                          </div>
                         </div>
                       </div>
                     </td>
