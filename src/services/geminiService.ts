@@ -2,41 +2,36 @@ import { GoogleGenAI } from "@google/genai";
 import { TimeEntry } from "../types";
 
 // Bezpečná inicializace klienta Gemini (pokud je nastaven klíč v prostředí)
+export interface ChatMessage {
+  role: 'user' | 'model';
+  text: string;
+}
+
 const apiKey = import.meta.env.VITE_GEMINI_API_KEY || '';
 
 const ai = apiKey ? new GoogleGenAI({ apiKey }) : null;
 
-export const getSmartHelpResponse = async (userQuestion: string): Promise<string> => {
+export const getSmartHelpResponse = async (history: ChatMessage[]): Promise<string> => {
   if (!ai) {
-    return "AI asistent není momentálně nakonfigurován (chybí VITE_GEMINI_API_KEY v nastavení). Pro docházku použijte standardní formulář nebo rychlé akce.";
+    return "AI asistent není momentálně nakonfigurován (chybí VITE_GEMINI_API_KEY v nastavení).";
   }
 
   try {
+    const contents = history.map(msg => ({
+      role: msg.role,
+      parts: [{ text: msg.text }]
+    }));
+
     const response = await ai.models.generateContent({
       model: 'gemini-2.5-flash',
-      contents: `Jsi asistent aplikace pro evidenci docházky firmy Kabel (výroba kabelů a elektroinstalace). Uživatel se ptá: "${userQuestion}". Odpověz stručně, přátelsky a k věci v češtině.`,
+      config: {
+        systemInstruction: "Jsi asistent aplikace pro evidenci docházky firmy Kabel (výroba kabelů a elektroinstalace). Odpovídej stručně, přátelsky a k věci v češtině."
+      },
+      contents
     });
     return response.text || "Nápověda není v tuto chvíli dostupná.";
   } catch (err: any) {
     console.warn('Gemini help error:', err);
     return "Omlouváme se, spojení s AI asistentem se nezdařilo.";
-  }
-};
-
-export const analyzeTimesheet = async (entries: TimeEntry[]): Promise<string> => {
-  if (!ai) {
-    return "Analýza výkazu pomocí AI vyžaduje nastavený klíč GEMINI_API_KEY.";
-  }
-
-  try {
-    const summary = entries.map(e => `${e.date}: ${e.project || 'Bez projektu'} - ${e.hours}h (${e.type})`).join("\n");
-    const response = await ai.models.generateContent({
-      model: 'gemini-2.5-flash',
-      contents: `Jsi vedoucí výroby ve firmě Kabel. Zkontroluj tento měsíční výkaz práce a napiš krátké manažerské zhodnocení v češtině (max 3 věty) o efektivitě, přesčasech a kontinuitě směn: \n${summary}`,
-    });
-    return response.text || "Analýzu se nepodařilo vygenerovat.";
-  } catch (err: any) {
-    console.warn('Gemini analyze error:', err);
-    return "Analýza docházky není momentálně dostupná.";
   }
 };
