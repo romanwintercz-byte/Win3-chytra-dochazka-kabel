@@ -13,6 +13,9 @@ import ValidationStatus from './components/ValidationStatus';
 import TeamOverview from './components/TeamOverview';
 import HelpSystem from './components/HelpSystem';
 import AboutModal from './components/AboutModal';
+import ChangelogModal from './components/ChangelogModal';
+
+const CURRENT_VERSION = '1.3.0';
 import NotificationBell from './components/NotificationBell';
 import PinPadModal from './components/PinPadModal'; 
 import MonthNavigator from './components/MonthNavigator';

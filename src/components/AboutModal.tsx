@@ -24,7 +24,10 @@ const AboutModal: React.FC<AboutModalProps> = ({ isOpen, onClose, version }) => 
         <h2 className="text-2xl font-black text-slate-900 mb-1">Kabel</h2>
         <p className="text-indigo-600 font-bold text-xs uppercase tracking-widest mb-4">Chytrá docházka & Zakázky</p>
         <p className="text-slate-600 mb-6 text-sm leading-relaxed">
-          Profesionální firemní systém pro evidenci pracovní doby, kabelových zakázek, přesčasů a mzdových podkladů pro firmu <strong>Kabel</strong>.
+          Profesionální firemní systém pro evidenci pracovní doby, zakázek a mezd pro firmu <strong>Kabel</strong>.<br/><br/>
+<strong className="text-indigo-700">Win3 Studio</strong><br/>
+Děláme aplikace na míru se zaměřením na zákazníka a jeho potřeby.<br/>
+Email: <a href="mailto:roman.winter.cz@gmail.com" className="text-indigo-600 hover:underline">roman.winter.cz@gmail.com</a>
         </p>
 
         <button 
@@ -33,7 +36,7 @@ const AboutModal: React.FC<AboutModalProps> = ({ isOpen, onClose, version }) => 
         >
           Zavřít
         </button>
-        <p className="mt-4 text-[10px] text-slate-400 font-medium">Verze aplikace {version} • Kabel s.r.o.</p>
+        <p className="mt-4 text-[10px] text-slate-400 font-medium">Verze aplikace {version} • Kabel s.r.o. | Win3 Studio</p>
       </div>
     </div>
   );

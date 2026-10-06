@@ -141,8 +141,18 @@ const Sidebar: React.FC<SidebarProps> = ({
             ))}
           </select>
         </div>
+        
+        {/* Win3 Studio Info */}
+        <div className="mt-4 pt-4 border-t border-slate-800 text-center">
+          <div className="text-[10px] text-slate-400 font-bold mb-1">Win3 Studio &copy; {new Date().getFullYear()}</div>
+          <div className="text-[9px] text-slate-500 leading-tight">
+            Aplikace na míru.<br/>Zaměřeno na potřeby zákazníka.<br/>
+            <a href="mailto:roman.winter.cz@gmail.com" className="hover:text-indigo-400 transition-colors">roman.winter.cz@gmail.com</a>
+          </div>
+        </div>
       </div>
     </div>
+
   );
 };
 
