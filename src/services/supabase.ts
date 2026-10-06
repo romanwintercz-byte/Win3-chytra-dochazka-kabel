@@ -243,7 +243,7 @@ export const addEmployee = async (emp: Employee) => {
       const { error } = await client.from('employees').update(toSnake(emp)).eq('id', emp.id);
       if (!error) return;
       if (error.message?.includes('column') || error.code === '42703') {
-        alert("INFO PRO WIN3 STUDIO: Supabase hlásí chybějící sloupec: " + error.message);
+        
         const baseEmp = {
           name: emp.name,
           email: emp.email,
