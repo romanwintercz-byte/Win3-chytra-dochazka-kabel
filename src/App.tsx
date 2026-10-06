@@ -759,6 +759,7 @@ const App: React.FC = () => {
           setIsPinModalOpen(false);
         }} 
         targetPin={(employees.find(e => String(e.id) === String(pendingUserId)) || MOCK_EMPLOYEES.find(e => String(e.id) === String(pendingUserId)))?.pinCode || ""} 
+        targetUserId={String(pendingUserId)}
         targetUserName={(employees.find(e => String(e.id) === String(pendingUserId)) || MOCK_EMPLOYEES.find(e => String(e.id) === String(pendingUserId)))?.name || ""} 
       />
 

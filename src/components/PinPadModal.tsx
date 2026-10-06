@@ -1,10 +1,12 @@
 import React, { useState, useEffect } from 'react';
+import { isBiometricsSupported, hasBiometricsRegistered, registerBiometrics, authenticateBiometrics } from '../services/biometrics';
 
 interface PinPadModalProps {
   isOpen: boolean;
   onClose: () => void;
   onSuccess: () => void;
   targetPin: string;
+  targetUserId?: string;
   targetUserName: string;
   title?: string;
   subtitle?: string;
@@ -16,18 +18,50 @@ const PinPadModal: React.FC<PinPadModalProps> = ({
   onSuccess, 
   targetPin, 
   targetUserName,
+  targetUserId,
   title,
   subtitle
 }) => {
   const [pin, setPin] = useState('');
   const [error, setError] = useState(false);
+  const [biometricsAvailable, setBiometricsAvailable] = useState(false);
+  const [biometricsRegistered, setBiometricsRegistered] = useState(false);
+
 
   useEffect(() => {
     if (isOpen) {
       setPin('');
       setError(false);
+      setBiometricsAvailable(isBiometricsSupported());
+      if (targetUserId) {
+        const isRegistered = hasBiometricsRegistered(targetUserId);
+        setBiometricsRegistered(isRegistered);
+        
+        // Auto-trigger if registered
+        if (isRegistered) {
+          handleBiometricLogin();
+        }
+      }
     }
-  }, [isOpen]);
+  }, [isOpen, targetUserId]);
+
+  const handleBiometricLogin = async () => {
+    if (!targetUserId) return;
+    const success = await authenticateBiometrics(targetUserId);
+    if (success) {
+      onSuccess();
+    }
+  };
+
+  const handleBiometricRegister = async () => {
+    if (!targetUserId) return;
+    const success = await registerBiometrics(targetUserId, targetUserName);
+    if (success) {
+      setBiometricsRegistered(true);
+      alert('Biometrie byla úspěšně nastavena pro toto zařízení!');
+    }
+  };
+
 
   const add = (n: number) => {
     if (pin.length < 4) {
@@ -119,6 +153,7 @@ const PinPadModal: React.FC<PinPadModalProps> = ({
           </button>
         </div>
 
+        {/* Zrušit tlačítko */}
         <button 
           type="button" 
           onClick={onClose} 
@@ -126,6 +161,29 @@ const PinPadModal: React.FC<PinPadModalProps> = ({
         >
           ZRUŠIT
         </button>
+
+        {/* Biometrie UI */}
+        {biometricsAvailable && targetUserId && (
+          <div className="mt-4 pt-4 border-t border-slate-100">
+            {biometricsRegistered ? (
+              <button
+                type="button"
+                onClick={handleBiometricLogin}
+                className="w-full py-3 bg-indigo-50 text-indigo-700 rounded-2xl font-bold hover:bg-indigo-100 transition-colors flex items-center justify-center gap-2"
+              >
+                <span className="text-xl">👁️</span> Přihlásit se (Face ID / Otisk)
+              </button>
+            ) : (
+              <button
+                type="button"
+                onClick={handleBiometricRegister}
+                className="w-full py-3 bg-slate-50 text-slate-600 rounded-2xl font-semibold text-sm hover:bg-slate-100 transition-colors flex items-center justify-center gap-2"
+              >
+                <span className="text-lg">🔐</span> Povolit otisk prstu / Face ID
+              </button>
+            )}
+          </div>
+        )}
       </div>
     </div>
   );
