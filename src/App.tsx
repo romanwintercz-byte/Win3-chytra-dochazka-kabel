@@ -7,6 +7,7 @@ import Dashboard from './components/Dashboard';
 import ReportingModule from './components/ReportingModule';
 import ApprovalWorkflow from './components/ApprovalWorkflow';
 import AdminPanel from './components/AdminPanel';
+import DeviceGuard from './components/DeviceGuard';
 import MobileNavigation from './components/MobileNavigation';
 import EntryFormModal from './components/EntryFormModal';
 import ValidationStatus from './components/ValidationStatus';
@@ -29,6 +30,7 @@ const getCurrentMonth = () => new Date().toISOString().slice(0, 7);
 const APP_VERSION = "2.2.0";
 
 const App: React.FC = () => {
+
   const [activeTab, setActiveTab] = useState<'overview' | 'report' | 'settings'>('overview');
   const [useDemoData, setUseDemoData] = useState(!isSupabaseConfigured());
   const [employees, setEmployees] = useState<Employee[]>(isSupabaseConfigured() ? [] : MOCK_EMPLOYEES);
@@ -56,6 +58,8 @@ const App: React.FC = () => {
   const [reviewingUserId, setReviewingUserId] = useState<string | null>(null);
   const [isConnected, setIsConnected] = useState(false);
   const [editingEntries, setEditingEntries] = useState<TimeEntry[]>([]);
+  const realEmployees = (useDemoData ? MOCK_EMPLOYEES : employees).filter(e => !e.id.startsWith('DEV-'));
+
 
   // Načtení dat z databáze nebo lokálních dat pro Kabel
   const loadData = useCallback(async () => {
@@ -122,7 +126,7 @@ const App: React.FC = () => {
   }, [currentUserId]);
 
   const activeEmployeeList = useMemo(() => {
-    return (useDemoData ? MOCK_EMPLOYEES : employees).filter(e => e.isActive);
+    return (useDemoData ? MOCK_EMPLOYEES : employees).filter(e => e.isActive && !e.id.startsWith('DEV-'));
   }, [useDemoData, employees]);
 
   const currentUser = useMemo(() => {
@@ -529,7 +533,7 @@ const App: React.FC = () => {
             {/* Týmový přehled pro manažera */}
             {isManagerMode && !reviewingUserId && (
               <TeamOverview 
-                employees={employees.length > 0 ? employees : MOCK_EMPLOYEES} 
+                employees={realEmployees} 
                 allEntries={entries} 
                 selectedMonth={selectedMonth} 
                 onInspect={setReviewingUserId} 
@@ -633,7 +637,7 @@ const App: React.FC = () => {
           <div className="p-4 md:p-8 print:p-0 print:m-0">
             <ReportingModule 
               entries={entries} 
-              employees={useDemoData ? MOCK_EMPLOYEES : employees} 
+              employees={realEmployees} 
               currentUserRole={currentUser.role} 
               jobs={jobs} 
               selectedEmployeeId={String(targetUserId)} 
@@ -648,7 +652,7 @@ const App: React.FC = () => {
           <div className="p-4 md:p-8">
             <AdminPanel 
               currentUser={currentUser}
-              employees={employees.length > 0 ? employees : MOCK_EMPLOYEES} 
+              employees={useDemoData ? MOCK_EMPLOYEES : employees} 
               jobs={jobs.length > 0 ? jobs : MOCK_JOBS} 
               onAddEmployee={handleAddEmployee}
               onUpdateEmployee={handleUpdateEmployee}

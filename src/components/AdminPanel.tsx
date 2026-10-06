@@ -59,7 +59,7 @@ const AdminPanel: React.FC<AdminPanelProps> = ({
   onToggleJobStatus
 }) => {
   // Aktivní podzáložka v administraci
-  const [adminTab, setAdminTab] = useState<'employees' | 'supervisors' | 'roles' | 'jobs' | 'backup'>('employees');
+  const [adminTab, setAdminTab] = useState<'employees' | 'devices' | 'supervisors' | 'roles' | 'jobs' | 'backup'>('employees');
 
   // Počet aktivních zaměstnanců bez přiřazeného vedoucího
   const unassignedCount = useMemo(() => {
