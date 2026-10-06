@@ -40,6 +40,7 @@ const App: React.FC = () => {
   const [notifications, setNotifications] = useState<Notification[]>([]);
   
   const [isLoading, setIsLoading] = useState(false);
+  const [deviceApproved, setDeviceApproved] = useState(false);
   const [loadError, setLoadError] = useState<string | null>(null);
   const [currentUserId, setCurrentUserId] = useState<string>('');
   const [selectedMonth, setSelectedMonth] = useState<string>(getCurrentMonth());
@@ -407,7 +408,6 @@ const App: React.FC = () => {
     );
   }
 
-  const [deviceApproved, setDeviceApproved] = useState(false);
 
   if (!deviceApproved) {
     return (
