@@ -233,22 +233,66 @@ const LiveTimeTracker: React.FC<LiveTimeTrackerProps> = ({
       defaultDesc = activeSession.activityType;
     }
 
-    const entryToSave: TimeEntry = {
-      id: newEntryId,
-      employeeId: currentUserId,
-      date: activeSession.dateStr || getTodayDateStr(),
-      project: finalJobId,
-      description: activeSession.note ? `${activeSession.note} (${defaultDesc})` : defaultDesc,
-      hours,
-      type: activeSession.activityType,
-      startTime: startTimeStr,
-      endTime: endTimeStr,
-      breakMinutes: appliedBreak,
-      lunchTime: appliedBreak > 0 ? `Automaticky ${appliedBreak} min` : undefined
+    const getSplitTimeStr = (start: string, targetHours: number, appliedBreak: number): string => {
+      const [sh, sm] = start.split(':').map(Number);
+      let endMinutes = sh * 60 + sm + Math.round(targetHours * 60) + appliedBreak;
+      const eh = Math.floor(endMinutes / 60) % 24;
+      const em = endMinutes % 60;
+      return `${String(eh).padStart(2, '0')}:${String(em).padStart(2, '0')}`;
     };
 
-    // Uložit nově dokončený záznam do systému
-    await onAddEntry(entryToSave);
+    if (activeSession.activityType === WorkType.REGULAR && hours > 8) {
+      // Split into 8 hours of REGULAR and the rest as OVERTIME
+      const splitTimeStr = getSplitTimeStr(startTimeStr, 8, appliedBreak);
+      
+      const regularEntry: TimeEntry = {
+        id: uuidv4(),
+        employeeId: currentUserId,
+        date: activeSession.dateStr || getTodayDateStr(),
+        project: finalJobId,
+        description: activeSession.note ? `${activeSession.note} (${defaultDesc})` : defaultDesc,
+        hours: 8,
+        type: WorkType.REGULAR,
+        startTime: startTimeStr,
+        endTime: splitTimeStr,
+        breakMinutes: appliedBreak,
+        lunchTime: appliedBreak > 0 ? `Automaticky ${appliedBreak} min` : undefined
+      };
+      
+      const overtimeHours = Math.round((hours - 8) * 10) / 10;
+      const overtimeEntry: TimeEntry = {
+        id: newEntryId, // Keep the generated ID so nextSession links to it properly
+        employeeId: currentUserId,
+        date: activeSession.dateStr || getTodayDateStr(),
+        project: finalJobId,
+        description: activeSession.note ? `${activeSession.note} (Přesčas: ${jobLabel})` : `Přesčas: ${jobLabel}`,
+        hours: overtimeHours,
+        type: WorkType.OVERTIME,
+        startTime: splitTimeStr,
+        endTime: endTimeStr,
+        breakMinutes: 0,
+        lunchTime: undefined
+      };
+      
+      await onAddEntry(regularEntry);
+      await onAddEntry(overtimeEntry);
+    } else {
+      const entryToSave: TimeEntry = {
+        id: newEntryId,
+        employeeId: currentUserId,
+        date: activeSession.dateStr || getTodayDateStr(),
+        project: finalJobId,
+        description: activeSession.note ? `${activeSession.note} (${defaultDesc})` : defaultDesc,
+        hours,
+        type: activeSession.activityType,
+        startTime: startTimeStr,
+        endTime: endTimeStr,
+        breakMinutes: appliedBreak,
+        lunchTime: appliedBreak > 0 ? `Automaticky ${appliedBreak} min` : undefined
+      };
+      await onAddEntry(entryToSave);
+    }
+
 
     if (navigator.vibrate) {
       try { navigator.vibrate([40, 60, 40]); } catch {}
