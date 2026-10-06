@@ -229,35 +229,36 @@ export const addEmployee = async (emp: Employee) => {
     throw err;
   }
 };
+  export const updateEmployee = async (emp: Employee) => {
+    saveLocalEmployeeMeta(emp.id, {
+      supervisorId: emp.supervisorId,
+      customRoleId: emp.customRoleId,
+      pinCode: emp.pinCode
+    });
+  
+    const client = getSupabase();
+    if (!client) return;
+  
+    try {
+      const { error } = await client.from('employees').update(toSnake(emp)).eq('id', emp.id);
+      if (!error) return;
+      if (error.message?.includes('column') || error.code === '42703') {
+        alert("INFO PRO WIN3 STUDIO: Supabase hlásí chybějící sloupec: " + error.message);
+        const baseEmp = {
+          name: emp.name,
+          email: emp.email,
+          role: emp.role,
+          avatar: emp.avatar,
+          is_active: emp.isActive,
+          department: emp.department
+        };
+        const { error: fallbackError } = await client.from('employees').update(baseEmp).eq('id', emp.id);
+        if (fallbackError) throw fallbackError;
+        return;
+      }
+      throw error;
+    } catch (err: any) {
 
-export const updateEmployee = async (emp: Employee) => {
-  saveLocalEmployeeMeta(emp.id, {
-    supervisorId: emp.supervisorId,
-    customRoleId: emp.customRoleId,
-    pinCode: emp.pinCode
-  });
-
-  const client = getSupabase();
-  if (!client) return;
-
-  try {
-    const { error } = await client.from('employees').update(toSnake(emp)).eq('id', emp.id);
-    if (!error) return;
-    if (error.message?.includes('column') || error.code === '42703') {
-      const baseEmp = {
-        name: emp.name,
-        email: emp.email,
-        role: emp.role,
-        avatar: emp.avatar,
-        is_active: emp.isActive,
-        department: emp.department
-      };
-      const { error: fallbackError } = await client.from('employees').update(baseEmp).eq('id', emp.id);
-      if (fallbackError) throw fallbackError;
-      return;
-    }
-    throw error;
-  } catch (err: any) {
     if (err.message?.includes('column') || err.code === '42703') {
       const baseEmp = {
         name: emp.name,
