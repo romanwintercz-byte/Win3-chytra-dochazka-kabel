@@ -2,13 +2,13 @@ import { GoogleGenAI } from "@google/genai";
 import { TimeEntry } from "../types";
 
 // Bezpečná inicializace klienta Gemini (pokud je nastaven klíč v prostředí)
-const apiKey = (typeof process !== 'undefined' ? process.env?.GEMINI_API_KEY || process.env?.API_KEY : '') || '';
+const apiKey = import.meta.env.VITE_GEMINI_API_KEY || '';
 
 const ai = apiKey ? new GoogleGenAI({ apiKey }) : null;
 
 export const getSmartHelpResponse = async (userQuestion: string): Promise<string> => {
   if (!ai) {
-    return "AI asistent není momentálně nakonfigurován (chybí GEMINI_API_KEY). Pro docházku použijte standardní formulář nebo rychlé akce.";
+    return "AI asistent není momentálně nakonfigurován (chybí VITE_GEMINI_API_KEY v nastavení). Pro docházku použijte standardní formulář nebo rychlé akce.";
   }
 
   try {
