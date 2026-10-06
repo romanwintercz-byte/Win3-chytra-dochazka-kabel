@@ -85,6 +85,7 @@ const AdminPanel: React.FC<AdminPanelProps> = ({
   const [newEmpSupervisorId, setNewEmpSupervisorId] = useState<string>('');
   const [newEmpPin, setNewEmpPin] = useState('');
   const [showPinField, setShowPinField] = useState(false);
+    const [newEmpAvatar, setNewEmpAvatar] = useState<string>('');
   const [newEmpDepartment, setNewEmpDepartment] = useState<'101' | '102' | '103' | string>('102');
   
   // Bezpečnostní ověření PINem pro administrátora Win3 Support
@@ -312,7 +313,7 @@ const AdminPanel: React.FC<AdminPanelProps> = ({
         role: systemRole,
         customRoleId: newEmpCustomRoleId || undefined,
         supervisorId: newEmpSupervisorId || undefined,
-        avatar: `https://api.dicebear.com/7.x/avataaars/svg?seed=${encodeURIComponent(newEmpName)}`,
+        avatar: newEmpAvatar || `https://api.dicebear.com/7.x/avataaars/svg?seed=${encodeURIComponent(newEmpName)}`,
         isActive: true,
         pinCode: newEmpPin.trim() || undefined,
         department: newEmpDepartment || undefined
@@ -346,6 +347,33 @@ const AdminPanel: React.FC<AdminPanelProps> = ({
       }
     }
     startEditingEmp(emp);
+  };
+
+  
+  const handleImageUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    const reader = new FileReader();
+    reader.onload = (event) => {
+      const img = new Image();
+      img.onload = () => {
+        const canvas = document.createElement('canvas');
+        const ctx = canvas.getContext('2d');
+        if (!ctx) return;
+        const size = Math.min(img.width, img.height);
+        const offsetX = (img.width - size) / 2;
+        const offsetY = (img.height - size) / 2;
+        const TARGET_SIZE = 128;
+        canvas.width = TARGET_SIZE;
+        canvas.height = TARGET_SIZE;
+        ctx.drawImage(img, offsetX, offsetY, size, size, 0, 0, TARGET_SIZE, TARGET_SIZE);
+        const dataUrl = canvas.toDataURL('image/webp', 0.8);
+        setNewEmpAvatar(dataUrl);
+      };
+      img.src = event.target?.result as string;
+    };
+    reader.readAsDataURL(file);
   };
 
   const handleCancelEditEmp = () => {
