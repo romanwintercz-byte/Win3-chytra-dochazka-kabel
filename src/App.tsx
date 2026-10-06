@@ -393,6 +393,52 @@ const App: React.FC = () => {
     }
   };
 
+
+  const [deviceApproved, setDeviceApproved] = useState(false);
+
+  if (!deviceApproved) {
+    return (
+      <DeviceGuard 
+        employees={employees} 
+        onApprove={(deviceId, deviceName) => {
+          const existing = employees.find(e => e.id === deviceId);
+          if (existing) {
+             handleUpdateEmployee({ ...existing, isActive: true, name: deviceName });
+          } else {
+             handleAddEmployee({
+               id: deviceId,
+               name: deviceName,
+               role: 'Zaměstnanec',
+               email: 'device@system',
+               avatar: '📱',
+               isActive: true
+             });
+          }
+          setDeviceApproved(true);
+        }}
+        onRegisterRequest={(deviceId, deviceName) => {
+          const existing = employees.find(e => e.id === deviceId);
+          if (!existing) {
+             handleAddEmployee({
+               id: deviceId,
+               name: deviceName,
+               role: 'Zaměstnanec',
+               email: 'device@system',
+               avatar: '📱',
+               isActive: false
+             });
+          }
+        }}
+        onCheckApproved={(deviceId) => {
+          const existing = employees.find(e => e.id === deviceId);
+          if (existing && existing.isActive) {
+            setDeviceApproved(true);
+          }
+        }}
+      />
+    );
+  }
+
   return (
     <div className="flex flex-col md:flex-row min-h-screen bg-slate-50 print:block print:bg-white print:min-h-0 text-slate-800">
       {/* Postranní panel pro desktop */}
