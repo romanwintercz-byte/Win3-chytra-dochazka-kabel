@@ -15,7 +15,7 @@ import HelpSystem from './components/HelpSystem';
 import AboutModal from './components/AboutModal';
 import ChangelogModal from './components/ChangelogModal';
 
-const CURRENT_VERSION = '1.3.0';
+
 import NotificationBell from './components/NotificationBell';
 import PinPadModal from './components/PinPadModal'; 
 import MonthNavigator from './components/MonthNavigator';
@@ -46,6 +46,12 @@ const App: React.FC = () => {
   const [isEntryModalOpen, setIsEntryModalOpen] = useState(false);
   const [isAboutOpen, setIsAboutOpen] = useState(false);
   const [isPinModalOpen, setIsPinModalOpen] = useState(false);
+  const [showChangelog, setShowChangelog] = useState(() => localStorage.getItem('kabel_app_version') !== APP_VERSION);
+
+  const handleCloseChangelog = () => {
+    localStorage.setItem('kabel_app_version', APP_VERSION);
+    setShowChangelog(false);
+  };
   const [pendingUserId, setPendingUserId] = useState<string | null>(null);
   const [reviewingUserId, setReviewingUserId] = useState<string | null>(null);
   const [isConnected, setIsConnected] = useState(false);
@@ -691,6 +697,10 @@ const App: React.FC = () => {
         onClose={() => setIsAboutOpen(false)} 
         version={APP_VERSION} 
       />
+
+      {showChangelog && (
+        <ChangelogModal version={APP_VERSION} onClose={handleCloseChangelog} />
+      )}
       
       {/* Spodní navigace pro mobily */}
       <MobileNavigation 
