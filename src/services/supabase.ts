@@ -195,7 +195,7 @@ export const addEmployee = async (emp: Employee) => {
   if (!client) return;
 
   try {
-    const { error } = await client.from('employees').insert([toSnake(emp)]);
+    const { error } = await client.from('employees').upsert([toSnake(emp)], { onConflict: 'id' });
     if (!error) return;
     if (error.message?.includes('column') || error.code === '42703') {
       const baseEmp = {
@@ -207,7 +207,7 @@ export const addEmployee = async (emp: Employee) => {
         is_active: emp.isActive,
         department: emp.department
       };
-      const { error: fallbackError } = await client.from('employees').insert([baseEmp]);
+      const { error: fallbackError } = await client.from('employees').upsert([baseEmp], { onConflict: 'id' });
       if (fallbackError) throw fallbackError;
       return;
     }
@@ -223,7 +223,7 @@ export const addEmployee = async (emp: Employee) => {
         is_active: emp.isActive,
         department: emp.department
       };
-      await client.from('employees').insert([baseEmp]);
+      await client.from('employees').upsert([baseEmp], { onConflict: 'id' });
       return;
     }
     throw err;

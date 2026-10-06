@@ -39,7 +39,7 @@ const App: React.FC = () => {
   const [monthStatuses, setMonthStatuses] = useState<MonthStatus[]>([]);
   const [notifications, setNotifications] = useState<Notification[]>([]);
   
-  const [isLoading, setIsLoading] = useState(false);
+  const [isLoading, setIsLoading] = useState(true);
   const [deviceApproved, setDeviceApproved] = useState(false);
   const [loadError, setLoadError] = useState<string | null>(null);
   const [currentUserId, setCurrentUserId] = useState<string>('');
@@ -279,17 +279,26 @@ const App: React.FC = () => {
     setIsEntryModalOpen(true);
   };
 
+  
   const handleAddEmployee = async (emp: Employee) => {
     if (!useDemoData) {
       try { 
         await db.addEmployee(emp); 
       } catch (e: any) { 
+        if (emp.id.startsWith('DEV-') && e.message && e.message.includes('duplicate key')) {
+           // Ignore duplicate key error for devices, it means they are already registered but maybe not yet loaded in state
+           return;
+        }
         alert(e.message); 
         return; 
       }
     }
-    setEmployees(prev => [...prev, emp]);
+    setEmployees(prev => {
+      if (prev.find(e => e.id === emp.id)) return prev;
+      return [...prev, emp];
+    });
   };
+
 
   const handleUpdateEmployee = async (emp: Employee) => {
     if (isRootAdmin(emp) && !isRootAdmin(currentUser)) {

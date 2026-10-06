@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { v4 as uuidv4 } from 'uuid';
 import { Employee } from '../types';
 
@@ -30,17 +30,22 @@ const DeviceGuard: React.FC<DeviceGuardProps> = ({ employees, onApprove, onRegis
   const [deviceName] = useState(getDeviceName());
   const [isPending, setIsPending] = useState(false);
   const [adminKey, setAdminKey] = useState('');
+  const requestSent = useRef(false);
 
   useEffect(() => {
     onCheckApproved(deviceId);
     
+    
     // Check if it's already in the system
     const existing = employees.find(e => e.id === deviceId);
     if (!existing) {
-      // Register it
-      onRegisterRequest(deviceId, deviceName);
+      if (!requestSent.current) {
+        requestSent.current = true;
+        onRegisterRequest(deviceId, deviceName);
+      }
       setIsPending(true);
     } else if (!existing.isActive) {
+
       setIsPending(true);
     } else {
       setIsPending(false);
