@@ -695,7 +695,36 @@ const AdminPanel: React.FC<AdminPanelProps> = ({
                     </div>
                   )}
 
-                  <div className="flex gap-2 pt-1">
+                  
+                    {/* Fotografie / Avatar */}
+                    <div className="md:col-span-2 mt-3">
+                      <label className="text-[10px] font-bold text-slate-500 uppercase block mb-1">Fotografie zaměstnance (nepovinné)</label>
+                      <div className="flex items-center gap-4">
+                        <img 
+                          src={newEmpAvatar || `https://api.dicebear.com/7.x/avataaars/svg?seed=${encodeURIComponent(newEmpName || 'N')}`} 
+                          alt="" 
+                          className="w-12 h-12 rounded-full bg-slate-100 object-cover border border-slate-200"
+                        />
+                        <div className="flex-1">
+                          <input 
+                            type="file" 
+                            accept="image/*"
+                            onChange={handleImageUpload}
+                            className="block w-full text-xs text-slate-500
+                              file:mr-4 file:py-2 file:px-4
+                              file:rounded-xl file:border-0
+                              file:text-xs file:font-bold
+                              file:bg-indigo-50 file:text-indigo-700
+                              hover:file:bg-indigo-100 cursor-pointer transition-colors"
+                          />
+                          <p className="text-[9px] text-slate-400 mt-1">
+                            Bude automaticky zmenšena do miniaturního formátu.
+                          </p>
+                        </div>
+                      </div>
+                    </div>
+
+                    <div className="flex gap-2 pt-1 mt-4 border-t border-slate-100 pt-4">
                     <button 
                       type="submit" 
                       className="flex-1 h-10 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl text-xs font-bold transition-colors shadow-xs cursor-pointer"
@@ -1126,7 +1155,36 @@ const AdminPanel: React.FC<AdminPanelProps> = ({
                   required
                 />
 
-                <div className="flex gap-2 pt-1">
+                
+                    {/* Fotografie / Avatar */}
+                    <div className="md:col-span-2 mt-3">
+                      <label className="text-[10px] font-bold text-slate-500 uppercase block mb-1">Fotografie zaměstnance (nepovinné)</label>
+                      <div className="flex items-center gap-4">
+                        <img 
+                          src={newEmpAvatar || `https://api.dicebear.com/7.x/avataaars/svg?seed=${encodeURIComponent(newEmpName || 'N')}`} 
+                          alt="" 
+                          className="w-12 h-12 rounded-full bg-slate-100 object-cover border border-slate-200"
+                        />
+                        <div className="flex-1">
+                          <input 
+                            type="file" 
+                            accept="image/*"
+                            onChange={handleImageUpload}
+                            className="block w-full text-xs text-slate-500
+                              file:mr-4 file:py-2 file:px-4
+                              file:rounded-xl file:border-0
+                              file:text-xs file:font-bold
+                              file:bg-indigo-50 file:text-indigo-700
+                              hover:file:bg-indigo-100 cursor-pointer transition-colors"
+                          />
+                          <p className="text-[9px] text-slate-400 mt-1">
+                            Bude automaticky zmenšena do miniaturního formátu.
+                          </p>
+                        </div>
+                      </div>
+                    </div>
+
+                    <div className="flex gap-2 pt-1 mt-4 border-t border-slate-100 pt-4">
                   <button 
                     type="submit" 
                     className="flex-1 h-10 bg-orange-600 hover:bg-orange-700 text-white rounded-xl text-xs font-bold transition-colors shadow-xs cursor-pointer"

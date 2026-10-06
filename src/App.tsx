@@ -394,6 +394,19 @@ const App: React.FC = () => {
   };
 
 
+
+  // Pokud se teprve načítají data, vrať spinner hned, ať se nevolá DeviceGuard
+  if (isLoading) {
+    return (
+      <div className="fixed inset-0 bg-white/80 backdrop-blur-sm z-[90] flex items-center justify-center">
+        <div className="flex flex-col items-center">
+          <div className="w-12 h-12 border-4 border-indigo-600 border-t-transparent rounded-full animate-spin mb-3" />
+          <p className="font-bold text-slate-800 text-sm">Načítám data z databáze Kabel...</p>
+        </div>
+      </div>
+    );
+  }
+
   const [deviceApproved, setDeviceApproved] = useState(false);
 
   if (!deviceApproved) {
