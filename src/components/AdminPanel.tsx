@@ -706,19 +706,29 @@ const AdminPanel: React.FC<AdminPanelProps> = ({
                           className="w-12 h-12 rounded-full bg-slate-100 object-cover border border-slate-200"
                         />
                         <div className="flex-1">
-                          <input 
-                            type="file" 
-                            accept="image/*"
-                            onChange={handleImageUpload}
-                            className="block w-full text-xs text-slate-500
-                              file:mr-4 file:py-2 file:px-4
-                              file:rounded-xl file:border-0
-                              file:text-xs file:font-bold
-                              file:bg-indigo-50 file:text-indigo-700
-                              hover:file:bg-indigo-100 cursor-pointer transition-colors"
-                          />
-                          <p className="text-[9px] text-slate-400 mt-1">
-                            Bude automaticky zmenšena do miniaturního formátu.
+                          <div className="flex gap-2">
+                            <label className="cursor-pointer bg-indigo-50 text-indigo-700 hover:bg-indigo-100 px-3 py-2 rounded-xl text-xs font-bold transition-colors flex items-center justify-center flex-1 text-center">
+                              📷 Vyfotit
+                              <input 
+                                type="file" 
+                                accept="image/*"
+                                capture="environment"
+                                onChange={handleImageUpload}
+                                className="hidden"
+                              />
+                            </label>
+                            <label className="cursor-pointer bg-slate-100 text-slate-700 hover:bg-slate-200 px-3 py-2 rounded-xl text-xs font-bold transition-colors flex items-center justify-center flex-1 text-center">
+                              📁 Ze souboru
+                              <input 
+                                type="file" 
+                                accept="image/*"
+                                onChange={handleImageUpload}
+                                className="hidden"
+                              />
+                            </label>
+                          </div>
+                          <p className="text-[9px] text-slate-400 mt-1.5">
+                            Fotka se automaticky ořízne na čtverec a úsporně zmenší.
                           </p>
                         </div>
                       </div>
@@ -1166,19 +1176,29 @@ const AdminPanel: React.FC<AdminPanelProps> = ({
                           className="w-12 h-12 rounded-full bg-slate-100 object-cover border border-slate-200"
                         />
                         <div className="flex-1">
-                          <input 
-                            type="file" 
-                            accept="image/*"
-                            onChange={handleImageUpload}
-                            className="block w-full text-xs text-slate-500
-                              file:mr-4 file:py-2 file:px-4
-                              file:rounded-xl file:border-0
-                              file:text-xs file:font-bold
-                              file:bg-indigo-50 file:text-indigo-700
-                              hover:file:bg-indigo-100 cursor-pointer transition-colors"
-                          />
-                          <p className="text-[9px] text-slate-400 mt-1">
-                            Bude automaticky zmenšena do miniaturního formátu.
+                          <div className="flex gap-2">
+                            <label className="cursor-pointer bg-indigo-50 text-indigo-700 hover:bg-indigo-100 px-3 py-2 rounded-xl text-xs font-bold transition-colors flex items-center justify-center flex-1 text-center">
+                              📷 Vyfotit
+                              <input 
+                                type="file" 
+                                accept="image/*"
+                                capture="environment"
+                                onChange={handleImageUpload}
+                                className="hidden"
+                              />
+                            </label>
+                            <label className="cursor-pointer bg-slate-100 text-slate-700 hover:bg-slate-200 px-3 py-2 rounded-xl text-xs font-bold transition-colors flex items-center justify-center flex-1 text-center">
+                              📁 Ze souboru
+                              <input 
+                                type="file" 
+                                accept="image/*"
+                                onChange={handleImageUpload}
+                                className="hidden"
+                              />
+                            </label>
+                          </div>
+                          <p className="text-[9px] text-slate-400 mt-1.5">
+                            Fotka se automaticky ořízne na čtverec a úsporně zmenší.
                           </p>
                         </div>
                       </div>
