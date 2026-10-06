@@ -152,7 +152,7 @@ const TimesheetTable: React.FC<TimesheetTableProps> = ({ entries, onDelete, onEd
                         </button>
                         <button 
                           type="button"
-                          onClick={() => onDelete(e.id)} 
+                          onClick={() => { if (window.confirm('Opravdu chcete smazat tento záznam?')) onDelete(e.id); }} 
                           className="p-1.5 text-slate-400 hover:text-rose-600 hover:bg-rose-50 rounded-lg transition-colors"
                           title="Smazat záznam"
                         >
