@@ -897,7 +897,7 @@ const AdminPanel: React.FC<AdminPanelProps> = ({
                     <h3 className="font-black text-slate-900 mt-8 mb-2 uppercase tracking-wider text-xs border-b pb-2 flex items-center gap-2">
                       <span>📱</span> Povolená a čekající zařízení
                     </h3>
-                    {employees.filter(e => e.id.startsWith('DEV-')).map(e => (
+                    {employees.filter(e => e.id.startsWith('DEV-')).sort((a, b) => a.name.localeCompare(b.name, 'cs')).map(e => (
                       <div key={e.id} className={`p-3.5 flex justify-between items-center gap-3 ${!e.isActive ? 'bg-rose-50 border border-rose-200 shadow-sm' : 'bg-slate-50'}`}>
                         <div className="flex items-center gap-3">
                           <div className={`w-10 h-10 rounded-xl flex items-center justify-center text-xl ${e.isActive ? 'bg-indigo-100 text-indigo-600' : 'bg-rose-200 text-rose-700 animate-pulse'}`}>
@@ -909,6 +909,9 @@ const AdminPanel: React.FC<AdminPanelProps> = ({
                           </div>
                         </div>
                         <div className="flex gap-2">
+                          <button type="button" onClick={() => { const nn = prompt('Nový název zařízení:', e.name); if (nn && nn.trim() !== '') onUpdateEmployee({...e, name: nn.trim()}); }} className="text-xs px-2 py-1.5 bg-slate-100 hover:bg-slate-200 text-slate-600 font-bold rounded-lg" title="Přejmenovat">
+                            ✏️
+                          </button>
                           {!e.isActive && (
                             <button type="button" onClick={() => onToggleEmployeeStatus(e.id, true)} className="text-xs px-3 py-1.5 bg-emerald-600 hover:bg-emerald-700 text-white font-bold rounded-lg shadow-sm">
                               Povolit zařízení
