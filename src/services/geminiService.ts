@@ -1,15 +1,15 @@
 import { GoogleGenAI } from "@google/genai";
 import { TimeEntry } from "../types";
 
-// Bezpečná inicializace klienta Gemini (pokud je nastaven klíč v prostředí)
 export interface ChatMessage {
   role: 'user' | 'model';
   text: string;
 }
 
 const apiKey = import.meta.env.VITE_GEMINI_API_KEY || '';
-
 const ai = apiKey ? new GoogleGenAI({ apiKey }) : null;
+
+const SYSTEM_INSTRUCTION = \$instruction\;
 
 export const getSmartHelpResponse = async (history: ChatMessage[]): Promise<string> => {
   if (!ai) {
@@ -25,7 +25,7 @@ export const getSmartHelpResponse = async (history: ChatMessage[]): Promise<stri
     const response = await ai.models.generateContent({
       model: 'gemini-2.5-flash',
       config: {
-        systemInstruction: "Jsi asistent aplikace pro evidenci docházky firmy Kabel (výroba kabelů a elektroinstalace). Odpovídej stručně, přátelsky a k věci v češtině."
+        systemInstruction: SYSTEM_INSTRUCTION
       },
       contents
     });
