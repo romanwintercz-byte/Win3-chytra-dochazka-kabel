@@ -782,7 +782,19 @@ const AdminPanel: React.FC<AdminPanelProps> = ({
                           <img src={e.avatar} alt="" className="w-10 h-10 rounded-full bg-slate-100 object-cover shrink-0 border border-slate-200" />
                           <div className="min-w-0">
                             <div className="font-bold text-xs text-slate-900 flex items-center gap-1.5 flex-wrap">
-                              <span className="truncate">{e.name}</span>
+                                                              <span className="truncate">{e.name}</span>
+                                {e.id.startsWith('DEV-') && (
+                                  <span className="text-[10px] bg-red-100 text-red-800 font-black px-2 py-0.5 rounded-md border border-red-300 flex items-center gap-1 shadow-2xs">
+                                    <span>📱</span>
+                                    <span>Kód: {e.id.replace('DEV-', '')}</span>
+                                  </span>
+                                )}
+                                {e.id.startsWith('DEV-') && (
+                                  <span className="text-[10px] bg-red-100 text-red-800 font-black px-2 py-0.5 rounded-md border border-red-300 flex items-center gap-1 shadow-2xs">
+                                    <span>📱</span>
+                                    <span>Kód: {e.id.replace('DEV-', '')}</span>
+                                  </span>
+                                )}
                               {isThisAdmin && (
                                 <span className="text-[10px] bg-indigo-600 text-white font-black px-2 py-0.5 rounded-md flex items-center gap-1 shadow-2xs">
                                   <span>👑</span>
@@ -848,14 +860,14 @@ const AdminPanel: React.FC<AdminPanelProps> = ({
                               {!isThisAdmin && (
                                 <>
                                   <button 
-                                    type="button"
-                                    onClick={() => onToggleEmployeeStatus(e.id, !e.isActive)}
-                                    className={`text-xs px-2.5 py-1.5 rounded-lg font-bold transition-colors cursor-pointer ${
-                                      e.isActive ? 'bg-amber-50 text-amber-700 hover:bg-amber-100' : 'bg-emerald-50 text-emerald-700 hover:bg-emerald-100'
-                                    }`}
-                                  >
-                                    {e.isActive ? 'Archiv' : 'Aktivovat'}
-                                  </button>
+                                      type="button"
+                                      onClick={() => onToggleEmployeeStatus(e.id, !e.isActive)}
+                                      className={`text-xs px-2.5 py-1.5 rounded-lg font-bold transition-colors cursor-pointer ${
+                                        e.isActive ? 'bg-amber-50 text-amber-700 hover:bg-amber-100' : 'bg-emerald-50 text-emerald-700 hover:bg-emerald-100'
+                                      }`}
+                                    >
+                                      {e.isActive ? 'Archiv' : (e.id.startsWith('DEV-') ? 'Povolit zařízení' : 'Aktivovat')}
+                                    </button>
                                   {onDeleteEmployee && (
                                     <button 
                                       type="button"
