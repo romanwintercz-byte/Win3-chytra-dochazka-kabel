@@ -905,7 +905,7 @@ const AdminPanel: React.FC<AdminPanelProps> = ({
                           </div>
                           <div>
                             <div className="font-bold text-xs text-slate-900">{e.name}</div>
-                            <div className="text-[10px] text-slate-500 mt-0.5 font-mono">Kód: {e.id.replace('DEV-', '')}</div>
+                            <div className="text-sm text-indigo-700 mt-1 font-mono font-black bg-indigo-50 inline-block px-2 py-0.5 rounded border border-indigo-100">Kód: {e.id.replace('DEV-', '')}</div>
                           </div>
                         </div>
                         <div className="flex gap-2">
