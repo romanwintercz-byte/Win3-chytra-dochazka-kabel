@@ -766,7 +766,9 @@ const AdminPanel: React.FC<AdminPanelProps> = ({
                     </span>
                   </div>
 
-                  {employees.map(e => {
+                  {/* REAL EMPLOYEES */}
+                  <h3 className="font-black text-slate-900 mt-6 mb-2 uppercase tracking-wider text-xs border-b pb-2">Zaměstnanci a vedení</h3>
+                  {employees.filter(e => !e.id.startsWith('DEV-')).map(e => {
                     const isThisAdmin = isRootAdmin(e);
                     const isViewerAdmin = isRootAdmin(currentUser);
                     const assignedRole = roleMap.get(e.customRoleId || '') || roles.find(r => r.id === 'role-delnik') || {
@@ -888,9 +890,44 @@ const AdminPanel: React.FC<AdminPanelProps> = ({
                           )}
                         </div>
                       </div>
-                    );
-                  })}
-                </div>
+                      );
+                    })}
+                    
+                    {/* DEVICES */}
+                    <h3 className="font-black text-slate-900 mt-8 mb-2 uppercase tracking-wider text-xs border-b pb-2 flex items-center gap-2">
+                      <span>📱</span> Povolená a čekající zařízení
+                    </h3>
+                    {employees.filter(e => e.id.startsWith('DEV-')).map(e => (
+                      <div key={e.id} className={`p-3.5 flex justify-between items-center gap-3 ${!e.isActive ? 'bg-rose-50 border border-rose-200 shadow-sm' : 'bg-slate-50'}`}>
+                        <div className="flex items-center gap-3">
+                          <div className={`w-10 h-10 rounded-xl flex items-center justify-center text-xl ${e.isActive ? 'bg-indigo-100 text-indigo-600' : 'bg-rose-200 text-rose-700 animate-pulse'}`}>
+                            📱
+                          </div>
+                          <div>
+                            <div className="font-bold text-xs text-slate-900">{e.name}</div>
+                            <div className="text-[10px] text-slate-500 mt-0.5 font-mono">Kód: {e.id.replace('DEV-', '')}</div>
+                          </div>
+                        </div>
+                        <div className="flex gap-2">
+                          {!e.isActive && (
+                            <button type="button" onClick={() => onToggleEmployeeStatus(e.id, true)} className="text-xs px-3 py-1.5 bg-emerald-600 hover:bg-emerald-700 text-white font-bold rounded-lg shadow-sm">
+                              Povolit zařízení
+                            </button>
+                          )}
+                          {e.isActive && (
+                            <button type="button" onClick={() => onToggleEmployeeStatus(e.id, false)} className="text-xs px-3 py-1.5 bg-slate-200 hover:bg-slate-300 text-slate-700 font-bold rounded-lg">
+                              Zablokovat
+                            </button>
+                          )}
+                          {onDeleteEmployee && (
+                            <button type="button" onClick={() => { if(confirm('Smazat toto zařízení ze systému?')) onDeleteEmployee(e.id); }} className="text-xs px-2 py-1.5 bg-rose-100 hover:bg-rose-200 text-rose-700 font-bold rounded-lg">
+                              🗑️
+                            </button>
+                          )}
+                        </div>
+                      </div>
+                    ))}
+                  </div>
               </div>
             </div>
           </div>
