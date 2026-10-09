@@ -455,12 +455,12 @@ const AdminPanel: React.FC<AdminPanelProps> = ({
           >
             <span>👥</span>
             <span>Zaměstnanci</span>
-            <span className={`px-2 py-0.5 rounded-full text-[10px] font-black ${
+              <span className={`px-2 py-0.5 rounded-full text-[10px] font-black ${
               adminTab === 'employees' ? 'bg-indigo-500 text-white' : 'bg-slate-200 text-slate-700'
             }`}>
-              {employees.length}
-            </span>
-          </button>
+                {employees.filter(e => !e.id.startsWith('DEV-')).length}
+              </span>
+            </button>
 
           <button
             type="button"
@@ -759,7 +759,7 @@ const AdminPanel: React.FC<AdminPanelProps> = ({
                 <div className="bg-white rounded-2xl border border-slate-200 divide-y divide-slate-100 overflow-hidden shadow-xs">
                   <div className="p-3.5 bg-slate-50 border-b border-slate-200 flex items-center justify-between">
                     <span className="text-xs font-black uppercase tracking-wider text-slate-700">
-                      Seznam zaměstnanců ({employees.length})
+                      Seznam zaměstnanců ({employees.filter(e => !e.id.startsWith('DEV-')).length})
                     </span>
                     <span className="text-[11px] text-slate-500">
                       Role a nadřízení
@@ -779,7 +779,7 @@ const AdminPanel: React.FC<AdminPanelProps> = ({
                     const supervisor = e.supervisorId ? employees.find(s => s.id === e.supervisorId) : null;
 
                     return (
-                      <div key={e.id} className={`p-3.5 flex justify-between items-center gap-3 ${!e.isActive ? 'opacity-50 bg-slate-50' : ''} ${isThisAdmin ? 'bg-indigo-50/20' : ''}`}>
+                      <div key={e.id} className={`p-3.5 flex flex-col sm:flex-row sm:items-center justify-between items-start gap-3 ${!e.isActive ? 'opacity-50 bg-slate-50' : ''} ${isThisAdmin ? 'bg-indigo-50/20' : ''}`}>
                         <div className="flex items-center gap-3 min-w-0">
                           <img src={e.avatar} alt="" className="w-10 h-10 rounded-full bg-slate-100 object-cover shrink-0 border border-slate-200" />
                           <div className="min-w-0">
@@ -841,7 +841,7 @@ const AdminPanel: React.FC<AdminPanelProps> = ({
                           </div>
                         </div>
                         
-                        <div className="flex items-center gap-1.5 shrink-0">
+                        <div className="flex items-center gap-1.5 shrink-0 w-full sm:w-auto mt-2 sm:mt-0 pt-2 sm:pt-0 border-t sm:border-0 border-slate-200">
                           {isThisAdmin && !isViewerAdmin ? (
                             <span 
                               className="text-[11px] px-3 py-1.5 rounded-xl font-bold bg-slate-100 text-slate-500 border border-slate-200 flex items-center gap-1.5 select-none"
@@ -898,7 +898,7 @@ const AdminPanel: React.FC<AdminPanelProps> = ({
                       <span>📱</span> Povolená a čekající zařízení
                     </h3>
                     {employees.filter(e => e.id.startsWith('DEV-')).sort((a, b) => a.name.localeCompare(b.name, 'cs')).map(e => (
-                      <div key={e.id} className={`p-3.5 flex justify-between items-center gap-3 ${!e.isActive ? 'bg-rose-50 border border-rose-200 shadow-sm' : 'bg-slate-50'}`}>
+                      <div key={e.id} className={`p-3.5 flex flex-col sm:flex-row sm:items-center justify-between items-start gap-3 ${!e.isActive ? 'bg-rose-50 border border-rose-200 shadow-sm' : 'bg-slate-50'}`}>
                         <div className="flex items-center gap-3">
                           <div className={`w-10 h-10 rounded-xl flex items-center justify-center text-xl ${e.isActive ? 'bg-indigo-100 text-indigo-600' : 'bg-rose-200 text-rose-700 animate-pulse'}`}>
                             📱
@@ -908,7 +908,7 @@ const AdminPanel: React.FC<AdminPanelProps> = ({
                             <div className="text-sm text-indigo-700 mt-1 font-mono font-black bg-indigo-50 inline-block px-2 py-0.5 rounded border border-indigo-100">Kód: {e.id.replace('DEV-', '')}</div>
                           </div>
                         </div>
-                        <div className="flex gap-2">
+                        <div className="flex flex-wrap gap-2 w-full sm:w-auto mt-2 sm:mt-0 pt-2 sm:pt-0 border-t sm:border-0 border-slate-200">
                           <button type="button" onClick={() => { const nn = prompt('Nový název zařízení:', e.name); if (nn && nn.trim() !== '') onUpdateEmployee({...e, name: nn.trim()}); }} className="text-xs px-2 py-1.5 bg-slate-100 hover:bg-slate-200 text-slate-600 font-bold rounded-lg" title="Přejmenovat">
                             ✏️
                           </button>
