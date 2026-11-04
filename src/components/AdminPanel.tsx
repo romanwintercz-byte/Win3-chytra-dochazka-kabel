@@ -895,21 +895,34 @@ const AdminPanel: React.FC<AdminPanelProps> = ({
                     
                     {/* DEVICES */}
                     <h3 className="font-black text-slate-900 mt-8 mb-2 uppercase tracking-wider text-xs border-b pb-2 flex items-center gap-2">
-                      <span>📱</span> Povolená a čekající zařízení
+                      <span>📱</span> Povolená a čekající zařízení ({employees.filter(e => e.id.startsWith('DEV-')).length})
                     </h3>
-                    {employees.filter(e => e.id.startsWith('DEV-')).sort((a, b) => a.name.localeCompare(b.name, 'cs')).map(e => (
+                    {employees.filter(e => e.id.startsWith('DEV-')).sort((a, b) => a.name.localeCompare(b.name, 'cs')).map(e => {
+                      const hasMeta = e.email && e.email !== 'device@system';
+                      return (
                       <div key={e.id} className={`p-3.5 flex flex-col sm:flex-row sm:items-center justify-between items-start gap-3 ${!e.isActive ? 'bg-rose-50 border border-rose-200 shadow-sm' : 'bg-slate-50'}`}>
-                        <div className="flex items-center gap-3">
-                          <div className={`w-10 h-10 rounded-xl flex items-center justify-center text-xl ${e.isActive ? 'bg-indigo-100 text-indigo-600' : 'bg-rose-200 text-rose-700 animate-pulse'}`}>
+                        <div className="flex items-center gap-3 min-w-0">
+                          <div className={`w-10 h-10 rounded-xl flex items-center justify-center text-xl shrink-0 ${e.isActive ? 'bg-indigo-100 text-indigo-600' : 'bg-rose-200 text-rose-700 animate-pulse'}`}>
                             📱
                           </div>
-                          <div>
-                            <div className="font-bold text-xs text-slate-900">{e.name}</div>
+                          <div className="min-w-0">
+                            <div className="flex items-center gap-2 flex-wrap">
+                              <span className="font-bold text-xs text-slate-900">{e.name}</span>
+                              <span className={`text-[10px] font-black px-2 py-0.5 rounded-full ${e.isActive ? 'bg-emerald-100 text-emerald-800 border border-emerald-200' : 'bg-rose-600 text-white'}`}>
+                                {e.isActive ? '✓ Povolené' : '⏳ Čeká na schválení'}
+                              </span>
+                            </div>
+                            {hasMeta && (
+                              <div className="text-[11px] font-semibold text-slate-600 mt-0.5 flex items-center gap-1.5 flex-wrap">
+                                <span>👤</span>
+                                <span>{e.email}</span>
+                              </div>
+                            )}
                             <div className="text-sm text-indigo-700 mt-1 font-mono font-black bg-indigo-50 inline-block px-2 py-0.5 rounded border border-indigo-100">Kód: {e.id.replace('DEV-', '')}</div>
                           </div>
                         </div>
                         <div className="flex flex-wrap gap-2 w-full sm:w-auto mt-2 sm:mt-0 pt-2 sm:pt-0 border-t sm:border-0 border-slate-200">
-                          <button type="button" onClick={() => { const nn = prompt('Nový název zařízení:', e.name); if (nn && nn.trim() !== '') onUpdateEmployee({...e, name: nn.trim()}); }} className="text-xs px-2 py-1.5 bg-slate-100 hover:bg-slate-200 text-slate-600 font-bold rounded-lg" title="Přejmenovat">
+                          <button type="button" onClick={() => { const nn = prompt('Nový název zařízení:', e.name); if (nn && nn.trim() !== '') onUpdateEmployee({...e, name: nn.trim()}); }} className="text-xs px-2.5 py-1.5 bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold rounded-lg cursor-pointer" title="Přejmenovat">
                             ✏️
                           </button>
                           {!e.isActive && (
@@ -929,7 +942,8 @@ const AdminPanel: React.FC<AdminPanelProps> = ({
                           )}
                         </div>
                       </div>
-                    ))}
+                      );
+                    })}
                   </div>
               </div>
             </div>
