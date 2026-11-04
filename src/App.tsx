@@ -7,7 +7,7 @@ import Dashboard from './components/Dashboard';
 import ReportingModule from './components/ReportingModule';
 import ApprovalWorkflow from './components/ApprovalWorkflow';
 import AdminPanel from './components/AdminPanel';
-import DeviceGuard from './components/DeviceGuard';
+import DeviceGuard, { getDeviceId, getDeviceName } from './components/DeviceGuard';
 import MobileNavigation from './components/MobileNavigation';
 import EntryFormModal from './components/EntryFormModal';
 import ValidationStatus from './components/ValidationStatus';
@@ -125,6 +125,26 @@ const App: React.FC = () => {
       localStorage.setItem('kabel_last_user_id', currentUserId);
     }
   }, [currentUserId]);
+
+  useEffect(() => {
+    if (!deviceApproved || !currentUser || currentUser.id.startsWith('DEV-')) return;
+    const devId = getDeviceId();
+    const devInfo = getDeviceName();
+    const devRecord = employees.find(e => e.id === devId);
+    if (devRecord) {
+      const genericNames = ['Mobilní zařízení', 'Počítač / PC', 'Tablet', 'Neznámé zařízení'];
+      const shouldUpdateName = genericNames.includes(devRecord.name) || devRecord.name === devInfo;
+      const newName = shouldUpdateName ? `${currentUser.name} — ${devInfo}` : devRecord.name;
+      const newEmail = `Přihlášen: ${currentUser.name} | ${devInfo}`;
+      if (devRecord.email !== newEmail || devRecord.name !== newName) {
+        handleUpdateEmployee({
+          ...devRecord,
+          name: newName,
+          email: newEmail
+        });
+      }
+    }
+  }, [deviceApproved, currentUser?.id, employees.length]);
 
   const activeEmployeeList = useMemo(() => {
     return (useDemoData ? MOCK_EMPLOYEES : employees).filter(e => e.isActive && !e.id.startsWith('DEV-'));
@@ -440,15 +460,18 @@ const App: React.FC = () => {
         }}
         onRegisterRequest={(deviceId, deviceName) => {
           const existing = employees.find(e => e.id === deviceId);
+          const devInfo = getDeviceName();
           if (!existing) {
              handleAddEmployee({
                id: deviceId,
                name: deviceName,
                role: 'Zaměstnanec',
-               email: 'device@system',
+               email: `Čeká na schválení | ${devInfo}`,
                avatar: '📱',
                isActive: false
              });
+          } else if (existing.name !== deviceName || !existing.email || existing.email === 'device@system') {
+             handleUpdateEmployee({ ...existing, name: deviceName, email: `Čeká na schválení | ${devInfo}` });
           }
         }}
         onCheckApproved={(deviceId) => {
