@@ -126,26 +126,6 @@ const App: React.FC = () => {
     }
   }, [currentUserId]);
 
-  useEffect(() => {
-    if (!deviceApproved || !currentUser || currentUser.id.startsWith('DEV-')) return;
-    const devId = getDeviceId();
-    const devInfo = getDeviceName();
-    const devRecord = employees.find(e => e.id === devId);
-    if (devRecord) {
-      const genericNames = ['Mobilní zařízení', 'Počítač / PC', 'Tablet', 'Neznámé zařízení'];
-      const shouldUpdateName = genericNames.includes(devRecord.name) || devRecord.name === devInfo;
-      const newName = shouldUpdateName ? `${currentUser.name} — ${devInfo}` : devRecord.name;
-      const newEmail = `Přihlášen: ${currentUser.name} | ${devInfo}`;
-      if (devRecord.email !== newEmail || devRecord.name !== newName) {
-        handleUpdateEmployee({
-          ...devRecord,
-          name: newName,
-          email: newEmail
-        });
-      }
-    }
-  }, [deviceApproved, currentUser?.id, employees.length]);
-
   const activeEmployeeList = useMemo(() => {
     return (useDemoData ? MOCK_EMPLOYEES : employees).filter(e => e.isActive && !e.id.startsWith('DEV-'));
   }, [useDemoData, employees]);
@@ -422,6 +402,26 @@ const App: React.FC = () => {
       setCurrentUserId(id);
     }
   };
+
+  useEffect(() => {
+    if (!deviceApproved || !currentUser || currentUser.id.startsWith('DEV-')) return;
+    const devId = getDeviceId();
+    const devInfo = getDeviceName();
+    const devRecord = employees.find(e => e.id === devId);
+    if (devRecord) {
+      const genericNames = ['Mobilní zařízení', 'Počítač / PC', 'Tablet', 'Neznámé zařízení'];
+      const shouldUpdateName = genericNames.includes(devRecord.name) || devRecord.name === devInfo;
+      const newName = shouldUpdateName ? `${currentUser.name} — ${devInfo}` : devRecord.name;
+      const newEmail = `Přihlášen: ${currentUser.name} | ${devInfo}`;
+      if (devRecord.email !== newEmail || devRecord.name !== newName) {
+        handleUpdateEmployee({
+          ...devRecord,
+          name: newName,
+          email: newEmail
+        });
+      }
+    }
+  }, [deviceApproved, currentUser?.id, employees.length]);
 
 
 
