@@ -95,14 +95,60 @@ const App: React.FC = () => {
         setEntries(entriesData);
         setMonthStatuses(statusesData);
 
-        const savedUserId = localStorage.getItem('kabel_last_user_id');
-        if (empData.length > 0) {
-          const userExists = empData.find(e => String(e.id) === String(savedUserId));
-          // Pokud je uložen uživatel ze starých demo dat, který už v DB není, preferovat Win3 Support nebo prvního manažera
-          const win3 = empData.find(e => e.name.toLowerCase().includes('win3'));
-          const defaultUser = win3 || empData.find(e => e.role === 'Manager') || empData[0];
-          const newId = String(userExists ? savedUserId : defaultUser.id);
-          setCurrentUserId(newId);
+        const urlParams = new URLSearchParams(window.location.search);
+        const pairEmpId = urlParams.get('pairEmp');
+        const pairEmpName = urlParams.get('pairName');
+
+        if (pairEmpId) {
+          const devId = getDeviceId();
+          const devInfo = getDeviceName();
+          const pairedUser = empData.find(e => String(e.id) === String(pairEmpId));
+          const displayName = pairedUser ? pairedUser.name : (pairEmpName || 'Zaměstnanec');
+          const fullDevName = `${displayName} — ${devInfo}`;
+          const fullDevEmail = `Přihlášen: ${displayName} | ${devInfo}`;
+
+          localStorage.setItem('kabel_device_owner', displayName);
+          localStorage.setItem('kabel_last_user_id', pairEmpId);
+
+          const existingDev = empData.find(e => e.id === devId);
+          const devRecord: Employee = existingDev
+            ? { ...existingDev, name: fullDevName, email: fullDevEmail, isActive: true }
+            : {
+                id: devId,
+                name: fullDevName,
+                role: 'Zaměstnanec' as const,
+                email: fullDevEmail,
+                avatar: '📱',
+                isActive: true
+              };
+
+          try {
+            if (existingDev) {
+              await db.updateEmployee(devRecord);
+            } else {
+              await db.addEmployee(devRecord);
+            }
+          } catch {}
+
+          const updatedEmpData = existingDev
+            ? empData.map(e => e.id === devId ? devRecord : e)
+            : [...empData, devRecord];
+          setEmployees(updatedEmpData);
+          setDeviceApproved(true);
+          setCurrentUserId(String(pairEmpId));
+
+          // Vyčistit URL parametry po spárování
+          window.history.replaceState({}, document.title, window.location.pathname);
+        } else {
+          const savedUserId = localStorage.getItem('kabel_last_user_id');
+          if (empData.length > 0) {
+            const userExists = empData.find(e => String(e.id) === String(savedUserId));
+            // Pokud je uložen uživatel ze starých demo dat, který už v DB není, preferovat Win3 Support nebo prvního manažera
+            const win3 = empData.find(e => e.name.toLowerCase().includes('win3'));
+            const defaultUser = win3 || empData.find(e => e.role === 'Manager') || empData[0];
+            const newId = String(userExists ? savedUserId : defaultUser.id);
+            setCurrentUserId(newId);
+          }
         }
       } else {
         setIsConnected(false);

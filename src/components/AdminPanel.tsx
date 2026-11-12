@@ -91,6 +91,7 @@ const AdminPanel: React.FC<AdminPanelProps> = ({
   // Bezpečnostní ověření PINem pro administrátora Win3 Support
   const [isVerifyingAdminPin, setIsVerifyingAdminPin] = useState(false);
   const [pendingAdminEditEmp, setPendingAdminEditEmp] = useState<Employee | null>(null);
+  const [qrPairingEmp, setQrPairingEmp] = useState<Employee | null>(null);
 
   // ZAKÁZKY
   const [editingJobId, setEditingJobId] = useState<string | null>(null);
@@ -854,6 +855,15 @@ const AdminPanel: React.FC<AdminPanelProps> = ({
                             <>
                               <button 
                                 type="button"
+                                onClick={() => setQrPairingEmp(e)}
+                                className="text-xs px-2.5 py-1.5 rounded-lg font-bold bg-indigo-50 hover:bg-indigo-100 text-indigo-700 border border-indigo-200 transition-colors cursor-pointer flex items-center gap-1"
+                                title="Spárovat telefon zaměstnance pomocí QR kódu"
+                              >
+                                <span>📲</span>
+                                <span>QR mobil</span>
+                              </button>
+                              <button 
+                                type="button"
                                 onClick={() => handleEditEmpClick(e)}
                                 className="text-xs px-2.5 py-1.5 rounded-lg font-bold bg-slate-100 hover:bg-slate-200 text-slate-700 transition-colors cursor-pointer"
                               >
@@ -894,9 +904,22 @@ const AdminPanel: React.FC<AdminPanelProps> = ({
                     })}
                     
                     {/* DEVICES */}
-                    <h3 className="font-black text-slate-900 mt-8 mb-2 uppercase tracking-wider text-xs border-b pb-2 flex items-center gap-2">
-                      <span>📱</span> Povolená a čekající zařízení ({employees.filter(e => e.id.startsWith('DEV-')).length})
-                    </h3>
+                    <div className="mt-8 mb-2 border-b pb-2 flex flex-wrap items-center justify-between gap-2">
+                      <h3 className="font-black text-slate-900 uppercase tracking-wider text-xs flex items-center gap-2">
+                        <span>📱</span> Povolená a čekající zařízení ({employees.filter(e => e.id.startsWith('DEV-')).length})
+                      </h3>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          const realEmps = employees.filter(e => !e.id.startsWith('DEV-') && e.isActive);
+                          if (realEmps.length > 0) setQrPairingEmp(realEmps[0]);
+                        }}
+                        className="text-xs px-3 py-1.5 bg-indigo-600 hover:bg-indigo-700 text-white font-bold rounded-xl shadow-xs flex items-center gap-1.5 cursor-pointer transition-colors"
+                      >
+                        <span>📲</span>
+                        <span>Připojit telefon přes QR kód</span>
+                      </button>
+                    </div>
                     {employees.filter(e => e.id.startsWith('DEV-')).sort((a, b) => a.name.localeCompare(b.name, 'cs')).map(e => {
                       const hasMeta = e.email && e.email !== 'device@system';
                       return (
@@ -1376,6 +1399,106 @@ const AdminPanel: React.FC<AdminPanelProps> = ({
           </section>
         )}
       </div>
+
+      {/* Modál pro spárování telefonu zaměstnance přes QR kód */}
+      {qrPairingEmp && (
+        <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-xs z-50 flex items-center justify-center p-4" onClick={() => setQrPairingEmp(null)}>
+          <div className="bg-white rounded-3xl shadow-2xl max-w-md w-full p-6 text-center space-y-5 border border-slate-200" onClick={e => e.stopPropagation()}>
+            <div className="flex items-center justify-between border-b border-slate-100 pb-3">
+              <div className="flex items-center gap-2 text-left">
+                <span className="text-2xl">📲</span>
+                <div>
+                  <h3 className="font-black text-slate-900 text-base">Připojení telefonu přes QR kód</h3>
+                  <p className="text-[11px] text-slate-500">Rychlé spárování a automatické schválení mobilu</p>
+                </div>
+              </div>
+              <button
+                type="button"
+                onClick={() => setQrPairingEmp(null)}
+                className="w-8 h-8 rounded-full bg-slate-100 hover:bg-slate-200 text-slate-600 font-bold flex items-center justify-center cursor-pointer"
+              >
+                ✕
+              </button>
+            </div>
+
+            <div className="text-left">
+              <label className="block text-[11px] font-black uppercase tracking-wider text-slate-500 mb-1">
+                Vyberte zaměstnance:
+              </label>
+              <select
+                value={qrPairingEmp.id}
+                onChange={ev => {
+                  const found = employees.find(emp => emp.id === ev.target.value);
+                  if (found) setQrPairingEmp(found);
+                }}
+                className="w-full px-3.5 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-sm font-bold text-slate-900 outline-none focus:border-indigo-600"
+              >
+                {employees.filter(e => !e.id.startsWith('DEV-') && e.isActive).map(emp => (
+                  <option key={emp.id} value={emp.id}>
+                    {emp.name} ({formatDepartment(emp.department)})
+                  </option>
+                ))}
+              </select>
+            </div>
+
+            {(() => {
+              const pairUrl = `${window.location.origin}${window.location.pathname}?pairEmp=${encodeURIComponent(qrPairingEmp.id)}&pairName=${encodeURIComponent(qrPairingEmp.name)}`;
+              const qrImgUrl = `https://api.qrserver.com/v1/create-qr-code/?size=260x260&margin=10&data=${encodeURIComponent(pairUrl)}`;
+              return (
+                <>
+                  <div className="bg-slate-50 p-5 rounded-2xl border border-slate-200 flex flex-col items-center">
+                    <div className="bg-white p-3 rounded-2xl shadow-sm border border-slate-100">
+                      <img
+                        src={qrImgUrl}
+                        alt={`QR kód pro ${qrPairingEmp.name}`}
+                        className="w-56 h-56 object-contain mx-auto"
+                      />
+                    </div>
+                    <div className="mt-3 font-black text-sm text-indigo-900">
+                      👤 {qrPairingEmp.name}
+                    </div>
+                    <p className="text-xs text-slate-500 mt-1 max-w-xs">
+                      Namiřte fotoaparát v telefonu zaměstnance na tento QR kód a klepněte na zobrazený odkaz.
+                    </p>
+                  </div>
+
+                  <div className="bg-emerald-50 border border-emerald-200 rounded-2xl p-3.5 text-left text-xs text-emerald-900 space-y-1">
+                    <div className="font-black flex items-center gap-1.5">
+                      <span>✨</span>
+                      <span>Co se stane po načtení QR kódu:</span>
+                    </div>
+                    <ul className="list-disc list-inside text-[11px] text-emerald-800 space-y-0.5">
+                      <li>Telefon se <strong>automaticky schválí</strong> (bez opisování kódu)</li>
+                      <li>Zařízení se pojmenuje podle <strong>{qrPairingEmp.name}</strong></li>
+                      <li>Rovnou se mu předvybere jeho profil pro přihlášení</li>
+                    </ul>
+                  </div>
+
+                  <div className="flex gap-2 pt-1">
+                    <button
+                      type="button"
+                      onClick={() => {
+                        navigator.clipboard.writeText(pairUrl);
+                        alert('Párovací odkaz byl zkopírován do schránky. Můžete ho zaměstnanci poslat např. přes SMS, WhatsApp nebo e-mail.');
+                      }}
+                      className="flex-1 py-2.5 px-4 bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold rounded-xl text-xs cursor-pointer transition-colors"
+                    >
+                      🔗 Kopírovat odkaz (SMS / WhatsApp)
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setQrPairingEmp(null)}
+                      className="py-2.5 px-5 bg-indigo-600 hover:bg-indigo-700 text-white font-bold rounded-xl text-xs cursor-pointer transition-colors"
+                    >
+                      Hotovo
+                    </button>
+                  </div>
+                </>
+              );
+            })()}
+          </div>
+        </div>
+      )}
 
       {/* PIN ověření pro administrátora Win3 Support */}
       <PinPadModal
