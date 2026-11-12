@@ -7,7 +7,7 @@ import Dashboard from './components/Dashboard';
 import ReportingModule from './components/ReportingModule';
 import ApprovalWorkflow from './components/ApprovalWorkflow';
 import AdminPanel from './components/AdminPanel';
-import DeviceGuard, { getDeviceId, getDeviceName } from './components/DeviceGuard';
+import DeviceGuard, { getDeviceId, getDeviceName, isMobileDevice } from './components/DeviceGuard';
 import MobileNavigation from './components/MobileNavigation';
 import EntryFormModal from './components/EntryFormModal';
 import ValidationStatus from './components/ValidationStatus';
@@ -107,8 +107,9 @@ const App: React.FC = () => {
           const fullDevName = `${displayName} — ${devInfo}`;
           const fullDevEmail = `Přihlášen: ${displayName} | ${devInfo}`;
 
+          localStorage.setItem('kabel_device_owner_id', String(pairEmpId));
           localStorage.setItem('kabel_device_owner', displayName);
-          localStorage.setItem('kabel_last_user_id', pairEmpId);
+          localStorage.setItem('kabel_last_user_id', String(pairEmpId));
 
           const existingDev = empData.find(e => e.id === devId);
           const devRecord: Employee = existingDev
@@ -141,12 +142,22 @@ const App: React.FC = () => {
           window.history.replaceState({}, document.title, window.location.pathname);
         } else {
           const savedUserId = localStorage.getItem('kabel_last_user_id');
-          if (empData.length > 0) {
-            const userExists = empData.find(e => String(e.id) === String(savedUserId));
-            // Pokud je uložen uživatel ze starých demo dat, který už v DB není, preferovat Win3 Support nebo prvního manažera
-            const win3 = empData.find(e => e.name.toLowerCase().includes('win3'));
-            const defaultUser = win3 || empData.find(e => e.role === 'Manager') || empData[0];
-            const newId = String(userExists ? savedUserId : defaultUser.id);
+          const ownerId = localStorage.getItem('kabel_device_owner_id');
+          const ownerName = localStorage.getItem('kabel_device_owner');
+          const devId = getDeviceId();
+          const devRecord = empData.find(e => e.id === devId);
+          const realEmps = empData.filter(e => !e.id.startsWith('DEV-') && e.isActive);
+
+          if (realEmps.length > 0) {
+            const matchedByOwnerId = ownerId ? realEmps.find(e => String(e.id) === String(ownerId)) : undefined;
+            const matchedByOwnerName = ownerName ? realEmps.find(e => e.name.toLowerCase() === ownerName.trim().toLowerCase()) : undefined;
+            const matchedByDevRecord = devRecord ? realEmps.find(e => devRecord.name.toLowerCase().includes(e.name.toLowerCase())) : undefined;
+            const deviceOwnerEmp = matchedByOwnerId || matchedByOwnerName || matchedByDevRecord;
+
+            const userExists = realEmps.find(e => String(e.id) === String(savedUserId));
+            const win3 = realEmps.find(e => e.name.toLowerCase().includes('win3'));
+            const defaultUser = deviceOwnerEmp || win3 || realEmps.find(e => e.role === 'Manager') || realEmps[0];
+            const newId = String(deviceOwnerEmp ? deviceOwnerEmp.id : (userExists ? savedUserId : defaultUser.id));
             setCurrentUserId(newId);
           }
         }
@@ -441,10 +452,29 @@ const App: React.FC = () => {
   const handleRequestSwitchUser = (id: string) => {
     const list = useDemoData ? MOCK_EMPLOYEES : employees;
     const targetEmp = list.find(e => String(e.id) === String(id));
-    if (targetEmp?.pinCode) { 
+    if (!targetEmp) return;
+
+    const devId = getDeviceId();
+    const devRecord = employees.find(e => e.id === devId);
+    const ownerId = localStorage.getItem('kabel_device_owner_id');
+    const ownerName = localStorage.getItem('kabel_device_owner');
+
+    const isOwnerOfDevice =
+      (ownerId && String(ownerId) === String(targetEmp.id)) ||
+      (ownerName && ownerName.trim().toLowerCase() === targetEmp.name.toLowerCase()) ||
+      (devRecord && devRecord.name.toLowerCase().includes(targetEmp.name.toLowerCase()));
+
+    // Na schváleném mobilu zaměstnance (nebo vlastním schváleném zařízení) není potřeba zadávat PIN
+    const skipPinOnApprovedMobile = deviceApproved && (isOwnerOfDevice || (isMobileDevice() && !isRootAdmin(targetEmp)));
+
+    if (targetEmp.pinCode && !skipPinOnApprovedMobile) { 
       setPendingUserId(id); 
       setIsPinModalOpen(true); 
     } else {
+      if (deviceApproved && isMobileDevice() && !isRootAdmin(targetEmp)) {
+        localStorage.setItem('kabel_device_owner_id', String(targetEmp.id));
+        localStorage.setItem('kabel_device_owner', targetEmp.name);
+      }
       setCurrentUserId(id);
     }
   };
@@ -523,6 +553,16 @@ const App: React.FC = () => {
         onCheckApproved={(deviceId) => {
           const existing = employees.find(e => e.id === deviceId);
           if (existing && existing.isActive) {
+            const ownerId = localStorage.getItem('kabel_device_owner_id');
+            const ownerName = localStorage.getItem('kabel_device_owner');
+            const realEmps = employees.filter(e => !e.id.startsWith('DEV-') && e.isActive);
+            const matched =
+              (ownerId && realEmps.find(e => String(e.id) === String(ownerId))) ||
+              (ownerName && realEmps.find(e => e.name.toLowerCase() === ownerName.trim().toLowerCase())) ||
+              realEmps.find(e => existing.name.toLowerCase().includes(e.name.toLowerCase()));
+            if (matched) {
+              setCurrentUserId(String(matched.id));
+            }
             setDeviceApproved(true);
           }
         }}

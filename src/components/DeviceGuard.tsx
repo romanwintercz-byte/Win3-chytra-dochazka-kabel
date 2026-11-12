@@ -46,14 +46,21 @@ export const getDeviceName = () => {
   return browser ? `${os} • ${browser}` : os;
 };
 
+export const isMobileDevice = () => {
+  return /Android|iPhone|iPad|iPod|Mobile/i.test(navigator.userAgent);
+};
+
 const DeviceGuard: React.FC<DeviceGuardProps> = ({ employees, onApprove, onRegisterRequest, onCheckApproved }) => {
   const [deviceId] = useState(getDeviceId());
   const [deviceName] = useState(getDeviceName());
   const [ownerName, setOwnerName] = useState(() => localStorage.getItem('kabel_device_owner') || '');
+  const [selectedEmpId, setSelectedEmpId] = useState(() => localStorage.getItem('kabel_device_owner_id') || '');
   const [nameSaved, setNameSaved] = useState(false);
   const [isPending, setIsPending] = useState(false);
   const [adminKey, setAdminKey] = useState('');
   const requestSent = useRef(false);
+
+  const realEmployees = employees.filter(e => !e.id.startsWith('DEV-') && e.isActive);
 
   const buildFullDeviceName = (owner: string) => {
     const clean = owner.trim();
@@ -84,9 +91,28 @@ const DeviceGuard: React.FC<DeviceGuardProps> = ({ employees, onApprove, onRegis
     return () => clearInterval(timer);
   }, [employees, deviceId, deviceName, ownerName, onCheckApproved, onRegisterRequest]);
 
+  const handleSelectEmployee = (empId: string) => {
+    setSelectedEmpId(empId);
+    const emp = realEmployees.find(e => String(e.id) === String(empId));
+    if (emp) {
+      setOwnerName(emp.name);
+      localStorage.setItem('kabel_device_owner_id', String(emp.id));
+      localStorage.setItem('kabel_device_owner', emp.name);
+      localStorage.setItem('kabel_last_user_id', String(emp.id));
+      onRegisterRequest(deviceId, buildFullDeviceName(emp.name));
+      setNameSaved(true);
+      setTimeout(() => setNameSaved(false), 3000);
+    }
+  };
+
   const handleOwnerSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     if (!ownerName.trim()) return;
+    const matched = realEmployees.find(emp => emp.name.toLowerCase() === ownerName.trim().toLowerCase());
+    if (matched) {
+      localStorage.setItem('kabel_device_owner_id', String(matched.id));
+      localStorage.setItem('kabel_last_user_id', String(matched.id));
+    }
     localStorage.setItem('kabel_device_owner', ownerName.trim());
     onRegisterRequest(deviceId, buildFullDeviceName(ownerName));
     setNameSaved(true);
@@ -116,16 +142,30 @@ const DeviceGuard: React.FC<DeviceGuardProps> = ({ employees, onApprove, onRegis
           </p>
         </div>
 
-        <form onSubmit={handleOwnerSubmit} className="text-left bg-indigo-50/70 p-4 rounded-2xl border border-indigo-200 space-y-2">
+        <form onSubmit={handleOwnerSubmit} className="text-left bg-indigo-50/70 p-4 rounded-2xl border border-indigo-200 space-y-2.5">
           <label className="block text-xs font-black uppercase tracking-wider text-indigo-900">
             1. Kdo z tohoto zařízení žádá o přístup?
           </label>
+          {realEmployees.length > 0 && (
+            <select
+              value={selectedEmpId}
+              onChange={e => handleSelectEmployee(e.target.value)}
+              className="w-full px-3.5 py-2 bg-white border border-indigo-200 rounded-xl text-sm font-bold text-slate-900 outline-none focus:border-indigo-600"
+            >
+              <option value="">-- Vyberte své jméno ze seznamu --</option>
+              {realEmployees.map(emp => (
+                <option key={emp.id} value={emp.id}>
+                  {emp.name}
+                </option>
+              ))}
+            </select>
+          )}
           <div className="flex gap-2">
             <input
               type="text"
               value={ownerName}
               onChange={e => setOwnerName(e.target.value)}
-              placeholder="Zadejte své jméno (např. Jan Novák)..."
+              placeholder="Nebo napište své jméno..."
               className="flex-1 px-3.5 py-2 bg-white border border-indigo-200 rounded-xl text-sm font-semibold text-slate-900 outline-none focus:border-indigo-600"
             />
             <button
@@ -137,7 +177,7 @@ const DeviceGuard: React.FC<DeviceGuardProps> = ({ employees, onApprove, onRegis
           </div>
           {nameSaved && (
             <p className="text-[11px] text-emerald-700 font-bold">
-              ✓ Vaše jméno teď vidí administrátor u čekajícího zařízení.
+              ✓ Vaše jméno teď vidí administrátor u čekajícího zařízení. Po schválení budete rovnou přihlášeni bez zadávání PINu.
             </p>
           )}
         </form>
@@ -150,8 +190,8 @@ const DeviceGuard: React.FC<DeviceGuardProps> = ({ employees, onApprove, onRegis
         </div>
 
         <p className="text-sm text-slate-600 font-medium">
-          Vyplňte své jméno výše a nahlaste kód administrátorovi.<br/>
-          Jakmile vás schválí, aplikace se <strong>automaticky odemkne</strong>.
+          Vyberte své jméno výše a nahlaste kód administrátorovi.<br/>
+          Jakmile vás schválí, aplikace se <strong>automaticky odemkne a přihlásí</strong>.
         </p>
 
         <form onSubmit={handleAdminKeySubmit} className="pt-6 border-t border-slate-100 mt-6">
